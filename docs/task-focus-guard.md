@@ -96,7 +96,7 @@ Recommended JSON fields:
 | Host | Current task visibility | Prompt drift reminder | Tool-time reminder | P0 path | Confidence |
 |------|-------------------------|-----------------------|--------------------|---------|------------|
 | Claude Code | `current-task.sh` in shell or tmux now; `statusLine` can also render the active task natively | `UserPromptSubmit` can call the shared checker | `PreToolUse` can reuse the same result or re-check tool text | shared core + Claude hooks + `claude-hooks/scripts/statusline.py` | high |
-| OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title, and show a toast | plugin can call the shared checker on chat messages | plugin can warn before `Task` and pin shell commands with `PLAN_TASK` | shared core + `skill/opencode-plugin/task-focus-guard.js` | medium |
+| OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title, and show a toast | plugin can call the shared checker on chat messages | plugin can warn before `Task` and pin shell commands with `PLAN_TASK` | shared core + `skill/opencode-plugin/task-focus-guard.js` (quiet outside repos that already use `.planning/`) | medium |
 | Codex | `current-task.sh` in shell or tmux now | best-effort reminder through skill text, docs, and future metadata | none in P0 | shared core + skill-level policy | medium-low |
 
 ## Rollout

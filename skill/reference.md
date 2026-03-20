@@ -74,6 +74,8 @@ Use `check-task-drift.sh` when you want a lightweight answer to: does this new r
 
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
 
+For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.
+
 P0 classifications are:
 
 - `related`

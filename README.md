@@ -92,6 +92,8 @@ cd context-task-planning
 sh skill/scripts/install-macos.sh
 ```
 
+That local installer now also enables the bundled OpenCode plugin by default. If you only want the skill symlinks, use `sh skill/scripts/install-macos.sh --skip-opencode-plugin`.
+
 See agent-specific notes in:
 
 - `docs/claude.md`
@@ -106,7 +108,7 @@ The core file workflow works without host-specific UI.
 If you want visible task cues inside the host itself:
 
 - `Claude Code` - enable the bundled hook + status-line config in `docs/claude.md`
-- `OpenCode` - enable the bundled plugin in `docs/opencode.md`
+- `OpenCode` - the local install script enables the bundled plugin by default; `npx skills add` users can run the helper in `docs/opencode.md`
 - `Codex` - use the shared shell commands and prompt-level confirm-before-switch guidance in `docs/codex.md`; native runtime UI is not bundled yet
 
 ## Quick verification after enable

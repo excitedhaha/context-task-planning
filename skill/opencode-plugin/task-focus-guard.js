@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -101,6 +102,15 @@ function prefixedSessionTitle(taskSlug, title) {
   return `task:${taskSlug} | ${baseTitle}`
 }
 
+function pluginEnabled(task) {
+  if (task?.found) {
+    return true
+  }
+
+  const planRoot = task?.plan_root
+  return typeof planRoot === "string" && planRoot.length > 0 && existsSync(planRoot)
+}
+
 export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, worktree }) => {
   const baseCwd = worktree || directory || process.cwd()
   const driftBySession = new Map()
@@ -193,6 +203,14 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
   return {
     "chat.message": async (input, output) => {
+      const currentTask = readCurrentTask(baseCwd)
+      if (!pluginEnabled(currentTask)) {
+        driftBySession.delete(input.sessionID)
+        promptBySession.delete(input.sessionID)
+        taskBySession.delete(input.sessionID)
+        return
+      }
+
       const prompt = collectPromptText(output.parts)
       promptBySession.set(input.sessionID, prompt)
 
@@ -201,13 +219,17 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         driftBySession.set(input.sessionID, drift)
       }
 
-      const task = drift?.task?.found ? drift.task : readCurrentTask(baseCwd)
+      const task = drift?.task?.found ? drift.task : currentTask
       await syncVisibleTask(input.sessionID, task, drift)
     },
 
     "experimental.chat.system.transform": async (input, output) => {
       const sessionID = input.sessionID || "default"
       const task = readCurrentTask(baseCwd)
+      if (!pluginEnabled(task)) {
+        return
+      }
+
       const drift = driftBySession.get(sessionID) || readDrift(promptBySession.get(sessionID) || "")
 
       if (task && task.found) {
@@ -226,6 +248,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "tool.execute.before": async (input, output) => {
+      const currentTask = readCurrentTask(baseCwd)
+      if (!pluginEnabled(currentTask)) {
+        return
+      }
+
       const toolName = String(input.tool || "").toLowerCase()
       if (toolName !== "task") {
         return
@@ -236,7 +263,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const task = drift.task && drift.task.found ? drift.task : readCurrentTask(baseCwd)
+      const task = drift.task && drift.task.found ? drift.task : currentTask
       if (!task || !task.found) {
         return
       }
@@ -253,6 +280,10 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     "shell.env": async (input, output) => {
       const task = readCurrentTask(input.cwd || baseCwd)
+      if (!pluginEnabled(task)) {
+        return
+      }
+
       if (!task || !task.found || !task.slug) {
         return
       }
@@ -270,6 +301,10 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const sessionID = event.properties?.info?.id
       const task = readCurrentTask(baseCwd)
+      if (!pluginEnabled(task)) {
+        return
+      }
+
       await syncVisibleTask(sessionID, task, null)
     },
   }

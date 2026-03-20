@@ -57,14 +57,33 @@ If your OpenCode setup uses a custom skill source list, make sure `~/.config/ope
 
 ## Optional plugin adapter
 
-If you want runtime task-focus reminders inside OpenCode, symlink the bundled plugin into `~/.config/opencode/plugins/`:
+If you installed from a local clone with:
 
 ```bash
-mkdir -p ~/.config/opencode/plugins
-ln -s ~/.config/opencode/skills/context-task-planning/opencode-plugin/task-focus-guard.js ~/.config/opencode/plugins/context-task-planning-task-focus-guard.js
+sh skill/scripts/install-macos.sh
+```
+
+the OpenCode plugin is installed automatically by default.
+
+If you installed the skill through `npx skills add`, OpenCode still needs one extra plugin-install step because it loads skills and local plugins from different directories. Run the bundled helper:
+
+```bash
+sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh
+```
+
+You can also run the helper from a local clone:
+
+```bash
+sh skill/scripts/install-opencode-plugin.sh
 ```
 
 Then restart OpenCode.
+
+If you want the skill symlink but not the runtime plugin from the local installer, use:
+
+```bash
+sh skill/scripts/install-macos.sh --skip-opencode-plugin
+```
 
 ## What users should notice
 
@@ -93,6 +112,8 @@ What the plugin adds:
 This is still a best-effort UI layer. The current OpenCode plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar/statusbar widget API.
 
 So if you do not see a dedicated sidebar widget, that is expected today; the title prefix is the current visibility fallback.
+
+To reduce global noise, the plugin stays quiet in repositories that do not already use `.planning/`.
 
 ## Manual fallback
 
