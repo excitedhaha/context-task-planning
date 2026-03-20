@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local planning state should stay machine-local by default.
+.planning/
+
+# Local Claude/Codex/OpenCode project settings should not be shared unless intentional.
+.claude/
+.codex/
+.opencode/

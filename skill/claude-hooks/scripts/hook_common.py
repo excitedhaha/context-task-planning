@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+
+def read_hook_input():
+    raw = sys.stdin.read().strip()
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+
+def skill_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def installed_skill_command(script_name: str) -> str:
+    return f'sh "$HOME/.claude/skills/context-task-planning/scripts/{script_name}"'
+
+
+def resolve_workspace_root(cwd: str | None = None) -> Path | None:
+    script = skill_root() / "scripts" / "resolve-workspace-root.sh"
+    try:
+        result = subprocess.run(
+            ["sh", str(script)],
+            cwd=cwd or os.getcwd(),
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    output = result.stdout.strip()
+    return Path(output) if output else None
+
+
+def resolve_plan_dir(cwd: str | None = None, slug: str | None = None) -> Path | None:
+    script = skill_root() / "scripts" / "resolve-plan-dir.sh"
+    command = ["sh", str(script)]
+    if slug:
+        command.append(slug)
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd or os.getcwd(),
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    output = result.stdout.strip()
+    return Path(output) if output else None
+
+
+def load_state(plan_dir: Path) -> dict:
+    state_file = plan_dir / "state.json"
+    if not state_file.exists():
+        return {}
+
+    try:
+        return json.loads(state_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def workspace_has_planning(cwd: str | None = None) -> bool:
+    root = resolve_workspace_root(cwd)
+    return bool(root and (root / ".planning").is_dir())
+
+
+def short_list(items, empty_text="none", limit=3):
+    values = [str(item).strip() for item in items if str(item).strip()]
+    if not values:
+        return empty_text
+    if len(values) <= limit:
+        return "; ".join(values)
+    shown = "; ".join(values[:limit])
+    return f"{shown}; +{len(values) - limit} more"
+
+
+def delegate_kind_for_text(text: str) -> str | None:
+    lowered = text.lower()
+    patterns = [
+        (
+            "review",
+            ["review", "diff review", "code review", "pr review", "审查", "评审"],
+        ),
+        (
+            "verify",
+            [
+                "verify",
+                "validation",
+                "regression",
+                "failing test",
+                "test failure",
+                "triage",
+                "验证",
+                "回归",
+                "测试失败",
+                "失败排查",
+            ],
+        ),
+        (
+            "spike",
+            [
+                "spike",
+                "prototype",
+                "poc",
+                "feasibility",
+                "compare options",
+                "方案对比",
+                "可行性",
+            ],
+        ),
+        (
+            "discovery",
+            [
+                "investigate",
+                "analyze",
+                "map",
+                "scan",
+                "explore",
+                "entry point",
+                "dependency",
+                "research",
+                "调研",
+                "分析",
+                "找入口",
+                "排查",
+            ],
+        ),
+    ]
+    for kind, keywords in patterns:
+        if any(keyword in lowered for keyword in keywords):
+            return kind
+    return None
+
+
+def default_delegate_title(kind: str) -> str:
+    titles = {
+        "discovery": "Repo scan",
+        "spike": "Option spike",
+        "verify": "Verification triage",
+        "review": "Review lane",
+        "catchup": "Catchup lane",
+        "other": "Delegate lane",
+    }
+    return titles.get(kind, "Delegate lane")
+
+
+def prepare_delegate_command(text: str, kind: str) -> str:
+    normalized = " ".join(text.split()) or default_delegate_title(kind)
+    if len(normalized) > 80:
+        normalized = normalized[:77].rstrip() + "..."
+    return f"{installed_skill_command('prepare-delegate.sh')} --kind {kind} {shlex.quote(normalized)}"
+
+
+def delegate_hint_for_text(text: str, state: dict | None = None) -> str | None:
+    kind = delegate_kind_for_text(text)
+    if not kind:
+        return None
+
+    command = prepare_delegate_command(text, kind)
+    base = (
+        f"[context-task-planning] This looks like a bounded `{kind}` subproblem. "
+        f"Use `{command}` to create and start a delegate lane, then keep subagent work inside `delegates/<delegate-id>/`."
+    )
+
+    if state:
+        active_delegates = state.get("delegation", {}).get("active", [])
+        if active_delegates:
+            return (
+                base
+                + f" Active delegates now: {short_list(active_delegates)}. Reuse one if it already matches the question."
+            )
+
+    return base
+
+
+def state_summary(state: dict, tool_name: str | None = None) -> str:
+    slug = state.get("slug", "(unknown)")
+    status = state.get("status", "unknown")
+    mode = state.get("mode", "unknown")
+    phase = state.get("current_phase", "unknown")
+    next_action = state.get("next_action", "(none recorded)")
+    blockers = short_list(state.get("blockers", []))
+    active_delegates = short_list(
+        state.get("delegation", {}).get("active", []), empty_text="none"
+    )
+    verify_commands = short_list(
+        state.get("verify_commands", []), empty_text="none declared"
+    )
+
+    lines = [
+        f"[context-task-planning] Task `{slug}` | status `{status}` | mode `{mode}` | phase `{phase}`",
+        f"Next action: {next_action}",
+        f"Blockers: {blockers}",
+        f"Active delegates: {active_delegates}",
+    ]
+
+    if tool_name == "Bash":
+        lines.append(f"Verification commands: {verify_commands}")
+        lines.append(
+            "If this Bash step changes task state, sync `progress.md` and `state.json` afterwards."
+        )
+    elif tool_name == "Task":
+        lines.append(
+            f'If this Task call is a bounded discovery, review, verify, or spike problem, prefer `{installed_skill_command("prepare-delegate.sh")} "<description>"` before launching the subagent.'
+        )
+        lines.append(
+            "Subagents should write only inside `delegates/<delegate-id>/`; keep main planning files single-writer, and mark the lane running with `start-delegate.sh` when work begins."
+        )
+    else:
+        lines.append(
+            "Keep external or untrusted material in `findings.md`, not in Hot Context."
+        )
+
+    return "\n".join(lines)
+
+
+def no_active_task_hint(cwd: str | None = None) -> str | None:
+    if workspace_has_planning(cwd):
+        return (
+            "[context-task-planning] This workspace already has `.planning/`, but no auto-selected active task. "
+            f"Run `{installed_skill_command('list-tasks.sh')}` to inspect tasks, then `resume-task.sh <slug>` or `set-active-task.sh <slug>` before major work."
+        )
+    return None
+
+
+def looks_complex(prompt: str) -> bool:
+    text = prompt.strip().lower()
+    if not text:
+        return False
+
+    keywords = [
+        "implement",
+        "build",
+        "create",
+        "add",
+        "refactor",
+        "debug",
+        "investigate",
+        "migrate",
+        "design",
+        "plan",
+        "optimize",
+        "fix",
+        "实现",
+        "设计",
+        "重构",
+        "排查",
+        "调研",
+        "迁移",
+        "优化",
+        "新增",
+        "修复",
+    ]
+    complexity_signals = [
+        "\n",
+        "1.",
+        "2.",
+        "- ",
+        "需要",
+        "并且",
+        "同时",
+        "方案",
+        "步骤",
+    ]
+
+    keyword_hit = any(word in text for word in keywords)
+    signal_hit = any(signal in prompt for signal in complexity_signals)
+    word_count = len(re.findall(r"\w+", prompt, flags=re.UNICODE))
+
+    return keyword_hit and (signal_hit or word_count >= 8)
+
+
+def init_task_hint() -> str:
+    return (
+        "[context-task-planning] This looks like multi-step work. Before implementation, initialize a task workspace with "
+        f'`{installed_skill_command("init-task.sh")} "<task title>"`, then capture goal, non-goals, constraints, and next action in `.planning/<slug>/`.'
+    )
+
+
+def session_start_payload(context: str) -> str:
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": context,
+            }
+        },
+        ensure_ascii=False,
+    )
+
+
+def user_prompt_payload(context: str) -> str:
+    return json.dumps({"additionalContext": context}, ensure_ascii=False)
+
+
+def pre_tool_payload(context: str) -> str:
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": context,
+            }
+        },
+        ensure_ascii=False,
+    )

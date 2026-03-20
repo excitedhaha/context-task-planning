@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/session_start.py\"",
+            "timeout": 8,
+            "statusMessage": "Loading task context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/user_prompt_submit.py\"",
+            "timeout": 5,
+            "statusMessage": "Checking planning context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Read|Glob|Grep|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/pre_tool_use.py\"",
+            "timeout": 5,
+            "statusMessage": "Refreshing task snapshot"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://context-task-planning.dev/schemas/state.schema.json",
+  "title": "Context Task State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "slug",
+    "title",
+    "status",
+    "mode",
+    "goal",
+    "source_path",
+    "planning_path",
+    "current_phase",
+    "next_action",
+    "blockers",
+    "verify_commands",
+    "phases",
+    "delegation",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "blocked",
+        "verifying",
+        "done",
+        "archived"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "clarify",
+        "plan",
+        "execute",
+        "verify",
+        "archive"
+      ]
+    },
+    "goal": {
+      "type": "string"
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planning_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "current_phase": {
+      "type": "string"
+    },
+    "next_action": {
+      "type": "string"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verify_commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "latest_checkpoint": {
+      "type": "string"
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "status",
+          "definition_of_done",
+          "verification"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "complete",
+              "blocked"
+            ]
+          },
+          "definition_of_done": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verification": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "delegation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "single_writer",
+        "active"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "single_writer": {
+          "type": "boolean"
+        },
+        "active": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

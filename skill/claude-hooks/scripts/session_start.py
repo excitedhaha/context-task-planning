@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+
+try:
+    from .hook_common import (
+        load_state,
+        no_active_task_hint,
+        read_hook_input,
+        resolve_plan_dir,
+        session_start_payload,
+        state_summary,
+    )
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from hook_common import (  # type: ignore
+        load_state,
+        no_active_task_hint,
+        read_hook_input,
+        resolve_plan_dir,
+        session_start_payload,
+        state_summary,
+    )
+
+
+def main():
+    payload = read_hook_input()
+    cwd = payload.get("cwd")
+    plan_dir = resolve_plan_dir(cwd=cwd)
+
+    if plan_dir:
+        state = load_state(plan_dir)
+        if state:
+            print(session_start_payload(state_summary(state)))
+            return
+
+    hint = no_active_task_hint(cwd)
+    if hint:
+        print(session_start_payload(hint))
+
+
+if __name__ == "__main__":
+    main()
