@@ -24,9 +24,9 @@ This repository is meant to be shared as a context engineering skill while keepi
 
 Those paths are ignored by `.gitignore` on purpose.
 
-## Preferred install for a teammate
+## Recommended install for a teammate
 
-After publishing to GitHub, the shortest path should be:
+The shortest path is:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g

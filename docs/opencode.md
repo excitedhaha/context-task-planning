@@ -2,7 +2,7 @@
 
 ## Install
 
-Preferred install after publishing to GitHub:
+Recommended install:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g

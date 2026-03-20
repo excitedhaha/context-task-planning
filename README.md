@@ -2,7 +2,7 @@
 
 Context engineering skill for Claude Code, Codex, and OpenCode.
 
-`context-task-planning` started from file-based planning, but its scope is broader than "persist a plan to disk". It combines:
+`context-task-planning` turns long-running agent work into task-scoped, recoverable workspaces on disk. It combines:
 
 - task-scoped planning workspaces
 - durable local context and recovery after context loss
@@ -51,13 +51,7 @@ Context engineering skill for Claude Code, Codex, and OpenCode.
 
 This repository keeps one canonical skill bundle in `skill/`.
 
-GitHub repository:
-
-```text
-https://github.com/excitedhaha/context-task-planning
-```
-
-Preferred install after publishing to GitHub:
+Recommended install:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
@@ -90,27 +84,33 @@ See agent-specific notes in:
 
 Most users should start by talking to the agent, not by memorizing shell scripts.
 
-In normal use, the agent can create or resume tasks, keep `.planning/` current, recover after context loss, and open delegate lanes through conversation alone.
+The most natural path is to just give the agent a complex task. For multi-step, long-running, recovery-sensitive, or delegation-heavy work, the expected behavior is that the agent decides to use `context-task-planning` automatically.
 
-Ask your agent to:
+If you want to force the workflow, or if a host does not auto-invoke skills reliably, mention the skill name explicitly.
 
-- use `context-task-planning` for the task
+In either mode, the agent should:
+
 - create or resume the task workspace in `.planning/<slug>/`
 - keep `Hot Context`, `next_action`, and verification state current
+- recover from local planning files after context loss
 - create delegate lanes for bounded review, discovery, or verify side quests when useful
 
 Example prompts:
 
 ```text
-Use context-task-planning for this refactor. Create or resume a task, keep the hot context current, and verify before wrapping up.
+Refactor the auth flow across backend and frontend. This will take multiple steps, so keep progress on disk, recover cleanly if context is lost, and verify before wrapping up.
 ```
 
 ```text
-I lost context. Recover the active task from .planning/ and continue from the recorded next_action.
+I lost context on this task. Recover the active task from local planning files and continue from the recorded next step.
 ```
 
 ```text
 Use context-task-planning and open a delegate lane to review migration risks. Promote only the distilled findings back to the main task.
+```
+
+```text
+Use context-task-planning for this refactor. Create or resume a task, keep the hot context current, and verify before wrapping up.
 ```
 
 If a host does not auto-invoke the skill reliably, mention the skill name explicitly or fall back to the scripts below.
