@@ -28,15 +28,15 @@ Most teammates should talk to Claude, not drive the shell scripts by hand.
 
 Good asks for Claude:
 
-- use `context-task-planning` for the work
-- create or resume the task under `.planning/<slug>/`
-- keep `Hot Context`, `next_action`, and verification state current
-- open delegate lanes for bounded review, discovery, or verify side quests
+- describe the real task in normal language
+- mention when the work is multi-step, long-running, or likely to be resumed later
+- expect Claude to create or resume the task under `.planning/<slug>/` when needed
+- ask for bounded side investigations when review, discovery, or verify work should stay isolated
 
 Example prompts:
 
 ```text
-Use context-task-planning for this refactor. Create or resume a task, keep the hot context current, and verify before wrapping up.
+Refactor the auth flow across backend and frontend. This will take multiple steps, may get interrupted, and should be verified before you wrap up.
 ```
 
 ```text
@@ -44,10 +44,10 @@ I lost context. Recover the active task from .planning/ and continue from the re
 ```
 
 ```text
-Use context-task-planning and open a delegate lane to review migration risks. Promote only the distilled findings back to the main task.
+Review migration risks for this refactor. Keep the main task focused, and if you need a bounded side investigation, promote only the distilled findings back to the main task.
 ```
 
-If Claude does not pick the skill automatically, mention the skill name explicitly. The scripts remain the fallback for explicit control.
+For multi-step or recovery-sensitive work, Claude should usually pick the skill automatically. If it does not, mention `context-task-planning` explicitly. The scripts remain the fallback for explicit control.
 
 ## Manual fallback
 

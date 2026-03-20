@@ -30,15 +30,15 @@ Most teammates should start with normal conversation, not with shell scripts.
 
 Good asks for Codex:
 
-- use `context-task-planning` for the task
-- create or resume the task under `.planning/<slug>/`
-- recover from `.planning/` after context loss
-- create delegate lanes for bounded discovery, review, or verify subproblems
+- describe the real task in normal language
+- mention when the work is multi-step, long-running, or likely to be resumed later
+- expect Codex to create or resume the task under `.planning/<slug>/` when needed
+- ask for bounded discovery, review, or verify subproblems when they should stay isolated
 
 Example prompts:
 
 ```text
-Use context-task-planning for this task. Create or resume the task workspace, keep the hot context current, and verify before wrapping up.
+Refactor the auth flow across backend and frontend. This will take multiple steps, may get interrupted, and should be verified before you wrap up.
 ```
 
 ```text
@@ -46,10 +46,10 @@ I lost context. Recover the active task from .planning/ and continue from next_a
 ```
 
 ```text
-Use context-task-planning and create a delegate lane to review the risky parts of this diff. Promote only the distilled findings.
+Review the risky parts of this diff. Keep the main task focused, and if you need a bounded side investigation, promote only the distilled findings back.
 ```
 
-If Codex does not pick the skill automatically, mention the skill name explicitly or fall back to the scripts.
+For multi-step or recovery-sensitive work, Codex should usually pick the skill automatically. If it does not, mention `context-task-planning` explicitly or fall back to the scripts.
 
 ## What users should notice
 
@@ -64,7 +64,7 @@ So the intended fallback is:
 If you want to force that behavior in a prompt, say it explicitly:
 
 ```text
-Use context-task-planning. Before mixing this request into the active task, check whether it still fits the current task and ask me whether to continue, switch tasks, or create a new task if it does not.
+Before mixing this request into the active task, check whether it still fits the current task and ask me whether to continue, switch tasks, or create a new task if it does not.
 ```
 
 Quick check:

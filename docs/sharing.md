@@ -52,7 +52,7 @@ sh skill/scripts/install-macos.sh
 
 ## How teammates should use it
 
-- Preferred: ask the agent to use `context-task-planning`, create or resume a task, keep `.planning/` current, and record verification as the work progresses
+- Preferred: give the agent a real multi-step task in normal language; it should usually pick `context-task-planning` automatically, create or resume a task, keep `.planning/` current, and record verification as the work progresses
 - Ask for delegate lanes when there is a bounded subproblem such as review, discovery, or verify triage
 - Use scripts when you want explicit control, debugging, or a fallback when a host does not auto-invoke the skill
 - If a teammate asks "how do I start", give them the GitHub install command first and one of the example prompts below second
@@ -60,7 +60,7 @@ sh skill/scripts/install-macos.sh
 Example prompts you can hand to a teammate:
 
 ```text
-Use context-task-planning for this feature. Create or resume the task, keep the hot context current, and verify before you wrap up.
+Implement this feature across the relevant backend and frontend paths. This will take multiple steps, may get interrupted, and should be verified before you wrap up.
 ```
 
 ```text
@@ -68,7 +68,7 @@ I lost context. Recover the active task from .planning/ and continue from the re
 ```
 
 ```text
-Use context-task-planning and create a delegate lane to review the risky parts of this migration. Promote only the distilled findings.
+Review the risky parts of this migration. Keep the main task focused, and if you need a bounded side investigation, promote only the distilled findings.
 ```
 
 ## Recommended publish checklist

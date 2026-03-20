@@ -4,10 +4,12 @@
 
 Most users do not need to call the scripts directly for normal work.
 
+For multi-step or recovery-sensitive work, the agent should usually pick this skill automatically from the task description alone.
+
 Useful prompts:
 
 ```text
-Use context-task-planning for this task. Create or resume the task, keep the hot context current, and verify before wrapping up.
+Refactor the auth flow across backend and frontend. This will take multiple steps, may get interrupted, and should be verified before you wrap up.
 ```
 
 ```text
@@ -15,10 +17,10 @@ I lost context. Recover the active task from .planning/ and continue from the re
 ```
 
 ```text
-Use context-task-planning and create a delegate lane to review the risky parts of this change. Promote only the distilled findings.
+Review the risky parts of this change. Keep the main task focused, and if you need a bounded side investigation, promote only the distilled findings.
 ```
 
-If the host does not auto-invoke the skill reliably, mention the skill name explicitly or use the scripts below.
+If the host does not auto-invoke the skill reliably, mention `context-task-planning` explicitly or use the scripts below.
 
 If the host also lacks a native task UI adapter, add one more instruction:
 

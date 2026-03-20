@@ -30,15 +30,15 @@ Most teammates should use it through normal conversation with the agent.
 
 Good asks for OpenCode:
 
-- use `context-task-planning` for the task
-- create or resume the task under `.planning/<slug>/`
-- recover from `.planning/` after context loss
-- create delegate lanes for bounded discovery, review, or verify side quests
+- describe the real task in normal language
+- mention when the work is multi-step, long-running, or likely to be resumed later
+- expect OpenCode to create or resume the task under `.planning/<slug>/` when needed
+- ask for bounded discovery, review, or verify side work when it should stay isolated
 
 Example prompts:
 
 ```text
-Use context-task-planning for this implementation. Create or resume the task, keep the hot context current, and verify before wrapping up.
+Implement this auth refactor across backend and frontend. It will take multiple steps, may get interrupted, and should be verified before you wrap up.
 ```
 
 ```text
@@ -46,10 +46,10 @@ I lost context. Recover the active task from .planning/ and continue from the re
 ```
 
 ```text
-Use context-task-planning and create a delegate lane to scan the repo for relevant entry points. Promote only the distilled findings.
+Scan the repo for the entry points relevant to this task. Keep that side investigation bounded, and promote only the distilled findings.
 ```
 
-If OpenCode does not invoke the skill automatically, mention the skill name explicitly or use the scripts directly.
+For multi-step or recovery-sensitive work, OpenCode should usually pick the skill automatically. If it does not in your setup, mention `context-task-planning` explicitly or use the scripts directly.
 
 The canonical state is the task folder itself under `.planning/<slug>/`.
 
