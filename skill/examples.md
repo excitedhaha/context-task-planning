@@ -20,6 +20,12 @@ Use context-task-planning and create a delegate lane to review the risky parts o
 
 If the host does not auto-invoke the skill reliably, mention the skill name explicitly or use the scripts below.
 
+If the host also lacks a native task UI adapter, add one more instruction:
+
+```text
+Before mixing this request into the active task, check whether it still fits the current task and ask whether to continue, switch tasks, or create a new task if it does not.
+```
+
 ## Example 1: Start a new task
 
 ```bash
@@ -49,6 +55,15 @@ Then fill in:
 2. Read `Hot Context` at the top of `task_plan.md`
 3. Read the most recent session section in `progress.md`
 4. Continue from `next_action`
+
+## Example 2b: Check for task drift before switching scope
+
+```bash
+sh scripts/current-task.sh --compact
+sh scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
+```
+
+If the result is `likely-unrelated` or `unclear`, confirm whether to continue the current task, switch tasks, or create a new task before editing `.planning/`.
 
 ## Example 3: Use a delegate lane
 

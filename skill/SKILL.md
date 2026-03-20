@@ -99,6 +99,16 @@ Every task should declare its verification targets and record actual results in 
 
 When a task is complete, keep the task directory as history. Switch or remove the active pointer instead of reusing the directory for unrelated work.
 
+### 7. Guard against task drift on hosts without runtime adapters
+
+When the host does not provide native task UI or prompt hooks, use the shared scripts as the fallback policy:
+
+- use `scripts/current-task.sh --compact` when you need to verify which task is currently active
+- use `scripts/check-task-drift.sh --prompt "..." --json` before mixing a new complex request into the active task when the match is uncertain
+- if the result is `likely-unrelated` or `unclear`, ask whether to continue the current task, switch tasks, or create a new task before changing planning state
+
+This is especially important for Codex-style environments where the file protocol exists but host-native reminder surfaces may not.
+
 ## Delegate protocol
 
 Delegates are optional and should be used only for isolated work such as:

@@ -72,6 +72,8 @@ Use `current-task.sh` when a shell prompt, tmux status line, or host adapter nee
 
 Use `check-task-drift.sh` when you want a lightweight answer to: does this new request still fit the active task, or should the agent confirm before mixing it in?
 
+On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
+
 P0 classifications are:
 
 - `related`

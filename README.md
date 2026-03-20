@@ -16,6 +16,7 @@ Once enabled, users should be able to notice the active task without opening `.p
 
 - `Claude Code` - the active task shows up in Claude Code's native status line, and hooks can warn before likely task drift
 - `OpenCode` - the optional plugin prefixes the session title with `task:<slug> | ...` and shows toasts when task focus changes or drifts
+- `Codex` - the portable fallback is `current-task.sh --compact` in the shell or tmux, plus an explicit confirm-before-switch prompt when work looks unrelated
 - `Any shell or tmux` - `sh skill/scripts/current-task.sh --compact` prints a one-line task summary for prompts, status bars, or scripts
 
 The goal is simple: make the current task visible, and make silent task mixing harder.
@@ -98,7 +99,15 @@ If you want visible task cues inside the host itself:
 
 - `Claude Code` - enable the bundled hook + status-line config in `docs/claude.md`
 - `OpenCode` - enable the bundled plugin in `docs/opencode.md`
-- `Codex` - use the shared shell commands for now; native runtime UI is not bundled yet
+- `Codex` - use the shared shell commands and prompt-level confirm-before-switch guidance in `docs/codex.md`; native runtime UI is not bundled yet
+
+## Quick verification after enable
+
+Use these as the fastest sanity checks that task visibility is actually working:
+
+- `Claude Code` - restart Claude Code and look for `task:<slug>` in the native status line
+- `OpenCode` - restart OpenCode, send one message, and look for `task:<slug> | ...` in the session title plus task/drift toasts
+- `Codex` - run `sh skill/scripts/current-task.sh --compact` and expect the current task slug in the output
 
 ## Recommended usage
 

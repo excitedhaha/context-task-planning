@@ -51,6 +51,30 @@ Use context-task-planning and create a delegate lane to review the risky parts o
 
 If Codex does not pick the skill automatically, mention the skill name explicitly or fall back to the scripts.
 
+## What users should notice
+
+Codex does not currently have a bundled native task UI adapter like Claude Code's status line or OpenCode's plugin.
+
+So the intended fallback is:
+
+- keep the active task visible with `sh skill/scripts/current-task.sh --compact` in your shell prompt, tmux status line, or a quick manual check
+- use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
+- expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the request looks mismatched
+
+If you want to force that behavior in a prompt, say it explicitly:
+
+```text
+Use context-task-planning. Before mixing this request into the active task, check whether it still fits the current task and ask me whether to continue, switch tasks, or create a new task if it does not.
+```
+
+Quick check:
+
+```bash
+sh skill/scripts/current-task.sh --compact
+```
+
+If that prints `task=<slug> ...`, the fallback visibility path is working.
+
 The portable contract is file-based, so even without host-specific hooks you can recover from:
 
 - long sessions
@@ -69,5 +93,7 @@ The core recovery sequence is always:
 Useful commands when you want direct control:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
+- `sh skill/scripts/current-task.sh --compact`
+- `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/validate-task.sh`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
