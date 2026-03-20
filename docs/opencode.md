@@ -92,6 +92,7 @@ After the plugin is enabled and OpenCode is restarted, you should see:
 - the session title prefixed as `task:<slug> | ...`
 - an info toast when the current task is first detected
 - a warning toast when a new prompt looks like likely task drift
+- a warning toast when tracked work has happened but `.planning/<slug>/` has not been synced for a while
 - stronger routing guidance before `Task` runs on mismatched work
 
 Sample illustration:
@@ -106,10 +107,13 @@ What the plugin adds:
 - prefixes the session title as `task:<slug> | ...`, which is the closest current plugin-level path to sidebar visibility
 - shows a toast when the current task is first detected or when a likely task switch is detected
 - warns when the newest user prompt looks likely unrelated to the current task
+- warns when task files look stale after tracked work without a planning sync
 - adds a stronger note before `Task` launches if the prompt looks mismatched
 - exports `PLAN_TASK` into shell commands so task-aware scripts stay pinned to the active task
 
 This is still a best-effort UI layer. The current OpenCode plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar/statusbar widget API.
+
+It is also still advisory, not a hard transaction layer: the plugin can detect likely stale task state and remind the model to sync `.planning/`, but the actual task file edits are still performed by the model/tools rather than by the plugin itself.
 
 So if you do not see a dedicated sidebar widget, that is expected today; the title prefix is the current visibility fallback.
 

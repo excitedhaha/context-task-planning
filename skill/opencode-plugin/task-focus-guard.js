@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { statSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -8,6 +9,9 @@ const SKILL_ROOT = path.resolve(PLUGIN_DIR, "..")
 const CURRENT_TASK_SCRIPT = path.join(SKILL_ROOT, "scripts", "current-task.sh")
 const CHECK_DRIFT_SCRIPT = path.join(SKILL_ROOT, "scripts", "check-task-drift.sh")
 const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
+const FRESHNESS_WORK_THRESHOLD = 2
+const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
+const FRESHNESS_TRACKED_TOOLS = new Set(["bash", "edit", "multiedit", "write", "task"])
 
 function runJsonScript(script, args, cwd) {
   const result = spawnSync("sh", [script, ...args], {
@@ -111,11 +115,140 @@ function pluginEnabled(task) {
   return typeof planRoot === "string" && planRoot.length > 0 && existsSync(planRoot)
 }
 
+function planningFiles(task) {
+  if (!task?.plan_dir) {
+    return []
+  }
+
+  return ["state.json", "task_plan.md", "progress.md", "findings.md"]
+    .map((name) => path.join(task.plan_dir, name))
+    .filter((filePath) => existsSync(filePath))
+}
+
+function latestPlanningInfo(task) {
+  const files = planningFiles(task)
+  if (files.length === 0) {
+    return null
+  }
+
+  let latestPath = files[0]
+  let latestMtimeMs = statSync(files[0]).mtimeMs
+
+  for (const filePath of files.slice(1)) {
+    const mtimeMs = statSync(filePath).mtimeMs
+    if (mtimeMs > latestMtimeMs) {
+      latestMtimeMs = mtimeMs
+      latestPath = filePath
+    }
+  }
+
+  return {
+    latestPath,
+    latestFile: path.basename(latestPath),
+    latestMtimeMs,
+    ageMs: Math.max(0, Date.now() - latestMtimeMs),
+  }
+}
+
+function defaultFreshnessState(planning) {
+  return {
+    lastPlanningMtimeMs: planning?.latestMtimeMs || 0,
+    workEventsSincePlanning: 0,
+    lastWorkTool: "",
+    lastWorkAt: 0,
+    toastPlanningMtimeMs: 0,
+  }
+}
+
+function refreshFreshnessState(store, sessionID, task) {
+  const planning = latestPlanningInfo(task)
+  const state = store.get(sessionID) || defaultFreshnessState(planning)
+  const planningUpdated = Boolean(planning && planning.latestMtimeMs > state.lastPlanningMtimeMs)
+
+  if (planningUpdated && planning) {
+    state.lastPlanningMtimeMs = planning.latestMtimeMs
+    state.workEventsSincePlanning = 0
+    state.lastWorkTool = ""
+    state.lastWorkAt = 0
+    state.toastPlanningMtimeMs = 0
+  }
+
+  store.set(sessionID, state)
+  return { state, planning, planningUpdated }
+}
+
+function freshnessLevel(state, planning) {
+  if (!state || !planning || state.workEventsSincePlanning < 1) {
+    return null
+  }
+
+  if (state.workEventsSincePlanning >= FRESHNESS_WORK_THRESHOLD) {
+    return "stale"
+  }
+
+  if (planning.ageMs >= FRESHNESS_AGE_THRESHOLD_MS) {
+    return "aging"
+  }
+
+  return null
+}
+
+function freshnessReminder(task, state, planning) {
+  const level = freshnessLevel(state, planning)
+  if (!level) {
+    return null
+  }
+
+  const slug = task.slug || "(unknown)"
+  const ageMinutes = Math.max(1, Math.round(planning.ageMs / 60000))
+  const count = state.workEventsSincePlanning
+  const urgency =
+    level === "stale"
+      ? "Task files look stale for the current task"
+      : "Task files may be getting stale for the current task"
+
+  return [
+    `[context-task-planning] ${urgency} \`${slug}\`: last planning update was \`${planning.latestFile}\` about ${ageMinutes}m ago, and ${count} tracked work step(s) have happened since then.`,
+    `Before more implementation or wrap-up, sync \`.planning/${slug}/\` with at least the current progress and next_action.`,
+  ].join(" ")
+}
+
+function freshnessToastMessage(task, state, planning) {
+  const reminder = freshnessReminder(task, state, planning)
+  if (!reminder) {
+    return null
+  }
+
+  return {
+    title: "Task files stale",
+    message: `Sync .planning/${task.slug}/ before more implementation or wrap-up.`,
+    variant: "warning",
+  }
+}
+
+function freshnessTaskPrefix(task, state, planning) {
+  const level = freshnessLevel(state, planning)
+  if (!level) {
+    return null
+  }
+
+  return [
+    `[context-task-planning] Task files may be stale for ${task.slug || "(unknown)"}.`,
+    `Last planning update: ${planning.latestFile}. Work steps since then: ${state.workEventsSincePlanning}.`,
+    "Before or after this subagent work, sync `.planning/<slug>/` with the current progress and next_action.",
+  ].join("\n")
+}
+
+function trackableTool(toolName) {
+  return FRESHNESS_TRACKED_TOOLS.has(String(toolName || "").toLowerCase())
+}
+
 export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, worktree }) => {
   const baseCwd = worktree || directory || process.cwd()
   const driftBySession = new Map()
   const promptBySession = new Map()
   const taskBySession = new Map()
+  const freshnessBySession = new Map()
 
   async function showToast(title, message, variant = "info") {
     if (!client?.tui?.showToast) {
@@ -231,12 +364,17 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       const drift = driftBySession.get(sessionID) || readDrift(promptBySession.get(sessionID) || "")
+      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, sessionID, task)
 
       if (task && task.found) {
         output.system.push(currentTaskSummary(task))
         const reminder = driftReminder(drift)
         if (reminder) {
           output.system.push(reminder)
+        }
+        const freshness = freshnessReminder(task, freshnessState, planning)
+        if (freshness) {
+          output.system.push(freshness)
         }
         return
       }
@@ -260,6 +398,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const drift = driftBySession.get(input.sessionID)
       if (!drift) {
+        const { state: freshnessState, planning } = refreshFreshnessState(
+          freshnessBySession,
+          input.sessionID,
+          currentTask,
+        )
+        const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
+        if (!freshnessPrefix || !output.args || typeof output.args !== "object") {
+          return
+        }
+        if (typeof output.args.prompt === "string" && !output.args.prompt.includes("Task files may be stale")) {
+          output.args.prompt = `${freshnessPrefix}\n\n${output.args.prompt}`
+        }
         return
       }
 
@@ -268,7 +418,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const prefix = taskToolPrefix(task, drift)
+      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, input.sessionID, task)
+      const prefixes = [taskToolPrefix(task, drift), freshnessTaskPrefix(task, freshnessState, planning)].filter(
+        Boolean,
+      )
+      const prefix = prefixes.join("\n\n")
       if (!prefix || !output.args || typeof output.args !== "object") {
         return
       }
@@ -294,6 +448,38 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
     },
 
+    "tool.execute.after": async (input, output) => {
+      const task = readCurrentTask(baseCwd)
+      if (!pluginEnabled(task) || !task?.found) {
+        return
+      }
+
+      const toolName = String(input.tool || "").toLowerCase()
+      const { state, planning, planningUpdated } = refreshFreshnessState(
+        freshnessBySession,
+        input.sessionID,
+        task,
+      )
+
+      if (!planning || !trackableTool(toolName) || planningUpdated) {
+        return
+      }
+
+      state.workEventsSincePlanning += 1
+      state.lastWorkTool = toolName
+      state.lastWorkAt = Date.now()
+      freshnessBySession.set(input.sessionID, state)
+
+      const toast = freshnessToastMessage(task, state, planning)
+      if (!toast || state.toastPlanningMtimeMs === planning.latestMtimeMs) {
+        return
+      }
+
+      state.toastPlanningMtimeMs = planning.latestMtimeMs
+      freshnessBySession.set(input.sessionID, state)
+      await showToast(toast.title, toast.message, toast.variant)
+    },
+
     event: async ({ event }) => {
       if (event?.type !== "session.created") {
         return
@@ -305,6 +491,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
+      refreshFreshnessState(freshnessBySession, sessionID, task)
       await syncVisibleTask(sessionID, task, null)
     },
   }

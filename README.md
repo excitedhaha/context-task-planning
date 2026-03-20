@@ -15,7 +15,7 @@ Context engineering skill for Claude Code, Codex, and OpenCode.
 Once enabled, users should be able to notice the active task without opening `.planning/` manually:
 
 - `Claude Code` - the active task shows up in Claude Code's native status line, and hooks can warn before likely task drift
-- `OpenCode` - the optional plugin prefixes the session title with `task:<slug> | ...` and shows toasts when task focus changes or drifts
+- `OpenCode` - the optional plugin prefixes the session title with `task:<slug> | ...`, shows task/drift toasts, and nudges when task files look stale after tracked work
 - `Codex` - the portable fallback is `current-task.sh --compact` in the shell or tmux, plus an explicit confirm-before-switch prompt when work looks unrelated
 - `Any shell or tmux` - `sh skill/scripts/current-task.sh --compact` prints a one-line task summary for prompts, status bars, or scripts
 
