@@ -66,6 +66,19 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
 - softer warnings can cover stale `progress.md` snapshots or other recoverable drift
 
+## Task focus guard
+
+Use `current-task.sh` when a shell prompt, tmux status line, or host adapter needs a compact view of the current task.
+
+Use `check-task-drift.sh` when you want a lightweight answer to: does this new request still fit the active task, or should the agent confirm before mixing it in?
+
+P0 classifications are:
+
+- `related`
+- `unclear`
+- `likely-unrelated`
+- `no-active-task`
+
 Poor delegate candidates:
 
 - concurrent writes to main planning files

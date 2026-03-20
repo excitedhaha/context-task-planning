@@ -63,6 +63,15 @@ The core skill still works without hooks. That remains the portability baseline 
 
 `v0.2.0` now includes an optional Claude-only hook adapter under `skill/claude-hooks/`.
 
+## What users should notice
+
+After enabling the bundled Claude settings and restarting Claude Code, you should see:
+
+- the current task in Claude Code's native status line, usually as `task:<slug>`
+- task context recovered automatically on session start when `.planning/` already exists
+- a reminder before Claude silently mixes likely-unrelated work into the current task
+- a stronger warning before `Task` launches when the request looks like a different task
+
 ### Recommended enable path
 
 1. Install the skill with `npx skills add` or the local script.
@@ -74,12 +83,17 @@ The core skill still works without hooks. That remains the portability baseline 
 
 For first-time testing, `.claude/settings.local.json` is the safest option.
 
+The bundled config now includes both hooks and `statusLine`, so copying it is enough to enable the visible task cue.
+
 ### Included automation
 
+- `statusLine` - show the current task in Claude Code's native status line
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/`
-- `UserPromptSubmit` - inject task or initialization guidance before Claude handles the prompt
-- `PreToolUse` - inject compact task context before key tools run
+- `UserPromptSubmit` - inject task context, init-task guidance, and task-drift reminders before Claude handles the prompt
+- `PreToolUse` - inject compact task context before key tools run, with a stronger mismatch warning before `Task`
 
 ### Conflict note
 
 Do not enable these hooks at the same time as `planning-with-files` hooks or plugin hooks in the same Claude environment. The two systems solve the same problem and will duplicate or fight over planning context.
+
+If the status line does not update right away, restart Claude Code or re-open the session so the new `statusLine.command` is picked up.

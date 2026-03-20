@@ -55,6 +55,39 @@ The canonical state is the task folder itself under `.planning/<slug>/`.
 
 If your OpenCode setup uses a custom skill source list, make sure `~/.config/opencode/skills` is enabled.
 
+## Optional plugin adapter
+
+If you want runtime task-focus reminders inside OpenCode, symlink the bundled plugin into `~/.config/opencode/plugins/`:
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+ln -s ~/.config/opencode/skills/context-task-planning/opencode-plugin/task-focus-guard.js ~/.config/opencode/plugins/context-task-planning-task-focus-guard.js
+```
+
+Then restart OpenCode.
+
+## What users should notice
+
+After the plugin is enabled and OpenCode is restarted, you should see:
+
+- the session title prefixed as `task:<slug> | ...`
+- an info toast when the current task is first detected
+- a warning toast when a new prompt looks like likely task drift
+- stronger routing guidance before `Task` runs on mismatched work
+
+What the plugin adds:
+
+- injects the current task summary into OpenCode's system prompt each turn
+- prefixes the session title as `task:<slug> | ...`, which is the closest current plugin-level path to sidebar visibility
+- shows a toast when the current task is first detected or when a likely task switch is detected
+- warns when the newest user prompt looks likely unrelated to the current task
+- adds a stronger note before `Task` launches if the prompt looks mismatched
+- exports `PLAN_TASK` into shell commands so task-aware scripts stay pinned to the active task
+
+This is still a best-effort UI layer. The current OpenCode plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar/statusbar widget API.
+
+So if you do not see a dedicated sidebar widget, that is expected today; the title prefix is the current visibility fallback.
+
 ## Manual fallback
 
 Useful commands when you want direct control:

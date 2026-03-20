@@ -166,6 +166,8 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 
 - `scripts/init-task.sh` - create or resume `.planning/<slug>/`
 - `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, `.active_task`, or latest plan
+- `scripts/current-task.sh` - show the resolved task for shells, status bars, or host adapters
+- `scripts/check-task-drift.sh` - classify whether a new prompt still fits the active task
 - `scripts/set-active-task.sh <slug>` - update shared default pointer
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it

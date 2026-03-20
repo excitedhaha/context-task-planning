@@ -23,6 +23,19 @@ def skill_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+TASK_GUARD_IMPORT_OK = False
+try:
+    scripts_dir = skill_root() / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from task_guard import classify_drift, resolve_task as resolve_guard_task  # type: ignore
+
+    TASK_GUARD_IMPORT_OK = True
+except ImportError:
+    classify_drift = None  # type: ignore
+    resolve_guard_task = None  # type: ignore
+
+
 def installed_skill_command(script_name: str) -> str:
     return f'sh "$HOME/.claude/skills/context-task-planning/scripts/{script_name}"'
 
@@ -188,6 +201,61 @@ def delegate_hint_for_text(text: str, state: dict | None = None) -> str | None:
             )
 
     return base
+
+
+def task_drift_result(text: str, cwd: str | None = None) -> dict | None:
+    if (
+        not TASK_GUARD_IMPORT_OK
+        or not text.strip()
+        or resolve_guard_task is None
+        or classify_drift is None
+    ):
+        return None
+
+    task = resolve_guard_task(cwd or "", "")
+    return classify_drift(text, task)
+
+
+def task_drift_hint(result: dict | None, tool_name: str | None = None) -> str | None:
+    if not result:
+        return None
+
+    classification = result.get("classification")
+    task = result.get("task") or {}
+    if not task.get("found"):
+        return None
+
+    slug = task.get("slug") or "(unknown)"
+    if classification == "likely-unrelated":
+        lines = [
+            f"[context-task-planning] This input looks likely unrelated to the current task `{slug}`.",
+            "Before proceeding, confirm whether to continue the current task, switch tasks, or initialize a new task.",
+            f"Do not silently mix unrelated work into `.planning/{slug}/`.",
+        ]
+        if tool_name == "Task":
+            lines.append(
+                "Avoid launching a subagent for it under the current task until that routing is clear."
+            )
+        return " ".join(lines)
+
+    if classification == "unclear" and result.get("complex_prompt"):
+        lines = [
+            f"[context-task-planning] This input may be drifting away from the current task `{slug}`.",
+            "If it is not part of the current task, confirm whether to continue here, switch tasks, or create a new task before updating planning state.",
+        ]
+        if tool_name == "Task":
+            lines.append(
+                "If you still launch a subagent, keep it scoped to the confirmed task instead of treating the mismatch as an implicit side quest."
+            )
+        return " ".join(lines)
+
+    return None
+
+
+def allow_delegate_hint(result: dict | None) -> bool:
+    if not result:
+        return True
+    return result.get("classification") == "related"
 
 
 def state_summary(state: dict, tool_name: str | None = None) -> str:

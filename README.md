@@ -10,6 +10,16 @@ Context engineering skill for Claude Code, Codex, and OpenCode.
 - delegate lanes for sub-agents or isolated side quests
 - verification as part of the task contract
 
+## Visible task cues
+
+Once enabled, users should be able to notice the active task without opening `.planning/` manually:
+
+- `Claude Code` - the active task shows up in Claude Code's native status line, and hooks can warn before likely task drift
+- `OpenCode` - the optional plugin prefixes the session title with `task:<slug> | ...` and shows toasts when task focus changes or drifts
+- `Any shell or tmux` - `sh skill/scripts/current-task.sh --compact` prints a one-line task summary for prompts, status bars, or scripts
+
+The goal is simple: make the current task visible, and make silent task mixing harder.
+
 ## Why this exists
 
 `planning-with-files` proved that durable local files are a powerful form of context engineering. This project takes the next step for day-to-day multi-agent work:
@@ -79,6 +89,16 @@ See agent-specific notes in:
 - `docs/codex.md`
 - `docs/opencode.md`
 - `docs/sharing.md`
+
+## Optional UX adapters
+
+The core file workflow works without host-specific UI.
+
+If you want visible task cues inside the host itself:
+
+- `Claude Code` - enable the bundled hook + status-line config in `docs/claude.md`
+- `OpenCode` - enable the bundled plugin in `docs/opencode.md`
+- `Codex` - use the shared shell commands for now; native runtime UI is not bundled yet
 
 ## Recommended usage
 
@@ -154,6 +174,18 @@ Validate task consistency before wrap-up:
 
 ```bash
 sh skill/scripts/validate-task.sh
+```
+
+Show the current task in a shell prompt, tmux status line, or host adapter:
+
+```bash
+sh skill/scripts/current-task.sh --compact
+```
+
+Check whether a new request looks like task drift before mixing it into the active lane:
+
+```bash
+sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 ```
 
 Create, inspect, complete, and promote a delegate lane:
@@ -238,7 +270,13 @@ All of them explore different forms of context engineering, planning, and coordi
 - task state schema
 - delegate lanes for sub-agents and bounded side quests
 - agent-first usage with script escape hatches
+- shared task focus guard primitives for visibility and drift checks
 - `npx skills add` friendly distribution
-- optional Claude Code hooks via `skill/claude-hooks/`
+- optional Claude Code hooks/status line and OpenCode plugin adapter
 
 It still does not include host-specific session catchup or cross-machine sync.
+
+Today that means users can already get visible task cues in two places:
+
+- `Claude Code` - native status line task display
+- `OpenCode` - session title prefix + drift toasts

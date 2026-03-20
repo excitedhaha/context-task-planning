@@ -5,6 +5,7 @@ from pathlib import Path
 
 try:
     from .hook_common import (
+        allow_delegate_hint,
         delegate_hint_for_text,
         init_task_hint,
         load_state,
@@ -13,11 +14,14 @@ try:
         read_hook_input,
         resolve_plan_dir,
         state_summary,
+        task_drift_hint,
+        task_drift_result,
         user_prompt_payload,
     )
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from hook_common import (  # type: ignore
+        allow_delegate_hint,
         delegate_hint_for_text,
         init_task_hint,
         load_state,
@@ -26,6 +30,8 @@ except ImportError:
         read_hook_input,
         resolve_plan_dir,
         state_summary,
+        task_drift_hint,
+        task_drift_result,
         user_prompt_payload,
     )
 
@@ -40,9 +46,14 @@ def main():
         state = load_state(plan_dir)
         if state:
             context = state_summary(state)
-            delegate_hint = delegate_hint_for_text(prompt, state)
-            if delegate_hint:
-                context += "\n" + delegate_hint
+            drift_result = task_drift_result(prompt, cwd)
+            drift_hint = task_drift_hint(drift_result)
+            if drift_hint:
+                context += "\n" + drift_hint
+            if allow_delegate_hint(drift_result):
+                delegate_hint = delegate_hint_for_text(prompt, state)
+                if delegate_hint:
+                    context += "\n" + delegate_hint
             print(user_prompt_payload(context))
             return
 
