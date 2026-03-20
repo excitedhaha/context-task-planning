@@ -106,6 +106,14 @@ function prefixedSessionTitle(taskSlug, title) {
   return `task:${taskSlug} | ${baseTitle}`
 }
 
+function visibleTaskSlug(task) {
+  if (!task?.found || !task?.slug) {
+    return ""
+  }
+
+  return task.slug
+}
+
 function pluginEnabled(task) {
   if (task?.found) {
     return true
@@ -243,12 +251,49 @@ function trackableTool(toolName) {
   return FRESHNESS_TRACKED_TOOLS.has(String(toolName || "").toLowerCase())
 }
 
+function resolveSessionID(...values) {
+  for (const value of values) {
+    if (!value) {
+      continue
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim()
+    }
+
+    if (typeof value === "object") {
+      const nested =
+        resolveSessionID(
+          value.sessionID,
+          value.sessionId,
+          value.id,
+          value.session,
+          value.properties?.info?.id,
+        ) || ""
+      if (nested) {
+        return nested
+      }
+    }
+  }
+
+  return ""
+}
+
 export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, worktree }) => {
   const baseCwd = worktree || directory || process.cwd()
   const driftBySession = new Map()
   const promptBySession = new Map()
   const taskBySession = new Map()
   const freshnessBySession = new Map()
+  let lastSessionID = ""
+
+  function rememberSessionID(...values) {
+    const sessionID = resolveSessionID(...values)
+    if (sessionID) {
+      lastSessionID = sessionID
+    }
+    return sessionID || lastSessionID
+  }
 
   async function showToast(title, message, variant = "info") {
     if (!client?.tui?.showToast) {
@@ -271,7 +316,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   }
 
   async function ensureSessionTitle(sessionID, taskSlug) {
-    if (!client?.session?.get || !client?.session?.update || !sessionID || !taskSlug) {
+    if (!client?.session?.get || !client?.session?.update || !sessionID) {
       return
     }
 
@@ -285,7 +330,9 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const nextTitle = prefixedSessionTitle(taskSlug, session.title)
+      const nextTitle = taskSlug
+        ? prefixedSessionTitle(taskSlug, session.title)
+        : stripTaskPrefix(session.title).trim() || "Session"
       if (session.title === nextTitle) {
         return
       }
@@ -299,17 +346,27 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   }
 
   async function syncVisibleTask(sessionID, task, drift) {
-    if (!task?.found || !task.slug || !sessionID) {
+    if (!sessionID) {
       return
     }
 
-    const previous = taskBySession.get(sessionID)
-    taskBySession.set(sessionID, task.slug)
+    const taskSlug = visibleTaskSlug(task)
+    const previous = taskBySession.get(sessionID) || ""
 
-    await ensureSessionTitle(sessionID, task.slug)
+    if (taskSlug) {
+      taskBySession.set(sessionID, taskSlug)
+    } else {
+      taskBySession.delete(sessionID)
+    }
 
-    if (previous !== task.slug) {
-      await showToast("Current task", task.slug, "info")
+    await ensureSessionTitle(sessionID, taskSlug)
+
+    if (!taskSlug) {
+      return
+    }
+
+    if (previous !== taskSlug) {
+      await showToast("Current task", taskSlug, "info")
     }
 
     if (drift?.classification === "likely-unrelated") {
@@ -336,28 +393,33 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
   return {
     "chat.message": async (input, output) => {
+      const sessionID = rememberSessionID(input, output)
       const currentTask = readCurrentTask(baseCwd)
       if (!pluginEnabled(currentTask)) {
-        driftBySession.delete(input.sessionID)
-        promptBySession.delete(input.sessionID)
-        taskBySession.delete(input.sessionID)
+        if (sessionID) {
+          driftBySession.delete(sessionID)
+          promptBySession.delete(sessionID)
+          taskBySession.delete(sessionID)
+        }
         return
       }
 
       const prompt = collectPromptText(output.parts)
-      promptBySession.set(input.sessionID, prompt)
+      if (sessionID) {
+        promptBySession.set(sessionID, prompt)
+      }
 
       const drift = readDrift(prompt)
-      if (drift) {
-        driftBySession.set(input.sessionID, drift)
+      if (drift && sessionID) {
+        driftBySession.set(sessionID, drift)
       }
 
       const task = drift?.task?.found ? drift.task : currentTask
-      await syncVisibleTask(input.sessionID, task, drift)
+      await syncVisibleTask(sessionID, task, drift)
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      const sessionID = input.sessionID || "default"
+      const sessionID = rememberSessionID(input) || "default"
       const task = readCurrentTask(baseCwd)
       if (!pluginEnabled(task)) {
         return
@@ -386,6 +448,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "tool.execute.before": async (input, output) => {
+      const sessionID = rememberSessionID(input, output)
       const currentTask = readCurrentTask(baseCwd)
       if (!pluginEnabled(currentTask)) {
         return
@@ -396,11 +459,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const drift = driftBySession.get(input.sessionID)
+      const drift = sessionID ? driftBySession.get(sessionID) : null
       if (!drift) {
         const { state: freshnessState, planning } = refreshFreshnessState(
           freshnessBySession,
-          input.sessionID,
+          sessionID || "default",
           currentTask,
         )
         const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
@@ -418,7 +481,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, input.sessionID, task)
+      const { state: freshnessState, planning } = refreshFreshnessState(
+        freshnessBySession,
+        sessionID || "default",
+        task,
+      )
       const prefixes = [taskToolPrefix(task, drift), freshnessTaskPrefix(task, freshnessState, planning)].filter(
         Boolean,
       )
@@ -449,15 +516,26 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "tool.execute.after": async (input, output) => {
+      const sessionID = rememberSessionID(input, output)
       const task = readCurrentTask(baseCwd)
-      if (!pluginEnabled(task) || !task?.found) {
+      if (!pluginEnabled(task)) {
+        return
+      }
+
+      const previousTaskSlug = sessionID ? taskBySession.get(sessionID) || "" : ""
+      const currentTaskSlug = visibleTaskSlug(task)
+      if (currentTaskSlug !== previousTaskSlug) {
+        await syncVisibleTask(sessionID, task, null)
+      }
+
+      if (!task?.found) {
         return
       }
 
       const toolName = String(input.tool || "").toLowerCase()
       const { state, planning, planningUpdated } = refreshFreshnessState(
         freshnessBySession,
-        input.sessionID,
+        sessionID || "default",
         task,
       )
 
@@ -468,7 +546,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       state.workEventsSincePlanning += 1
       state.lastWorkTool = toolName
       state.lastWorkAt = Date.now()
-      freshnessBySession.set(input.sessionID, state)
+      freshnessBySession.set(sessionID || "default", state)
 
       const toast = freshnessToastMessage(task, state, planning)
       if (!toast || state.toastPlanningMtimeMs === planning.latestMtimeMs) {
@@ -476,7 +554,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       state.toastPlanningMtimeMs = planning.latestMtimeMs
-      freshnessBySession.set(input.sessionID, state)
+      freshnessBySession.set(sessionID || "default", state)
       await showToast(toast.title, toast.message, toast.variant)
     },
 
@@ -485,7 +563,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const sessionID = event.properties?.info?.id
+      const sessionID = rememberSessionID(event)
       const task = readCurrentTask(baseCwd)
       if (!pluginEnabled(task)) {
         return
