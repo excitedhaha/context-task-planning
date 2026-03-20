@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">OpenCode task title and toast sample</title>
+  <desc id="desc">Sample illustration of OpenCode showing a task-prefixed session title and a task drift toast.</desc>
+  <rect width="1200" height="340" fill="#f3f0ea"/>
+  <rect x="40" y="28" width="1120" height="284" rx="18" fill="#fbfbfb" stroke="#d9d5cd"/>
+  <rect x="40" y="28" width="1120" height="48" rx="18" fill="#ece8df"/>
+  <text x="70" y="59" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#444">OpenCode</text>
+  <text x="190" y="59" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#1d1d1d">task:feature-auth | Investigate auth regression</text>
+  <rect x="72" y="102" width="744" height="156" rx="14" fill="#ffffff" stroke="#e6e1d7"/>
+  <text x="100" y="136" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#222">User</text>
+  <text x="100" y="170" font-family="Menlo, Monaco, Consolas, monospace" font-size="20" fill="#333">另外顺手查一下 billing webhook 回调 bug</text>
+  <text x="100" y="212" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#6b6b6b">Plugin reminder: confirm whether to continue the current task, switch tasks, or</text>
+  <text x="100" y="238" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#6b6b6b">create a new task before mixing unrelated work.</text>
+  <rect x="832" y="108" width="284" height="90" rx="12" fill="#fff4d6" stroke="#f0c96a"/>
+  <text x="856" y="140" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#6a4a00">Task drift</text>
+  <text x="856" y="168" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#7b5b10">Current task is `feature-auth`.</text>
+  <text x="856" y="190" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#7b5b10">Confirm before switching work.</text>
+  <rect x="832" y="214" width="284" height="72" rx="12" fill="#e8f5ff" stroke="#7bb6e8"/>
+  <text x="856" y="244" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#114a73">Current task</text>
+  <text x="856" y="271" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#285b80">feature-auth</text>
+</svg>

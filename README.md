@@ -21,6 +21,14 @@ Once enabled, users should be able to notice the active task without opening `.p
 
 The goal is simple: make the current task visible, and make silent task mixing harder.
 
+Sample illustrations of the current UI cues:
+
+![Claude Code status line sample](docs/assets/claude-statusline-sample.svg)
+
+![OpenCode title and toast sample](docs/assets/opencode-title-toast-sample.svg)
+
+These are sample illustrations, not live screenshots. You can replace them with real captures later if you want docs that exactly match your local theme.
+
 ## Why this exists
 
 `planning-with-files` proved that durable local files are a powerful form of context engineering. This project takes the next step for day-to-day multi-agent work:

@@ -75,6 +75,12 @@ After the plugin is enabled and OpenCode is restarted, you should see:
 - a warning toast when a new prompt looks like likely task drift
 - stronger routing guidance before `Task` runs on mismatched work
 
+Sample illustration:
+
+![OpenCode title and toast sample](assets/opencode-title-toast-sample.svg)
+
+This is a sample illustration of the expected title/toast fallback, not a live screenshot from your machine.
+
 What the plugin adds:
 
 - injects the current task summary into OpenCode's system prompt each turn

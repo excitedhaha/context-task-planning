@@ -72,6 +72,12 @@ After enabling the bundled Claude settings and restarting Claude Code, you shoul
 - a reminder before Claude silently mixes likely-unrelated work into the current task
 - a stronger warning before `Task` launches when the request looks like a different task
 
+Sample illustration:
+
+![Claude Code status line sample](assets/claude-statusline-sample.svg)
+
+This is a sample illustration of the expected task cue, not a live screenshot from your machine.
+
 ### Recommended enable path
 
 1. Install the skill with `npx skills add` or the local script.

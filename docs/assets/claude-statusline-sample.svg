@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-labelledby="title desc">
+  <title id="title">Claude Code task status line sample</title>
+  <desc id="desc">Sample illustration of Claude Code showing a task label in the native status line.</desc>
+  <rect width="1200" height="280" fill="#f5efe3"/>
+  <rect x="36" y="28" width="1128" height="224" rx="16" fill="#161616"/>
+  <rect x="36" y="28" width="1128" height="38" rx="16" fill="#222"/>
+  <circle cx="64" cy="47" r="7" fill="#ff5f57"/>
+  <circle cx="88" cy="47" r="7" fill="#febc2e"/>
+  <circle cx="112" cy="47" r="7" fill="#28c840"/>
+  <text x="150" y="53" font-family="Menlo, Monaco, Consolas, monospace" font-size="16" fill="#bdbdbd">Claude Code</text>
+  <text x="64" y="112" font-family="Menlo, Monaco, Consolas, monospace" font-size="22" fill="#e8e8e8">Review the auth migration and keep task state current.</text>
+  <text x="64" y="150" font-family="Menlo, Monaco, Consolas, monospace" font-size="19" fill="#9fd3ff">Use context-task-planning and verify before wrapping up.</text>
+  <rect x="36" y="210" width="1128" height="42" rx="0" fill="#111"/>
+  <text x="62" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#67e480">&gt;</text>
+  <text x="92" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#73d0ff">~/AIProjects/context-task-planning</text>
+  <rect x="486" y="218" width="244" height="26" rx="6" fill="#2e63ff"/>
+  <text x="504" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#ffffff">task:feature-auth</text>
+  <rect x="758" y="218" width="124" height="26" rx="6" fill="#8a2be2"/>
+  <text x="778" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#ffffff">git:main</text>
+  <text x="914" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#8fe388">CTX 42%</text>
+  <text x="1026" y="237" font-family="Menlo, Monaco, Consolas, monospace" font-size="17" fill="#bdbdbd">MODEL Sonnet</text>
+</svg>
