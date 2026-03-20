@@ -8,9 +8,17 @@ TEMPLATE_DIR="$SKILL_ROOT/templates"
 
 TASK_TITLE=""
 TASK_SLUG=""
+ALLOW_DIRTY=0
+AUTO_STASH=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --stash)
+            AUTO_STASH=1
+            ;;
+        --allow-dirty)
+            ALLOW_DIRTY=1
+            ;;
         --slug)
             shift
             [ "$#" -gt 0 ] || { echo "Missing value for --slug" >&2; exit 1; }
@@ -22,7 +30,7 @@ while [ "$#" -gt 0 ]; do
             TASK_TITLE="$1"
             ;;
         -h|--help)
-            echo "Usage: $0 [--slug task-slug] [--title \"Task Title\"] [task title]" >&2
+            echo "Usage: $0 [--stash] [--allow-dirty] [--slug task-slug] [--title \"Task Title\"] [task title]" >&2
             exit 0
             ;;
         *)
@@ -37,7 +45,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$TASK_TITLE" ] && [ -z "$TASK_SLUG" ]; then
-    echo "Usage: $0 [--slug task-slug] [--title \"Task Title\"] [task title]" >&2
+    echo "Usage: $0 [--stash] [--allow-dirty] [--slug task-slug] [--title \"Task Title\"] [task title]" >&2
+    exit 1
+fi
+
+if [ "$ALLOW_DIRTY" -eq 1 ] && [ "$AUTO_STASH" -eq 1 ]; then
+    echo "Choose only one of --stash or --allow-dirty." >&2
     exit 1
 fi
 
@@ -55,6 +68,23 @@ WORKSPACE_ROOT=$(sh "$SCRIPT_DIR/resolve-workspace-root.sh")
 PLAN_ROOT="$WORKSPACE_ROOT/.planning"
 PLAN_DIR="$PLAN_ROOT/$TASK_SLUG"
 ACTIVE_FILE="$PLAN_ROOT/.active_task"
+
+CURRENT_ACTIVE_SLUG=""
+if [ -f "$ACTIVE_FILE" ]; then
+    CURRENT_ACTIVE_SLUG=$(tr -d '\r\n' < "$ACTIVE_FILE")
+fi
+
+if [ "$AUTO_STASH" -eq 1 ]; then
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --stash
+elif [ "$ALLOW_DIRTY" -eq 1 ]; then
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --allow-dirty
+else
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG"
+fi
+
+if [ -n "$CURRENT_ACTIVE_SLUG" ] && [ "$CURRENT_ACTIVE_SLUG" != "$TASK_SLUG" ]; then
+    sh "$SCRIPT_DIR/pause-task.sh" "$CURRENT_ACTIVE_SLUG"
+fi
 
 mkdir -p "$PLAN_DIR/delegates"
 

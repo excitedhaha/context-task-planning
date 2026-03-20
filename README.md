@@ -151,10 +151,13 @@ Use these when you want explicit control, debugging, or automation.
 sh skill/scripts/init-task.sh "Implement auth flow"
 sh skill/scripts/current-task.sh --compact
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
+sh skill/scripts/check-switch-safety.sh --target-task feature-auth --json
 sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"
 sh skill/scripts/validate-task.sh
 sh skill/scripts/list-tasks.sh
 ```
+
+In git repositories, `init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now warn before switching tasks with a dirty worktree. Use `--stash` to stash automatically or `--allow-dirty` only when you intentionally want to carry local changes across tasks.
 
 ### Multiple active sessions
 

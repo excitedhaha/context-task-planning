@@ -72,6 +72,10 @@ Use `current-task.sh` when a shell prompt, tmux status line, or host adapter nee
 
 Use `check-task-drift.sh` when you want a lightweight answer to: does this new request still fit the active task, or should the agent confirm before mixing it in?
 
+Use `check-switch-safety.sh --target-task <slug> --json` when you are about to switch tasks in a git repository and want to know whether the current worktree should be stashed or committed first.
+
+`init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately.
+
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
 
 For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.

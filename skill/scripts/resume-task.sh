@@ -5,7 +5,49 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 WORKSPACE_ROOT=$(sh "$SCRIPT_DIR/resolve-workspace-root.sh")
 PLAN_ROOT="$WORKSPACE_ROOT/.planning"
-PLAN_DIR=$(sh "$SCRIPT_DIR/resolve-plan-dir.sh" "${1:-}")
+ACTIVE_FILE="$PLAN_ROOT/.active_task"
+
+ALLOW_DIRTY=0
+AUTO_STASH=0
+TASK_ARG=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --stash)
+            AUTO_STASH=1
+            ;;
+        --allow-dirty)
+            ALLOW_DIRTY=1
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$TASK_ARG" ]; then
+                echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+                exit 1
+            fi
+            TASK_ARG="$1"
+            ;;
+    esac
+    shift
+done
+
+if [ "$#" -gt 0 ]; then
+    echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+    exit 1
+fi
+
+PLAN_DIR=$(sh "$SCRIPT_DIR/resolve-plan-dir.sh" "$TASK_ARG")
 
 if [ -z "$PLAN_DIR" ] || [ ! -d "$PLAN_DIR" ]; then
     echo "[context-task-planning] No task found to resume." >&2
@@ -15,7 +57,6 @@ fi
 STATE_FILE="$PLAN_DIR/state.json"
 PROGRESS_FILE="$PLAN_DIR/progress.md"
 TASK_PLAN_FILE="$PLAN_DIR/task_plan.md"
-ACTIVE_FILE="$PLAN_ROOT/.active_task"
 TASK_SLUG=$(basename "$PLAN_DIR")
 
 if [ ! -f "$STATE_FILE" ]; then
@@ -27,6 +68,55 @@ PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [ -z "$PYTHON_BIN" ]; then
     echo "[context-task-planning] Python is required to resume tasks." >&2
     exit 1
+fi
+
+TARGET_STATUS=$("$PYTHON_BIN" - "$STATE_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+state = json.loads(state_path.read_text(encoding="utf-8"))
+print(state.get("status", ""))
+PY
+)
+
+if [ "$TARGET_STATUS" = "archived" ]; then
+    echo "Cannot resume an archived task." >&2
+    exit 1
+fi
+
+if [ "$TARGET_STATUS" = "done" ]; then
+    echo "Cannot resume a done task. Reopen it explicitly if you want to continue work." >&2
+    exit 1
+fi
+
+CURRENT_ACTIVE_SLUG=""
+if [ -f "$ACTIVE_FILE" ]; then
+    CURRENT_ACTIVE_SLUG=$(tr -d '\r\n' < "$ACTIVE_FILE")
+fi
+
+if [ "$ALLOW_DIRTY" -eq 1 ] && [ "$AUTO_STASH" -eq 1 ]; then
+    echo "Choose only one of --stash or --allow-dirty." >&2
+    exit 1
+fi
+
+if [ -n "$CURRENT_ACTIVE_SLUG" ] && [ "$CURRENT_ACTIVE_SLUG" != "$TASK_SLUG" ]; then
+    if [ "$AUTO_STASH" -eq 1 ]; then
+        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --stash
+    elif [ "$ALLOW_DIRTY" -eq 1 ]; then
+        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --allow-dirty
+    else
+        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG"
+    fi
+
+    sh "$SCRIPT_DIR/pause-task.sh" "$CURRENT_ACTIVE_SLUG"
+elif [ "$AUTO_STASH" -eq 1 ]; then
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --target-task "$TASK_SLUG" --stash
+elif [ "$ALLOW_DIRTY" -eq 1 ]; then
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --target-task "$TASK_SLUG" --allow-dirty
+else
+    sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --target-task "$TASK_SLUG"
 fi
 
 "$PYTHON_BIN" - "$STATE_FILE" "$PROGRESS_FILE" "$TASK_PLAN_FILE" <<'PY'

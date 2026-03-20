@@ -174,12 +174,13 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 
 ## Scripts
 
-- `scripts/init-task.sh` - create or resume `.planning/<slug>/`
+- `scripts/init-task.sh` - create or resume `.planning/<slug>/`, warning before switching away from dirty git work
 - `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, `.active_task`, or latest plan
 - `scripts/current-task.sh` - show the resolved task for shells, status bars, or host adapters
 - `scripts/check-task-drift.sh` - classify whether a new prompt still fits the active task
+- `scripts/check-switch-safety.sh` - inspect whether a git worktree should be stashed or committed before switching tasks
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
-- `scripts/set-active-task.sh <slug>` - update shared default pointer
+- `scripts/set-active-task.sh <slug>` - update shared default pointer, with a dirty-worktree guard in git repos
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
 - `scripts/create-delegate.sh` - create a delegate lane under the current task
@@ -192,7 +193,8 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/promote-delegate.sh <delegate-id>` - append delegate results into `findings.md`
 - `scripts/list-tasks.sh` - show all task workspaces and their states
 - `scripts/pause-task.sh [slug]` - pause a task without losing its current phase or next action
-- `scripts/resume-task.sh [slug]` - reactivate a paused task and restore it as the shared default
+- `scripts/resume-task.sh [slug]` - reactivate a paused task, auto-pause the previously active task, and guard dirty git worktrees before switching
+- `scripts/ensure-switch-safety.sh` - enforce the dirty-worktree guard, prompting to stash, commit manually, or continue dirty
 - `scripts/done-task.sh [slug]` - mark a task done after verification and clear the shared pointer if needed
 - `scripts/archive-task.sh [slug]` - archive a task and clear the shared pointer if needed
 - `scripts/check-complete.sh` - summarize current task completion state
@@ -203,4 +205,5 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - Keep untrusted external content in `findings.md`
 - Do not let delegates mutate the main planning files
 - Do not mark tasks done without recording real verification results
+- Before switching tasks in a git repo, handle dirty worktrees explicitly instead of silently carrying changes into the next task
 - Do not reuse an old slug for unrelated work

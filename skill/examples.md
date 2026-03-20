@@ -155,6 +155,18 @@ sh scripts/resume-task.sh feature-auth
 
 This switches task status back to `active`, records a resume checkpoint, and restores `.planning/.active_task` to the resumed task.
 
+If the git worktree is dirty and the switch would carry local code changes into another task, the script now warns before switching. Use `--stash` to stash automatically:
+
+```bash
+sh scripts/resume-task.sh --stash feature-auth
+```
+
+You can inspect the recommendation first with:
+
+```bash
+sh scripts/check-switch-safety.sh --target-task feature-auth --json
+```
+
 ## Example 10: Done guard when delegates are still open
 
 If `delegation.active` still contains delegates, `done-task.sh` will refuse to mark the task done until those lanes are completed or otherwise resolved.

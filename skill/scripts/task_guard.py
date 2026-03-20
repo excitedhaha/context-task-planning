@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -159,6 +160,20 @@ def parse_args() -> argparse.Namespace:
     drift.add_argument("--json", action="store_true")
     drift.add_argument("--compact", action="store_true")
 
+    switch = subparsers.add_parser("check-switch-safety")
+    switch.add_argument("--cwd", default="")
+    switch.add_argument("--source-task", default="")
+    switch.add_argument("--target-task", default="")
+    switch.add_argument("--json", action="store_true")
+    switch.add_argument("--compact", action="store_true")
+
+    enforce = subparsers.add_parser("ensure-switch-safety")
+    enforce.add_argument("--cwd", default="")
+    enforce.add_argument("--source-task", default="")
+    enforce.add_argument("--target-task", default="")
+    enforce.add_argument("--stash", action="store_true")
+    enforce.add_argument("--allow-dirty", action="store_true")
+
     return parser.parse_args()
 
 
@@ -307,6 +322,393 @@ def resolve_task(cwd: str, requested_slug: str) -> dict:
         else [],
         "phases": state.get("phases", []) if isinstance(state, dict) else [],
     }
+
+
+def task_snapshot(plan_dir: Path | None, source: str) -> dict:
+    if plan_dir is None or not plan_dir.is_dir():
+        return {
+            "found": False,
+            "selection_source": source,
+            "plan_dir": "",
+            "slug": "",
+            "title": "",
+            "status": "",
+            "mode": "",
+            "current_phase": "",
+            "next_action": "",
+        }
+
+    state = load_task_state(plan_dir)
+    return {
+        "found": True,
+        "selection_source": source,
+        "plan_dir": str(plan_dir),
+        "slug": state.get("slug", plan_dir.name),
+        "title": state.get("title", plan_dir.name),
+        "status": state.get("status", ""),
+        "mode": state.get("mode", ""),
+        "current_phase": state.get("current_phase", ""),
+        "next_action": state.get("next_action", ""),
+    }
+
+
+def latest_updated_task(plan_root: Path, exclude_slug: str = "") -> Path | None:
+    if not plan_root.is_dir():
+        return None
+
+    candidates = []
+    for entry in plan_root.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        if exclude_slug and entry.name == exclude_slug:
+            continue
+
+        state = load_task_state(entry)
+        if state.get("status") == "archived":
+            continue
+
+        state_path = entry / "state.json"
+        try:
+            mtime = (
+                state_path.stat().st_mtime
+                if state_path.exists()
+                else entry.stat().st_mtime
+            )
+        except OSError:
+            continue
+        candidates.append((mtime, entry))
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def git_root_for(workspace_root: Path) -> Path | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(workspace_root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+
+    output = result.stdout.strip()
+    if result.returncode != 0 or not output:
+        return None
+
+    try:
+        return Path(output).resolve()
+    except OSError:
+        return None
+
+
+def git_status_summary(workspace_root: Path) -> dict:
+    git_root = git_root_for(workspace_root)
+    if git_root is None:
+        return {
+            "found": False,
+            "root": "",
+            "dirty": False,
+            "staged": 0,
+            "unstaged": 0,
+            "untracked": 0,
+            "entries": [],
+        }
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(git_root),
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return {
+            "found": True,
+            "root": str(git_root),
+            "dirty": False,
+            "staged": 0,
+            "unstaged": 0,
+            "untracked": 0,
+            "entries": [],
+        }
+
+    entries = [line for line in result.stdout.splitlines() if line.strip()]
+    staged = 0
+    unstaged = 0
+    untracked = 0
+
+    for entry in entries:
+        if entry.startswith("??"):
+            untracked += 1
+            continue
+
+        if len(entry) < 2:
+            continue
+
+        if entry[0] not in {" ", "?"}:
+            staged += 1
+        if entry[1] != " ":
+            unstaged += 1
+
+    return {
+        "found": True,
+        "root": str(git_root),
+        "dirty": bool(entries),
+        "staged": staged,
+        "unstaged": unstaged,
+        "untracked": untracked,
+        "entries": entries,
+    }
+
+
+def recommendation_for_switch(source_task: dict) -> tuple[str, str]:
+    status = source_task.get("status", "")
+    mode = source_task.get("mode", "")
+    phase = source_task.get("current_phase", "")
+
+    if status in {"done", "verifying"} or mode == "verify" or phase == "verify":
+        return (
+            "commit-first",
+            "The current task looks verified or near-done, so committing is safer than hiding the state in a stash.",
+        )
+
+    return (
+        "stash-first",
+        "The current task still looks in progress, so stashing is the safest quick way to switch without mixing changes.",
+    )
+
+
+def stash_message(source_task: dict, target_task: dict) -> str:
+    source_slug = source_task.get("slug") or "unknown-task"
+    target_slug = target_task.get("slug") or "another-task"
+    return f"[context-task-planning] switch from {source_slug} to {target_slug}"
+
+
+def check_switch_safety(cwd: str, source_slug: str, target_slug: str) -> dict:
+    workspace_root = resolve_workspace_root(cwd)
+    plan_root = workspace_root / ".planning"
+    active_pointer = read_active_pointer(plan_root)
+    git = git_status_summary(workspace_root)
+
+    source_plan_dir = None
+    source_source = "none"
+    if source_slug:
+        source_plan_dir = plan_root / source_slug
+        source_source = "requested_source"
+    elif active_pointer and active_pointer != target_slug:
+        source_plan_dir = plan_root / active_pointer
+        source_source = "active_pointer"
+    elif git["dirty"] and active_pointer != target_slug:
+        source_plan_dir = latest_updated_task(plan_root, exclude_slug=target_slug)
+        source_source = "recent_task"
+
+    target_plan_dir = plan_root / target_slug if target_slug else None
+    source_task = task_snapshot(source_plan_dir, source_source)
+    target_task = task_snapshot(target_plan_dir, "target_task")
+
+    switching = bool(target_slug)
+    if active_pointer and active_pointer == target_slug:
+        switching = False
+    if source_task["found"] and source_task["slug"] == target_slug:
+        switching = False
+
+    safe = (not git["found"]) or (not git["dirty"]) or (not switching)
+    recommendation = "none"
+    reason = ""
+    if not safe:
+        recommendation, reason = recommendation_for_switch(source_task)
+
+    return {
+        "workspace_root": str(workspace_root),
+        "plan_root": str(plan_root),
+        "active_pointer": active_pointer,
+        "switching": switching,
+        "safe": safe,
+        "recommendation": recommendation,
+        "reason": reason,
+        "git": git,
+        "source_task": source_task,
+        "target_task": target_task,
+        "stash_message": stash_message(source_task, target_task),
+    }
+
+
+def compact_switch_safety(result: dict) -> str:
+    source_slug = result["source_task"].get("slug") or "(none)"
+    target_slug = result["target_task"].get("slug") or "(none)"
+    dirty = str(result["git"].get("dirty", False)).lower()
+    safe = str(result.get("safe", False)).lower()
+    recommendation = result.get("recommendation", "none") or "none"
+    return (
+        f"safe={safe} dirty={dirty} source={source_slug} target={target_slug} "
+        f"recommendation={recommendation}"
+    )
+
+
+def print_switch_safety(result: dict, as_json: bool, compact: bool) -> None:
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    if compact:
+        print(compact_switch_safety(result))
+        return
+
+    git = result["git"]
+    print(f"[context-task-planning] Workspace: {result['workspace_root']}")
+    if not git["found"]:
+        print("[context-task-planning] Switch safety: no git repository detected.")
+        return
+
+    print(f"[context-task-planning] Git root: {git['root']}")
+    print(
+        "[context-task-planning] Dirty worktree: "
+        f"{str(git['dirty']).lower()} "
+        f"(staged={git['staged']}, unstaged={git['unstaged']}, untracked={git['untracked']})"
+    )
+    print(
+        f"[context-task-planning] Source task: {result['source_task'].get('slug') or '(unknown)'} "
+        f"(source={result['source_task'].get('selection_source') or 'none'})"
+    )
+    print(
+        f"[context-task-planning] Target task: {result['target_task'].get('slug') or '(none)'}"
+    )
+    print(
+        f"[context-task-planning] Switching: {str(result['switching']).lower()} | "
+        f"Safe: {str(result['safe']).lower()}"
+    )
+    if result["reason"]:
+        print(f"[context-task-planning] Recommendation: {result['recommendation']}")
+        print(f"[context-task-planning] Reason: {result['reason']}")
+
+
+def run_stash(result: dict) -> None:
+    git = result["git"]
+    if not git["found"] or not git["dirty"]:
+        return
+
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                git["root"],
+                "stash",
+                "push",
+                "-u",
+                "-m",
+                result["stash_message"],
+            ],
+            check=False,
+        )
+    except OSError as exc:
+        raise SystemExit(f"Failed to stash worktree before switching: {exc}") from exc
+
+    if completed.returncode != 0:
+        raise SystemExit(completed.returncode)
+
+
+def print_switch_warning(result: dict) -> None:
+    git = result["git"]
+    source_task = result["source_task"]
+    target_task = result["target_task"]
+    recommendation = result["recommendation"]
+
+    print(
+        "[context-task-planning] Dirty git worktree detected before switching tasks.",
+        file=sys.stderr,
+    )
+    print(
+        "[context-task-planning] Worktree changes: "
+        f"staged={git['staged']} unstaged={git['unstaged']} untracked={git['untracked']}",
+        file=sys.stderr,
+    )
+    print(
+        f"[context-task-planning] Source task: {source_task.get('slug') or '(unknown)'} "
+        f"status={source_task.get('status') or '-'} mode={source_task.get('mode') or '-'} "
+        f"phase={source_task.get('current_phase') or '-'}",
+        file=sys.stderr,
+    )
+    print(
+        f"[context-task-planning] Target task: {target_task.get('slug') or '(none)'}",
+        file=sys.stderr,
+    )
+    if result["reason"]:
+        print(
+            f"[context-task-planning] Recommended action: {recommendation} — {result['reason']}",
+            file=sys.stderr,
+        )
+
+
+def ensure_switch_safety(args: argparse.Namespace) -> None:
+    result = check_switch_safety(args.cwd, args.source_task, args.target_task)
+
+    if result["safe"] or args.allow_dirty:
+        return
+
+    if args.stash:
+        run_stash(result)
+        return
+
+    print_switch_warning(result)
+
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        print(
+            "[context-task-planning] Retry the switching command with `--stash` to stash automatically, "
+            "commit the current work manually and retry, or use `--allow-dirty` to continue anyway.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    recommendation = result["recommendation"]
+    if recommendation == "commit-first":
+        choices = [
+            ("c", "stop here so you can commit manually (recommended)"),
+            ("s", "stash current work and continue switching"),
+            ("l", "leave the worktree dirty and continue switching"),
+            ("x", "cancel the switch"),
+        ]
+    else:
+        choices = [
+            ("s", "stash current work and continue switching (recommended)"),
+            ("c", "stop here so you can commit manually"),
+            ("l", "leave the worktree dirty and continue switching"),
+            ("x", "cancel the switch"),
+        ]
+
+    print(
+        "[context-task-planning] Choose how to handle the current worktree:",
+        file=sys.stderr,
+    )
+    for key, label in choices:
+        print(f"  [{key}] {label}", file=sys.stderr)
+
+    while True:
+        response = (
+            input("[context-task-planning] Enter choice [s/c/l/x]: ").strip().lower()
+        )
+        if response == "s":
+            run_stash(result)
+            return
+        if response == "l":
+            return
+        if response == "c":
+            raise SystemExit(
+                "Commit the current work manually, then rerun the switching command."
+            )
+        if response == "x":
+            raise SystemExit("Cancelled task switch.")
 
 
 def compact_current_task(task: dict) -> str:
@@ -585,6 +987,15 @@ def main() -> None:
     if args.command == "current-task":
         task = resolve_task(args.cwd, args.task)
         print_current_task(task, args.json, args.compact)
+        return
+
+    if args.command == "check-switch-safety":
+        result = check_switch_safety(args.cwd, args.source_task, args.target_task)
+        print_switch_safety(result, args.json, args.compact)
+        return
+
+    if args.command == "ensure-switch-safety":
+        ensure_switch_safety(args)
         return
 
     prompt = args.prompt or sys.stdin.read()
