@@ -85,6 +85,7 @@ STATE_FILE="$PLAN_DIR/state.json"
 PROGRESS_FILE="$PLAN_DIR/progress.md"
 DELEGATES_DIR="$PLAN_DIR/delegates"
 DELEGATE_DIR="$DELEGATES_DIR/$DELEGATE_ID"
+TASK_NAME=$(basename "$PLAN_DIR")
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "[context-task-planning] Missing state.json in $PLAN_DIR" >&2
@@ -97,7 +98,16 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-export PLAN_DIR STATE_FILE PROGRESS_FILE TEMPLATE_DIR DELEGATE_DIR DELEGATE_ID DELEGATE_TITLE DELEGATE_KIND DELEGATE_GOAL DELEGATE_DELIVERABLE
+ALLOW_MAIN_PLAN_WRITES=1
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    if ! "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME" >/dev/null 2>&1; then
+        ALLOW_MAIN_PLAN_WRITES=0
+    fi
+elif ! "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME" --fallback >/dev/null 2>&1; then
+    ALLOW_MAIN_PLAN_WRITES=0
+fi
+
+export PLAN_DIR STATE_FILE PROGRESS_FILE TEMPLATE_DIR DELEGATE_DIR DELEGATE_ID DELEGATE_TITLE DELEGATE_KIND DELEGATE_GOAL DELEGATE_DELIVERABLE ALLOW_MAIN_PLAN_WRITES
 "$PYTHON_BIN" <<'PY'
 import json
 import os
@@ -114,6 +124,7 @@ delegate_title = os.environ["DELEGATE_TITLE"]
 delegate_kind = os.environ["DELEGATE_KIND"]
 delegate_goal = os.environ["DELEGATE_GOAL"]
 delegate_deliverable = os.environ["DELEGATE_DELIVERABLE"]
+allow_main_plan_writes = os.environ.get("ALLOW_MAIN_PLAN_WRITES", "1") == "1"
 
 allowed_kinds = {"discovery", "spike", "verify", "review", "catchup", "other"}
 if delegate_kind not in allowed_kinds:
@@ -187,20 +198,20 @@ else:
         log_note = "Delegate lane reused via create-delegate.sh"
         log_status = delegate_state.get("status", "pending")
 
-if delegate_state.get("status") not in {"complete", "cancelled"}:
-    active = state.setdefault("delegation", {}).setdefault("active", [])
-    if delegate_id not in active:
-        active.append(delegate_id)
-
-state.setdefault("delegation", {}).setdefault("enabled", True)
-state.setdefault("delegation", {}).setdefault("single_writer", True)
-state["latest_checkpoint"] = f"Delegate {delegate_id} {'created' if created else 'reused'} at {timestamp}."
-state["updated_at"] = timestamp
-
 status_path.write_text(json.dumps(delegate_state, indent=2) + "\n", encoding="utf-8")
-state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+if allow_main_plan_writes:
+    if delegate_state.get("status") not in {"complete", "cancelled"}:
+        active = state.setdefault("delegation", {}).setdefault("active", [])
+        if delegate_id not in active:
+            active.append(delegate_id)
 
-if progress_path.exists():
+    state.setdefault("delegation", {}).setdefault("enabled", True)
+    state.setdefault("delegation", {}).setdefault("single_writer", True)
+    state["latest_checkpoint"] = f"Delegate {delegate_id} {'created' if created else 'reused'} at {timestamp}."
+    state["updated_at"] = timestamp
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+if allow_main_plan_writes and progress_path.exists():
     with progress_path.open("a", encoding="utf-8") as fh:
         fh.write("\n")
         fh.write(f"### Delegate {'Created' if created else 'Updated'}: {timestamp}\n\n")
@@ -216,4 +227,7 @@ PY
 echo "[context-task-planning] Delegate ready: $DELEGATE_ID"
 echo "[context-task-planning] Task directory: $PLAN_DIR"
 echo "[context-task-planning] Delegate directory: $DELEGATE_DIR"
+if [ "$ALLOW_MAIN_PLAN_WRITES" -eq 0 ]; then
+    echo "[context-task-planning] Observe-only session: main planning files were left unchanged; only the delegate lane was updated."
+fi
 echo "[context-task-planning] Fill brief.md, run start-delegate.sh when work begins, let the subagent work only inside this lane, then run complete-delegate.sh and promote-delegate.sh."

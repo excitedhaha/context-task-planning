@@ -24,7 +24,7 @@ A global install makes the skill available under:
 
 ## Usage
 
-This skill is designed so that OpenCode does not need host-specific session parsing in order to recover context.
+This skill is designed so that OpenCode does not need full session-history parsing in order to recover context.
 
 Most teammates should use it through normal conversation with the agent.
 
@@ -109,7 +109,13 @@ What the plugin adds:
 - warns when the newest user prompt looks likely unrelated to the current task
 - warns when task files look stale after tracked work without a planning sync
 - adds a stronger note before `Task` launches if the prompt looks mismatched
-- exports `PLAN_TASK` into shell commands so task-aware scripts stay pinned to the active task
+- exports `PLAN_SESSION_KEY` into shell commands so task-aware scripts bind work to the current OpenCode session
+
+If an OpenCode session is bound as an observer, the injected task summary will say so explicitly and remind the model to keep main planning files read-only while still allowing delegate-lane work.
+
+When a task declares `repo_scope` and `primary_repo`, the injected summary now carries that repo context too, which helps parent-directory multi-repo sessions choose the right checkout.
+
+When OpenCode starts inside a registered repo path or recorded `.worktrees/...` checkout under a parent workspace, the plugin still resolves the shared parent `.planning/`. Unrelated ancestor `.planning/` directories should not capture that session.
 
 This is still a best-effort UI layer. The current OpenCode plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar/statusbar widget API.
 

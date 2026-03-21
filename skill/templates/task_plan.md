@@ -8,6 +8,8 @@
 - Current Mode: `clarify`
 - Current Phase: `clarify`
 - Next Action: {{INITIAL_NEXT_ACTION}}
+- Primary Repo: (unset)
+- Repo Scope: (unset)
 - Blockers:
   - None
 - Verification Target:
@@ -25,6 +27,8 @@
 
 - Source Path: `{{SOURCE_PATH}}`
 - Planning Path: `.planning/{{TASK_SLUG}}`
+- Primary Repo Constraint: (unset)
+- Repo Scope Constraint: (unset)
 - Single Writer: only the coordinator updates `task_plan.md`, `progress.md`, and `state.json`
 
 ## Open Questions

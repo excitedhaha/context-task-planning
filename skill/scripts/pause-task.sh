@@ -29,6 +29,12 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG"
+else
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --fallback
+fi
+
 "$PYTHON_BIN" - "$STATE_FILE" "$PROGRESS_FILE" "$TASK_PLAN_FILE" <<'PY'
 import json
 import sys
@@ -87,6 +93,8 @@ if [ -f "$ACTIVE_FILE" ]; then
         echo "[context-task-planning] Cleared shared active pointer for $TASK_SLUG"
     fi
 fi
+
+"$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" clear-task-sessions --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG"
 
 echo "[context-task-planning] Paused task: $TASK_SLUG"
 echo "[context-task-planning] Task directory: $PLAN_DIR"

@@ -4,6 +4,7 @@ __pycache__/
 
 # Local planning state should stay machine-local by default.
 .planning/
+.worktrees/
 
 # Local Claude/Codex/OpenCode project settings should not be shared unless intentional.
 .claude/

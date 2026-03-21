@@ -12,7 +12,9 @@ try:
         looks_complex,
         no_active_task_hint,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         state_summary,
         task_drift_hint,
         task_drift_result,
@@ -28,7 +30,9 @@ except ImportError:
         looks_complex,
         no_active_task_hint,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         state_summary,
         task_drift_hint,
         task_drift_result,
@@ -40,13 +44,15 @@ def main():
     payload = read_hook_input()
     cwd = payload.get("cwd")
     prompt = payload.get("prompt", "")
-    plan_dir = resolve_plan_dir(cwd=cwd)
+    session_key = session_key_from_payload(payload)
+    plan_dir = resolve_plan_dir(cwd=cwd, session_key=session_key)
+    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
 
     if plan_dir:
         state = load_state(plan_dir)
         if state:
-            context = state_summary(state)
-            drift_result = task_drift_result(prompt, cwd)
+            context = state_summary(state, task_meta=task_meta)
+            drift_result = task_drift_result(prompt, cwd, session_key=session_key)
             drift_hint = task_drift_hint(drift_result)
             if drift_hint:
                 context += "\n" + drift_hint

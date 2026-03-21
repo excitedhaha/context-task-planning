@@ -4,6 +4,12 @@ set -eu
 
 START_DIR="${1:-$PWD}"
 START_DIR=$(cd "$START_DIR" 2>/dev/null && pwd)
+PYTHON_BIN="$(command -v python3 || command -v python || true)"
+
+if [ -n "$PYTHON_BIN" ]; then
+    "$PYTHON_BIN" "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/task_guard.py" resolve-workspace-root --cwd "$START_DIR"
+    exit 0
+fi
 
 candidate="$START_DIR"
 git_root=""

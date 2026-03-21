@@ -68,7 +68,10 @@ The core skill still works without hooks. That remains the portability baseline 
 After enabling the bundled Claude settings and restarting Claude Code, you should see:
 
 - the current task in Claude Code's native status line, usually as `task:<slug>`
-- task context recovered automatically on session start when `.planning/` already exists
+- if the session is observe-only, the status line cue changes to `obs:<slug>`
+- task context recovered automatically on session start from the current Claude session binding when available, otherwise from the workspace fallback
+- when a task declares multiple repos, the injected task context includes `primary_repo` and `repo_scope`
+- if Claude starts inside a registered repo path or recorded worktree under a parent workspace, the recovered task still resolves to that shared parent `.planning/` instead of to an unrelated ancestor workspace
 - a reminder before Claude silently mixes likely-unrelated work into the current task
 - a stronger warning before `Task` launches when the request looks like a different task
 

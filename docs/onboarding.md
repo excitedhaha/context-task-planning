@@ -91,7 +91,7 @@ If the agent can continue from `.planning/<slug>/` without you re-teaching the w
 For your first few uses, ignore these concepts unless you hit a real need:
 
 - delegate lanes
-- session pinning
+- session-scoped task binding
 - manual task switching
 - archive semantics
 - JSON schemas
@@ -202,10 +202,13 @@ This is especially useful when a later session needs to tell the difference betw
 
 ### What heavy users should learn next
 
-- `PLAN_TASK` session pinning for multiple terminals or sessions
+- `PLAN_SESSION_KEY` plus `set-active-task.sh` / `resume-task.sh` when multiple terminals or sessions need independent current tasks
+- explicit `register-repo.sh` / `set-task-repos.sh` when one parent workspace contains several git repos
 - `validate-task.sh` when task files may have drifted
 - delegate lane lifecycle for repeated subagent use
 - pause / resume / done / archive commands when task history starts to matter
+
+When you adopt the parent-workspace multi-repo pattern, keep the shared `.planning/` at that parent level. After repos are registered, entering from `frontend/`, `backend/`, or a recorded `.worktrees/...` checkout still resolves back to the same workspace; unrelated ancestor `.planning/` directories should not steal that resolution.
 
 ### What heavy users still should not optimize too early
 

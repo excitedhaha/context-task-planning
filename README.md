@@ -152,6 +152,10 @@ sh skill/scripts/init-task.sh "Implement auth flow"
 sh skill/scripts/current-task.sh --compact
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 sh skill/scripts/check-switch-safety.sh --target-task feature-auth --json
+sh skill/scripts/list-repos.sh --discover
+sh skill/scripts/register-repo.sh --id frontend frontend
+sh skill/scripts/set-task-repos.sh feature-auth --repo frontend --primary frontend
+sh skill/scripts/prepare-task-worktree.sh --task feature-auth --repo frontend
 sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"
 sh skill/scripts/validate-task.sh
 sh skill/scripts/list-tasks.sh
@@ -161,10 +165,34 @@ In git repositories, `init-task.sh`, `resume-task.sh`, and `set-active-task.sh` 
 
 ### Multiple active sessions
 
-Pin one terminal or agent session to a task:
+Each Claude/OpenCode/Codex session can keep its own current task. Host adapters can provide a stable session key automatically; the manual shell fallback is:
 
 ```bash
-export PLAN_TASK=feature-auth
+export PLAN_SESSION_KEY=manual:feature-auth
+sh skill/scripts/set-active-task.sh feature-auth
+```
+
+Use `PLAN_TASK` only as a one-off manual override inside the current shell. `.planning/.active_task` remains the workspace fallback when no session binding exists.
+
+If several sessions point at the same task, only one should be the writer. Use `sh skill/scripts/set-active-task.sh --observe <slug>` for extra read-only sessions; observers may still work inside `delegates/<delegate-id>/` lanes.
+
+### Parent workspace with multiple repos
+
+If you open the agent from a parent directory that contains several git repos, keep one shared `.planning/` in that parent directory and register repos explicitly before binding them to tasks:
+
+```bash
+sh skill/scripts/list-repos.sh --discover
+sh skill/scripts/register-repo.sh --id frontend frontend
+sh skill/scripts/register-repo.sh --id backend backend
+sh skill/scripts/init-task.sh --repo frontend --repo backend --primary frontend "Cross-repo auth flow"
+```
+
+Use `list-repos.sh --discover` only to review candidate repos; the actual registration step stays explicit. Once that parent workspace owns `.planning/`, running from the parent directory itself, a registered repo path such as `frontend/`, or a recorded `.worktrees/<repo>/<task>/` checkout still resolves back to the same shared task state. Unrelated ancestor `.planning/` directories are ignored unless the current path actually belongs to that older workspace.
+
+If two writer tasks need the same repo at once, prepare a dedicated checkout for the overlapping repo instead of reusing the shared checkout:
+
+```bash
+sh skill/scripts/prepare-task-worktree.sh --task cross-repo-auth-flow --repo frontend
 ```
 
 ### Delegate lanes

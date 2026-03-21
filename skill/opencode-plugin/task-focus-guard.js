@@ -47,11 +47,30 @@ function collectPromptText(parts) {
 }
 
 function currentTaskSummary(task) {
-  return [
+  const lines = [
     `[context-task-planning] Current task \`${task.slug}\` | status \`${task.status || "unknown"}\` | mode \`${task.mode || "unknown"}\` | phase \`${task.current_phase || "unknown"}\``,
     `Next action: ${task.next_action || "(none recorded)"}`,
     "Keep unrelated work out of this task; if the user's request does not belong here, confirm whether to continue, switch tasks, or initialize a new task before updating planning state.",
-  ].join("\n")
+  ]
+
+  if (task.binding_role) {
+    lines.push(
+      `Access: ${task.binding_role} | writer=${task.writer_display || "(none)"} | observers=${task.observer_count || 0}`,
+    )
+    if (task.binding_role === "observer") {
+      lines.push(
+        "Observe-only session: do not edit task_plan.md, progress.md, or state.json here. Delegate lane updates under delegates/<delegate-id>/ are still allowed.",
+      )
+    }
+  }
+
+  if (Array.isArray(task.repo_scope) && task.repo_scope.length > 0) {
+    lines.push(
+      `Repos: primary=${task.primary_repo || "(none)"} | scope=${task.repo_scope.join(", ")}`,
+    )
+  }
+
+  return lines.join("\n")
 }
 
 function noActiveTaskReminder(result) {
@@ -94,7 +113,10 @@ function taskToolPrefix(task, result) {
     `[context-task-planning] Active task: ${task.slug || "(unknown)"}`,
     `Drift classification: ${result.classification}`,
     "Before treating this as a subagent side quest, confirm whether the request belongs to the current task, should switch tasks, or should start a new task.",
-  ].join("\n")
+    task.binding_role === "observer"
+      ? "This session is observe-only for the main planning files; keep any subagent output inside delegate lanes instead."
+      : "",
+  ].filter(Boolean).join("\n")
 }
 
 function stripTaskPrefix(title) {
@@ -112,6 +134,11 @@ function visibleTaskSlug(task) {
   }
 
   return task.slug
+}
+
+function pluginSessionKey(sessionID) {
+  const value = String(sessionID || "").trim()
+  return value ? `opencode:${value}` : ""
 }
 
 function pluginEnabled(task) {
@@ -378,15 +405,26 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     }
   }
 
-  function readCurrentTask(cwd = baseCwd) {
-    return runJsonScript(CURRENT_TASK_SCRIPT, ["--json", "--cwd", cwd], cwd)
+  function readCurrentTask(cwd = baseCwd, sessionID = "") {
+    const args = ["--json", "--cwd", cwd]
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      args.push("--session-key", sessionKey)
+    }
+    return runJsonScript(CURRENT_TASK_SCRIPT, args, cwd)
   }
 
-  function readDrift(prompt, cwd = baseCwd) {
+  function readDrift(prompt, cwd = baseCwd, sessionID = "") {
     if (!prompt || !prompt.trim()) return null
+    const args = ["--json", "--cwd", cwd]
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      args.push("--session-key", sessionKey)
+    }
+    args.push("--prompt", prompt)
     return runJsonScript(
       CHECK_DRIFT_SCRIPT,
-      ["--json", "--cwd", cwd, "--prompt", prompt],
+      args,
       cwd,
     )
   }
@@ -394,7 +432,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   return {
     "chat.message": async (input, output) => {
       const sessionID = rememberSessionID(input, output)
-      const currentTask = readCurrentTask(baseCwd)
+      const currentTask = readCurrentTask(baseCwd, sessionID)
       if (!pluginEnabled(currentTask)) {
         if (sessionID) {
           driftBySession.delete(sessionID)
@@ -409,7 +447,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         promptBySession.set(sessionID, prompt)
       }
 
-      const drift = readDrift(prompt)
+      const drift = readDrift(prompt, baseCwd, sessionID)
       if (drift && sessionID) {
         driftBySession.set(sessionID, drift)
       }
@@ -419,14 +457,15 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      const sessionID = rememberSessionID(input) || "default"
-      const task = readCurrentTask(baseCwd)
+      const sessionID = rememberSessionID(input)
+      const mapSessionID = sessionID || "default"
+      const task = readCurrentTask(baseCwd, sessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      const drift = driftBySession.get(sessionID) || readDrift(promptBySession.get(sessionID) || "")
-      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, sessionID, task)
+      const drift = driftBySession.get(mapSessionID) || readDrift(promptBySession.get(mapSessionID) || "", baseCwd, sessionID)
+      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, mapSessionID, task)
 
       if (task && task.found) {
         output.system.push(currentTaskSummary(task))
@@ -449,7 +488,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     "tool.execute.before": async (input, output) => {
       const sessionID = rememberSessionID(input, output)
-      const currentTask = readCurrentTask(baseCwd)
+      const currentTask = readCurrentTask(baseCwd, sessionID)
       if (!pluginEnabled(currentTask)) {
         return
       }
@@ -500,7 +539,8 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "shell.env": async (input, output) => {
-      const task = readCurrentTask(input.cwd || baseCwd)
+      const sessionID = rememberSessionID(input, output)
+      const task = readCurrentTask(input.cwd || baseCwd, sessionID)
       if (!pluginEnabled(task)) {
         return
       }
@@ -511,13 +551,13 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       output.env = {
         ...output.env,
-        PLAN_TASK: task.slug,
+        PLAN_SESSION_KEY: pluginSessionKey(sessionID),
       }
     },
 
     "tool.execute.after": async (input, output) => {
       const sessionID = rememberSessionID(input, output)
-      const task = readCurrentTask(baseCwd)
+      const task = readCurrentTask(baseCwd, sessionID)
       if (!pluginEnabled(task)) {
         return
       }
@@ -564,7 +604,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       const sessionID = rememberSessionID(event)
-      const task = readCurrentTask(baseCwd)
+      const task = readCurrentTask(baseCwd, sessionID)
       if (!pluginEnabled(task)) {
         return
       }

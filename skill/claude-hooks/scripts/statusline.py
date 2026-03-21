@@ -39,6 +39,46 @@ def color(text: str, ansi: str) -> str:
     return f"{ansi}{text}{RESET}"
 
 
+def find_named_string(value, names: set[str]) -> str:
+    if isinstance(value, dict):
+        for key in names:
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+        for nested in value.values():
+            found = find_named_string(nested, names)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = find_named_string(item, names)
+            if found:
+                return found
+    return ""
+
+
+def session_key_from_payload(payload: dict) -> str:
+    raw = find_named_string(
+        payload,
+        {
+            "session_id",
+            "sessionId",
+            "sessionID",
+            "conversation_id",
+            "conversationId",
+            "thread_id",
+            "threadId",
+            "chat_id",
+            "chatId",
+            "transcript_path",
+            "transcriptPath",
+        },
+    )
+    if not raw:
+        return ""
+    return f"claude:{raw}"
+
+
 def pick_cwd(payload: dict) -> str:
     candidates = [
         payload.get("workspace", {}).get("current_dir"),
@@ -169,17 +209,17 @@ def spinner_frame() -> str:
     return SPINNER_FRAMES[int(time.time() * 10) % len(SPINNER_FRAMES)]
 
 
-def resolve_task(cwd: str) -> dict | None:
+def resolve_task(cwd: str, session_key: str = "") -> dict | None:
     if not TASK_GUARD_IMPORT_OK or resolve_guard_task is None:
         return None
     try:
-        return resolve_guard_task(cwd, "")
+        return resolve_guard_task(cwd, "", session_key)
     except Exception:
         return None
 
 
-def task_segment(cwd: str) -> str | None:
-    task = resolve_task(cwd)
+def task_segment(cwd: str, payload: dict) -> str | None:
+    task = resolve_task(cwd, session_key_from_payload(payload))
     if not task:
         return None
 
@@ -187,7 +227,10 @@ def task_segment(cwd: str) -> str | None:
         slug = shorten_label(task.get("slug") or "(unknown)")
         prefix = "task"
         style = BG_BLUE + WHITE
-        if task.get("selection_source") == "session_pin":
+        if task.get("binding_role") == "observer":
+            prefix = "obs"
+            style = BG_RED + WHITE
+        elif task.get("selection_source") in {"session_binding", "session_pin"}:
             prefix = "task!"
             style = BG_GREEN + BLACK
         return color(f" {prefix}:{slug} ", style)
@@ -218,7 +261,7 @@ def main() -> int:
 
     parts.append(color(path_text, CYAN))
 
-    task_text = task_segment(cwd)
+    task_text = task_segment(cwd, payload)
     if task_text:
         parts.append(task_text)
 

@@ -53,7 +53,6 @@ from pathlib import Path
 state_path = Path(sys.argv[1])
 delegates_dir = Path(sys.argv[2])
 state = json.loads(state_path.read_text(encoding="utf-8"))
-active = set(state.get("delegation", {}).get("active", []))
 
 status_order = {
     "running": 0,
@@ -77,10 +76,11 @@ if delegates_dir.is_dir():
             continue
 
         delegate_id = dstate.get("delegate_id", entry.name)
+        mark = "active" if dstate.get("status") not in {"complete", "cancelled"} else "-"
         summary = (dstate.get("summary") or "").strip() or "-"
         rows.append(
             {
-                "mark": "active" if delegate_id in active else "-",
+                "mark": mark,
                 "delegate_id": delegate_id,
                 "kind": dstate.get("kind", "-"),
                 "status": dstate.get("status", "unknown"),

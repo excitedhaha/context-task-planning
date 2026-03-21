@@ -57,11 +57,62 @@ def resolve_workspace_root(cwd: str | None = None) -> Path | None:
     return Path(output) if output else None
 
 
-def resolve_plan_dir(cwd: str | None = None, slug: str | None = None) -> Path | None:
+def find_named_string(value, names: set[str]) -> str:
+    if isinstance(value, dict):
+        for key in names:
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+        for nested in value.values():
+            found = find_named_string(nested, names)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = find_named_string(item, names)
+            if found:
+                return found
+    return ""
+
+
+def qualify_session_key(host: str, raw: str) -> str:
+    value = raw.strip()
+    if not value:
+        return ""
+    return f"{host}:{value}"
+
+
+def session_key_from_payload(payload: dict, host: str = "claude") -> str:
+    raw = find_named_string(
+        payload,
+        {
+            "session_id",
+            "sessionId",
+            "sessionID",
+            "conversation_id",
+            "conversationId",
+            "thread_id",
+            "threadId",
+            "chat_id",
+            "chatId",
+            "transcript_path",
+            "transcriptPath",
+        },
+    )
+    return qualify_session_key(host, raw)
+
+
+def resolve_plan_dir(
+    cwd: str | None = None, slug: str | None = None, session_key: str | None = None
+) -> Path | None:
     script = skill_root() / "scripts" / "resolve-plan-dir.sh"
     command = ["sh", str(script)]
     if slug:
         command.append(slug)
+
+    env = os.environ.copy()
+    if session_key:
+        env["PLAN_SESSION_KEY"] = session_key
 
     try:
         result = subprocess.run(
@@ -70,6 +121,7 @@ def resolve_plan_dir(cwd: str | None = None, slug: str | None = None) -> Path | 
             check=True,
             text=True,
             capture_output=True,
+            env=env,
         )
     except subprocess.CalledProcessError:
         return None
@@ -203,7 +255,9 @@ def delegate_hint_for_text(text: str, state: dict | None = None) -> str | None:
     return base
 
 
-def task_drift_result(text: str, cwd: str | None = None) -> dict | None:
+def task_drift_result(
+    text: str, cwd: str | None = None, session_key: str | None = None
+) -> dict | None:
     if (
         not TASK_GUARD_IMPORT_OK
         or not text.strip()
@@ -212,8 +266,19 @@ def task_drift_result(text: str, cwd: str | None = None) -> dict | None:
     ):
         return None
 
-    task = resolve_guard_task(cwd or "", "")
+    task = resolve_guard_task(cwd or "", "", session_key or "")
     return classify_drift(text, task)
+
+
+def resolve_task_meta(
+    cwd: str | None = None, session_key: str | None = None
+) -> dict | None:
+    if not TASK_GUARD_IMPORT_OK or resolve_guard_task is None:
+        return None
+    try:
+        return resolve_guard_task(cwd or "", "", session_key or "")
+    except Exception:
+        return None
 
 
 def task_drift_hint(result: dict | None, tool_name: str | None = None) -> str | None:
@@ -258,7 +323,9 @@ def allow_delegate_hint(result: dict | None) -> bool:
     return result.get("classification") == "related"
 
 
-def state_summary(state: dict, tool_name: str | None = None) -> str:
+def state_summary(
+    state: dict, task_meta: dict | None = None, tool_name: str | None = None
+) -> str:
     slug = state.get("slug", "(unknown)")
     status = state.get("status", "unknown")
     mode = state.get("mode", "unknown")
@@ -279,11 +346,41 @@ def state_summary(state: dict, tool_name: str | None = None) -> str:
         f"Active delegates: {active_delegates}",
     ]
 
+    role = ""
+    writer_display = ""
+    observer_count = 0
+    repo_scope = []
+    primary_repo = ""
+    if isinstance(task_meta, dict):
+        role = str(task_meta.get("binding_role") or "")
+        writer_display = str(task_meta.get("writer_display") or "")
+        observer_count = int(task_meta.get("observer_count") or 0)
+        repo_scope = list(task_meta.get("repo_scope") or [])
+        primary_repo = str(task_meta.get("primary_repo") or "")
+
+    if role:
+        lines.append(
+            f"Access: {role} | writer={writer_display or '(none)'} | observers={observer_count}"
+        )
+        if role == "observer":
+            lines.append(
+                "Observe-only session: do not edit `task_plan.md`, `progress.md`, or `state.json`. You may still create or update delegate lanes under `delegates/<delegate-id>/`."
+            )
+    if repo_scope:
+        lines.append(
+            f"Repos: primary={primary_repo or '(none)'} | scope={', '.join(repo_scope)}"
+        )
+
     if tool_name == "Bash":
         lines.append(f"Verification commands: {verify_commands}")
-        lines.append(
-            "If this Bash step changes task state, sync `progress.md` and `state.json` afterwards."
-        )
+        if role == "observer":
+            lines.append(
+                "If this Bash step needs planning changes, hand them to the writer session instead of editing main planning files here."
+            )
+        else:
+            lines.append(
+                "If this Bash step changes task state, sync `progress.md` and `state.json` afterwards."
+            )
     elif tool_name == "Task":
         lines.append(
             f'If this Task call is a bounded discovery, review, verify, or spike problem, prefer `{installed_skill_command("prepare-delegate.sh")} "<description>"` before launching the subagent.'

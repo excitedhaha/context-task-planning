@@ -29,8 +29,9 @@ The wrappers stay shell-friendly. The Python core owns the selection logic and d
 
 1. explicit `--task <slug>`
 2. `PLAN_TASK`
-3. `.planning/.active_task`
-4. latest auto-selectable task
+3. session binding selected by `PLAN_SESSION_KEY`
+4. `.planning/.active_task`
+5. latest auto-selectable task
 
 P0 outputs:
 
@@ -46,8 +47,16 @@ Recommended JSON fields:
 - `plan_root`
 - `plan_dir`
 - `requested_slug`
+- `session_key`
+- `session_binding`
+- `binding_role`
 - `session_pin`
 - `active_pointer`
+- `writer_display`
+- `observer_count`
+- `primary_repo`
+- `repo_scope`
+- `repo_bindings`
 - `slug`
 - `title`
 - `status`
@@ -96,7 +105,11 @@ Recommended JSON fields:
 | Host | Current task visibility | Prompt drift reminder | Tool-time reminder | P0 path | Confidence |
 |------|-------------------------|-----------------------|--------------------|---------|------------|
 | Claude Code | `current-task.sh` in shell or tmux now; `statusLine` can also render the active task natively | `UserPromptSubmit` can call the shared checker | `PreToolUse` can reuse the same result or re-check tool text | shared core + Claude hooks + `claude-hooks/scripts/statusline.py` | high |
-| OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title, and show a toast | plugin can call the shared checker on chat messages | plugin can warn before `Task` and pin shell commands with `PLAN_TASK` | shared core + `skill/opencode-plugin/task-focus-guard.js` (quiet outside repos that already use `.planning/`) | medium |
+| OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title, and show a toast | plugin can call the shared checker on chat messages | plugin can warn before `Task` and bind shell commands to the OpenCode session with `PLAN_SESSION_KEY` | shared core + `skill/opencode-plugin/task-focus-guard.js` (quiet outside repos that already use `.planning/`) | medium |
+
+Session bindings are not the same thing as writer ownership: one task may have one writer session plus additional observers.
+
+In parent-directory multi-repo workspaces, the canonical task still lives under `.planning/<slug>/`, but the task may also declare explicit repo scope and checkout bindings so host adapters can show the right repo context.
 | Codex | `current-task.sh` in shell or tmux now | best-effort reminder through skill text, docs, and future metadata | none in P0 | shared core + skill-level policy | medium-low |
 
 ## Rollout

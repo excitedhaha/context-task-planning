@@ -48,6 +48,7 @@ FINDINGS_FILE="$PLAN_DIR/findings.md"
 DELEGATE_DIR="$PLAN_DIR/delegates/$DELEGATE_ID"
 DELEGATE_STATUS_FILE="$DELEGATE_DIR/status.json"
 DELEGATE_RESULT_FILE="$DELEGATE_DIR/result.md"
+TASK_NAME=$(basename "$PLAN_DIR")
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "[context-task-planning] Missing state.json in $PLAN_DIR" >&2
@@ -63,6 +64,12 @@ PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [ -z "$PYTHON_BIN" ]; then
     echo "Python is required to promote delegates." >&2
     exit 1
+fi
+
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME"
+else
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME" --fallback
 fi
 
 export STATE_FILE PROGRESS_FILE FINDINGS_FILE DELEGATE_STATUS_FILE DELEGATE_RESULT_FILE DELEGATE_ID

@@ -8,7 +8,9 @@ try:
         load_state,
         no_active_task_hint,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         session_start_payload,
         state_summary,
     )
@@ -18,7 +20,9 @@ except ImportError:
         load_state,
         no_active_task_hint,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         session_start_payload,
         state_summary,
     )
@@ -27,12 +31,14 @@ except ImportError:
 def main():
     payload = read_hook_input()
     cwd = payload.get("cwd")
-    plan_dir = resolve_plan_dir(cwd=cwd)
+    session_key = session_key_from_payload(payload)
+    plan_dir = resolve_plan_dir(cwd=cwd, session_key=session_key)
+    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
 
     if plan_dir:
         state = load_state(plan_dir)
         if state:
-            print(session_start_payload(state_summary(state)))
+            print(session_start_payload(state_summary(state, task_meta=task_meta)))
             return
 
     hint = no_active_task_hint(cwd)

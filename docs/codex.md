@@ -61,6 +61,12 @@ So the intended fallback is:
 - use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
 - expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the request looks mismatched
 
+If you keep several Codex threads open in one repository, give each shell or wrapper a different `PLAN_SESSION_KEY`, then use `set-active-task.sh` or `resume-task.sh` inside that session to keep the task bindings separate. Use `set-active-task.sh --observe <slug>` when a second thread should watch the same task without becoming a second writer.
+
+If you run Codex from a parent directory that contains several repos, explicitly register those repos first and bind them to the task before you start editing. Treat `list-repos.sh --discover` as a candidate list, not as an automatic mutation step.
+
+After that parent workspace owns `.planning/`, the same task should still resolve when Codex is started from a registered repo path or a recorded `.worktrees/...` checkout. Unrelated ancestor `.planning/` directories should not capture the session.
+
 If you want to force that behavior in a prompt, say it explicitly:
 
 ```text

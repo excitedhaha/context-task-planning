@@ -29,7 +29,13 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-"$PYTHON_BIN" - "$STATE_FILE" "$PROGRESS_FILE" "$TASK_PLAN_FILE" <<'PY'
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG"
+else
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --fallback
+fi
+
+"$PYTHON_BIN" - "$STATE_FILE" "$PROGRESS_FILE" "$TASK_PLAN_FILE" "$PLAN_DIR" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -38,6 +44,7 @@ from pathlib import Path
 state_path = Path(sys.argv[1])
 progress_path = Path(sys.argv[2])
 task_plan_path = Path(sys.argv[3])
+plan_dir = Path(sys.argv[4])
 
 timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -48,7 +55,20 @@ if state.get("status") == "archived":
 if state.get("blockers"):
     raise SystemExit("Cannot mark task done while blockers are still recorded.")
 
-active_delegates = state.get("delegation", {}).get("active", [])
+active_delegates = []
+delegates_dir = plan_dir / "delegates"
+if delegates_dir.is_dir():
+    for entry in delegates_dir.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        status_path = entry / "status.json"
+        if not status_path.exists():
+            continue
+        delegate_state = json.loads(status_path.read_text(encoding="utf-8"))
+        if delegate_state.get("status") in {"complete", "cancelled"}:
+            continue
+        active_delegates.append(delegate_state.get("delegate_id", entry.name))
+
 if active_delegates:
     raise SystemExit("Cannot mark task done while active delegates remain: " + ", ".join(active_delegates))
 
@@ -111,6 +131,8 @@ if [ -f "$ACTIVE_FILE" ]; then
         echo "[context-task-planning] Cleared shared active pointer for $TASK_SLUG"
     fi
 fi
+
+"$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" clear-task-sessions --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG"
 
 echo "[context-task-planning] Marked done: $TASK_SLUG"
 echo "[context-task-planning] Task directory: $PLAN_DIR"

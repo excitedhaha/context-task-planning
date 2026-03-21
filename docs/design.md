@@ -7,7 +7,7 @@ Build a planning skill that treats context engineering as a first-class system, 
 ## Non-goals for v0.1.0
 
 - no Claude plugin packaging
-- no host-specific session parsing
+- no full host-specific session-history parsing
 - no cross-machine git sync
 - no mega-plan or story graph orchestration
 - no GUI or MCP server
@@ -47,6 +47,12 @@ Only the coordinator updates:
 - `state.json`
 
 Delegates may write only inside `delegates/<delegate-id>/`.
+
+Session-scoped routing does not change that rule: a task may have one writer session plus additional observer sessions, and observers stay out of the main planning files.
+
+For parent workspaces that contain multiple git repos, the planning root stays shared at the parent level, while repo ownership is declared per task through explicit repo registration and repo scope metadata.
+
+Ancestor `.planning/` directories are only reused when the current path still belongs to that workspace root, its planning tree, a registered repo, or a recorded worktree checkout. Otherwise resolution falls back to the current session directory so unrelated parent workspaces do not capture a new task by accident.
 
 ### 5. Pure-file recovery
 

@@ -7,6 +7,8 @@
 - Current Mode: `clarify`
 - Current Phase: `clarify`
 - Next Action: {{INITIAL_NEXT_ACTION}}
+- Primary Repo: (unset)
+- Repo Scope: (unset)
 - Last Updated: {{CREATED_AT}}
 
 ## Session Log

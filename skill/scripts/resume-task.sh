@@ -10,6 +10,7 @@ ACTIVE_FILE="$PLAN_ROOT/.active_task"
 ALLOW_DIRTY=0
 AUTO_STASH=0
 TASK_ARG=""
+STEAL=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -19,8 +20,11 @@ while [ "$#" -gt 0 ]; do
         --allow-dirty)
             ALLOW_DIRTY=1
             ;;
+        --steal)
+            STEAL=1
+            ;;
         -h|--help)
-            echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+            echo "Usage: $0 [--stash] [--allow-dirty] [--steal] [task-slug]" >&2
             exit 0
             ;;
         --)
@@ -28,12 +32,12 @@ while [ "$#" -gt 0 ]; do
             break
             ;;
         -*)
-            echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+            echo "Usage: $0 [--stash] [--allow-dirty] [--steal] [task-slug]" >&2
             exit 1
             ;;
         *)
             if [ -n "$TASK_ARG" ]; then
-                echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+                echo "Usage: $0 [--stash] [--allow-dirty] [--steal] [task-slug]" >&2
                 exit 1
             fi
             TASK_ARG="$1"
@@ -43,7 +47,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$#" -gt 0 ]; then
-    echo "Usage: $0 [--stash] [--allow-dirty] [task-slug]" >&2
+    echo "Usage: $0 [--stash] [--allow-dirty] [--steal] [task-slug]" >&2
     exit 1
 fi
 
@@ -91,27 +95,12 @@ if [ "$TARGET_STATUS" = "done" ]; then
     exit 1
 fi
 
-CURRENT_ACTIVE_SLUG=""
-if [ -f "$ACTIVE_FILE" ]; then
-    CURRENT_ACTIVE_SLUG=$(tr -d '\r\n' < "$ACTIVE_FILE")
-fi
-
 if [ "$ALLOW_DIRTY" -eq 1 ] && [ "$AUTO_STASH" -eq 1 ]; then
     echo "Choose only one of --stash or --allow-dirty." >&2
     exit 1
 fi
 
-if [ -n "$CURRENT_ACTIVE_SLUG" ] && [ "$CURRENT_ACTIVE_SLUG" != "$TASK_SLUG" ]; then
-    if [ "$AUTO_STASH" -eq 1 ]; then
-        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --stash
-    elif [ "$ALLOW_DIRTY" -eq 1 ]; then
-        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG" --allow-dirty
-    else
-        sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --source-task "$CURRENT_ACTIVE_SLUG" --target-task "$TASK_SLUG"
-    fi
-
-    sh "$SCRIPT_DIR/pause-task.sh" "$CURRENT_ACTIVE_SLUG"
-elif [ "$AUTO_STASH" -eq 1 ]; then
+if [ "$AUTO_STASH" -eq 1 ]; then
     sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --target-task "$TASK_SLUG" --stash
 elif [ "$ALLOW_DIRTY" -eq 1 ]; then
     sh "$SCRIPT_DIR/ensure-switch-safety.sh" --cwd "$WORKSPACE_ROOT" --target-task "$TASK_SLUG" --allow-dirty
@@ -172,7 +161,26 @@ if task_plan_path.exists():
 PY
 
 mkdir -p "$PLAN_ROOT"
-printf '%s\n' "$TASK_SLUG" > "$ACTIVE_FILE"
+
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    if [ "$STEAL" -eq 1 ]; then
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" bind-session-task --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --role writer --steal
+    else
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" bind-session-task --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --role writer
+    fi
+else
+    if [ "$STEAL" -eq 1 ]; then
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" bind-session-task --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --role writer --fallback --steal
+    else
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" bind-session-task --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --role writer --fallback
+    fi
+    printf '%s\n' "$TASK_SLUG" > "$ACTIVE_FILE"
+fi
 
 echo "[context-task-planning] Resumed task: $TASK_SLUG"
 echo "[context-task-planning] Task directory: $PLAN_DIR"
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    echo "[context-task-planning] Session writer binding: ${PLAN_SESSION_KEY} -> $TASK_SLUG"
+else
+    echo "[context-task-planning] Workspace fallback writer task: $TASK_SLUG"
+fi

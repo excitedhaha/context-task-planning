@@ -104,6 +104,10 @@ def parse_task_plan_hot_context(path: Path):
             fields["phase"] = extract_inline_value(line)
         elif line.startswith("- Next Action:"):
             fields["next_action"] = extract_inline_value(line)
+        elif line.startswith("- Primary Repo:"):
+            fields["primary_repo"] = extract_inline_value(line)
+        elif line.startswith("- Repo Scope:"):
+            fields["repo_scope"] = extract_inline_value(line)
     return fields
 
 
@@ -130,6 +134,10 @@ def parse_progress_snapshot(path: Path):
             fields["phase"] = extract_inline_value(line)
         elif line.startswith("- Next Action:"):
             fields["next_action"] = extract_inline_value(line)
+        elif line.startswith("- Primary Repo:"):
+            fields["primary_repo"] = extract_inline_value(line)
+        elif line.startswith("- Repo Scope:"):
+            fields["repo_scope"] = extract_inline_value(line)
         elif line.startswith("- Last Updated:"):
             fields["last_updated"] = extract_inline_value(line)
     return fields
@@ -199,6 +207,23 @@ if state:
     if len(active_delegates) != len(set(active_delegates)):
         add_issue("state.json delegation.active contains duplicate delegate ids")
 
+    repo_scope = state.get("repo_scope", [])
+    if repo_scope and not isinstance(repo_scope, list):
+        add_issue("state.json repo_scope must be a list when present")
+        repo_scope = []
+    if isinstance(repo_scope, list):
+        normalized_repo_scope = []
+        for repo_id in repo_scope:
+            if not isinstance(repo_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", repo_id):
+                add_issue(f"Invalid repo id in state.json repo_scope: {repo_id!r}")
+                continue
+            normalized_repo_scope.append(repo_id)
+        if len(normalized_repo_scope) != len(set(normalized_repo_scope)):
+            add_issue("state.json repo_scope contains duplicate repo ids")
+        primary_repo = state.get("primary_repo", "")
+        if primary_repo and primary_repo not in normalized_repo_scope:
+            add_issue("state.json primary_repo must be included in repo_scope")
+
 if task_plan_file.exists() and state:
     hot = parse_task_plan_hot_context(task_plan_file)
     required_hot = ["slug", "status", "goal", "mode", "phase", "next_action"]
@@ -213,6 +238,9 @@ if task_plan_file.exists() and state:
         "phase": state.get("current_phase", ""),
         "next_action": state.get("next_action", ""),
     }
+    if state.get("primary_repo") or state.get("repo_scope"):
+        expected_hot["primary_repo"] = state.get("primary_repo", "") or "(unset)"
+        expected_hot["repo_scope"] = ", ".join(state.get("repo_scope", [])) if state.get("repo_scope") else "(unset)"
     for key, expected in expected_hot.items():
         actual = hot.get(key)
         if actual is None:
@@ -242,6 +270,9 @@ if progress_file.exists() and state:
         "phase": state.get("current_phase", ""),
         "next_action": state.get("next_action", ""),
     }
+    if state.get("primary_repo") or state.get("repo_scope"):
+        expected_snapshot["primary_repo"] = state.get("primary_repo", "") or "(unset)"
+        expected_snapshot["repo_scope"] = ", ".join(state.get("repo_scope", [])) if state.get("repo_scope") else "(unset)"
     for key, expected in expected_snapshot.items():
         actual = snapshot.get(key)
         if actual is None:
@@ -289,14 +320,14 @@ if state:
             continue
         status = dstate.get("status")
         if status not in active_delegate_statuses:
-            add_issue(f"Delegate `{delegate_id}` is active in state.json but has terminal status `{status}`")
+            add_warning(f"Delegate `{delegate_id}` is active in state.json but has terminal status `{status}`")
 
     for delegate_id, dstate in delegate_states.items():
         status = dstate.get("status")
         if status in active_delegate_statuses and delegate_id not in active_delegates:
-            add_issue(f"Delegate `{delegate_id}` has status `{status}` but is missing from state.json delegation.active")
+            add_warning(f"Delegate `{delegate_id}` has status `{status}` but is missing from state.json delegation.active")
         if status in terminal_delegate_statuses and delegate_id in active_delegates:
-            add_issue(f"Delegate `{delegate_id}` has terminal status `{status}` but is still listed as active")
+            add_warning(f"Delegate `{delegate_id}` has terminal status `{status}` but is still listed as active")
 
 print(f"[context-task-planning] Validating task: {state.get('slug', plan_dir.name) if state else plan_dir.name}")
 print(f"[context-task-planning] Task directory: {plan_dir}")

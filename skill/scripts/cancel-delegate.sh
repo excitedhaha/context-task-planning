@@ -52,6 +52,7 @@ STATE_FILE="$PLAN_DIR/state.json"
 PROGRESS_FILE="$PLAN_DIR/progress.md"
 DELEGATE_DIR="$PLAN_DIR/delegates/$DELEGATE_ID"
 DELEGATE_STATUS_FILE="$DELEGATE_DIR/status.json"
+TASK_NAME=$(basename "$PLAN_DIR")
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "[context-task-planning] Missing state.json in $PLAN_DIR" >&2
@@ -69,7 +70,16 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-export STATE_FILE PROGRESS_FILE DELEGATE_STATUS_FILE DELEGATE_ID DELEGATE_SUMMARY
+ALLOW_MAIN_PLAN_WRITES=1
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    if ! "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME" >/dev/null 2>&1; then
+        ALLOW_MAIN_PLAN_WRITES=0
+    fi
+elif ! "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --cwd "$PLAN_DIR" --task "$TASK_NAME" --fallback >/dev/null 2>&1; then
+    ALLOW_MAIN_PLAN_WRITES=0
+fi
+
+export STATE_FILE PROGRESS_FILE DELEGATE_STATUS_FILE DELEGATE_ID DELEGATE_SUMMARY ALLOW_MAIN_PLAN_WRITES
 "$PYTHON_BIN" <<'PY'
 import json
 import os
@@ -81,6 +91,7 @@ progress_path = Path(os.environ["PROGRESS_FILE"])
 delegate_status_path = Path(os.environ["DELEGATE_STATUS_FILE"])
 delegate_id = os.environ["DELEGATE_ID"]
 delegate_summary = os.environ["DELEGATE_SUMMARY"].strip()
+allow_main_plan_writes = os.environ.get("ALLOW_MAIN_PLAN_WRITES", "1") == "1"
 
 timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -100,13 +111,14 @@ delegate_state["summary"] = delegate_summary
 delegate_state["updated_at"] = timestamp
 delegate_status_path.write_text(json.dumps(delegate_state, indent=2) + "\n", encoding="utf-8")
 
-active = state.setdefault("delegation", {}).setdefault("active", [])
-state["delegation"]["active"] = [item for item in active if item != delegate_id]
-state["latest_checkpoint"] = f"Delegate {delegate_id} cancelled at {timestamp}."
-state["updated_at"] = timestamp
-state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+if allow_main_plan_writes:
+    active = state.setdefault("delegation", {}).setdefault("active", [])
+    state["delegation"]["active"] = [item for item in active if item != delegate_id]
+    state["latest_checkpoint"] = f"Delegate {delegate_id} cancelled at {timestamp}."
+    state["updated_at"] = timestamp
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
-if progress_path.exists():
+if allow_main_plan_writes and progress_path.exists():
     with progress_path.open("a", encoding="utf-8") as fh:
         fh.write("\n")
         fh.write(f"### Delegate Cancelled: {timestamp}\n\n")
@@ -119,3 +131,6 @@ PY
 
 echo "[context-task-planning] Cancelled delegate: $DELEGATE_ID"
 echo "[context-task-planning] Delegate directory: $DELEGATE_DIR"
+if [ "$ALLOW_MAIN_PLAN_WRITES" -eq 0 ]; then
+    echo "[context-task-planning] Observe-only session: main planning files were left unchanged; only the delegate lane was updated."
+fi

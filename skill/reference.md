@@ -24,7 +24,7 @@ Use markdown for explanation and review. Use `state.json` for stable machine-rea
 
 ### Single writer, multiple readers
 
-The coordinator owns main planning files. Delegates do not.
+The coordinator owns main planning files. Delegates do not. A task may have one writer session plus additional observer sessions.
 
 ### Distill before promote
 
@@ -70,11 +70,23 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 
 Use `current-task.sh` when a shell prompt, tmux status line, or host adapter needs a compact view of the current task.
 
+Resolution order is: explicit `--task`, `PLAN_TASK`, the session binding selected by `PLAN_SESSION_KEY`, `.planning/.active_task`, then the latest auto-selectable task.
+
+`set-active-task.sh` accepts `--observe` for read-only bindings and `--steal` when a new session intentionally takes over the writer lease.
+
 Use `check-task-drift.sh` when you want a lightweight answer to: does this new request still fit the active task, or should the agent confirm before mixing it in?
 
 Use `check-switch-safety.sh --target-task <slug> --json` when you are about to switch tasks in a git repository and want to know whether the current worktree should be stashed or committed first.
 
-`init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately.
+`init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately. When `PLAN_SESSION_KEY` is present, those commands update the current session binding instead of treating `.planning/.active_task` as the only live pointer.
+
+Observer sessions may still create or update delegate lanes under `delegates/<delegate-id>/`, but they must leave `task_plan.md`, `progress.md`, `state.json`, and `findings.md` to the writer.
+
+For parent workspaces that contain multiple repos, register repos explicitly with `register-repo.sh`, attach them to tasks with `set-task-repos.sh`, and only use auto-discovery as a review aid before you confirm the registrations.
+
+Workspace resolution only reuses an ancestor `.planning/` when the current path still belongs to that workspace root, its planning tree, a registered repo, or a recorded worktree checkout. Otherwise the tools fall back to the current directory so unrelated parent workspaces do not capture a new task accidentally.
+
+If two writer tasks need the same repo concurrently, prepare a dedicated checkout for the overlapping repo with `prepare-task-worktree.sh --task <slug> --repo <repo-id>`.
 
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
 
@@ -107,7 +119,7 @@ Those answers should be available from the task folder without relying on sessio
 
 ## Status semantics
 
-- `active` - the task is the current working target
+- `active` - the task is open for ongoing work and may be the current target for one or more sessions
 - `paused` - the task is intentionally parked; keep the next action intact
 - `blocked` - the task cannot advance until blockers are resolved
 - `verifying` - the task is in an explicit validation pass

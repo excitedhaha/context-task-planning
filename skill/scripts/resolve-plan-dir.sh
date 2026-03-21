@@ -3,9 +3,20 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REQUESTED_SLUG="${1:-}"
+PYTHON_BIN="$(command -v python3 || command -v python || true)"
+
+if [ -n "$PYTHON_BIN" ]; then
+    if [ -n "$REQUESTED_SLUG" ]; then
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" resolve-plan-dir --cwd "$PWD" --task "$REQUESTED_SLUG"
+    else
+        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" resolve-plan-dir --cwd "$PWD"
+    fi
+    exit 0
+fi
+
 WORKSPACE_ROOT=$(sh "$SCRIPT_DIR/resolve-workspace-root.sh")
 PLAN_ROOT="$WORKSPACE_ROOT/.planning"
-REQUESTED_SLUG="${1:-}"
 
 is_status_dir() {
     dir="$1"

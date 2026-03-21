@@ -101,16 +101,45 @@ sh scripts/cancel-delegate.sh --summary "No longer needed after design change" r
 
 ## Example 4: Parallel sessions
 
-Pin each terminal or agent session to a different task:
+Give each terminal or agent session its own session key, then bind a task inside that session:
 
 ```bash
-export PLAN_TASK=feature-auth
-export PLAN_TASK=bugfix-login
+PLAN_SESSION_KEY=manual:feature-auth sh scripts/set-active-task.sh feature-auth
+PLAN_SESSION_KEY=manual:bugfix-login sh scripts/set-active-task.sh bugfix-login
 ```
 
-This avoids accidental switching through the shared `.planning/.active_task` pointer.
+Host adapters can do this automatically with their own session IDs. `PLAN_TASK` remains a one-off manual override, while `.planning/.active_task` is only the workspace fallback.
 
-## Example 5: List tasks in one repository
+If two sessions need the same task, keep one writer and bind the others as observers:
+
+```bash
+PLAN_SESSION_KEY=manual:writer sh scripts/set-active-task.sh feature-auth
+PLAN_SESSION_KEY=manual:reviewer sh scripts/set-active-task.sh --observe feature-auth
+```
+
+Observers may update delegate lanes, but they should not edit `task_plan.md`, `progress.md`, or `state.json`.
+
+## Example 5: Parent workspace with multiple repos
+
+Register repos explicitly, then bind them to the task:
+
+```bash
+sh scripts/list-repos.sh --discover
+sh scripts/register-repo.sh --id frontend frontend
+sh scripts/register-repo.sh --id backend backend
+sh scripts/init-task.sh --repo frontend --repo backend --primary frontend "Cross-repo auth flow"
+```
+
+After that parent workspace owns `.planning/`, you can keep working from `frontend/`, `backend/`, or a recorded `.worktrees/...` checkout and still resolve the same shared task state. Unrelated ancestor `.planning/` directories should not capture the session.
+
+If another writer task needs `frontend` at the same time, prepare a dedicated checkout for that repo:
+
+```bash
+sh scripts/prepare-task-worktree.sh --task billing-cleanup --repo frontend
+sh scripts/list-worktrees.sh
+```
+
+## Example 6: List tasks in one repository
 
 ```bash
 sh scripts/list-tasks.sh
@@ -119,11 +148,12 @@ sh scripts/list-tasks.sh
 Use this when you need to see:
 
 - active pointer
-- session pin
+- current session binding
+- how many sessions point at each task
 - archived vs non-archived tasks
 - most recently updated tasks
 
-## Example 6: Archive a finished task
+## Example 7: Archive a finished task
 
 ```bash
 sh scripts/archive-task.sh feature-auth
@@ -131,15 +161,15 @@ sh scripts/archive-task.sh feature-auth
 
 This updates `state.json`, appends an archive note to `progress.md`, updates the `Hot Context` snapshot in `task_plan.md`, and clears `.planning/.active_task` if it pointed at the archived task.
 
-## Example 7: Pause a task mid-stream
+## Example 8: Pause a task mid-stream
 
 ```bash
 sh scripts/pause-task.sh feature-auth
 ```
 
-This keeps the current phase and next action intact, marks the task as `paused`, and clears the shared active pointer if needed.
+This keeps the current phase and next action intact, marks the task as `paused`, and clears any session bindings or workspace fallback pointers that still pointed at the task.
 
-## Example 8: Mark a task done before archival
+## Example 9: Mark a task done before archival
 
 ```bash
 sh scripts/done-task.sh feature-auth
@@ -147,13 +177,15 @@ sh scripts/done-task.sh feature-auth
 
 This marks all non-blocked phases complete, sets the task status to `done`, updates the Hot Context snapshot, and leaves the task ready for later archival.
 
-## Example 9: Resume a paused task
+## Example 10: Resume a paused task
 
 ```bash
 sh scripts/resume-task.sh feature-auth
 ```
 
-This switches task status back to `active`, records a resume checkpoint, and restores `.planning/.active_task` to the resumed task.
+This switches task status back to `active`, records a resume checkpoint, and binds the resumed task to the current session when `PLAN_SESSION_KEY` is present; otherwise it updates the workspace fallback pointer.
+
+If another session already owns the writer lease for that task, use `--steal` only when you intentionally want to take over that ownership.
 
 If the git worktree is dirty and the switch would carry local code changes into another task, the script now warns before switching. Use `--stash` to stash automatically:
 
@@ -167,11 +199,11 @@ You can inspect the recommendation first with:
 sh scripts/check-switch-safety.sh --target-task feature-auth --json
 ```
 
-## Example 10: Done guard when delegates are still open
+## Example 11: Done guard when delegates are still open
 
 If `delegation.active` still contains delegates, `done-task.sh` will refuse to mark the task done until those lanes are completed or otherwise resolved.
 
-## Example 11: Validate task consistency
+## Example 12: Validate task consistency
 
 ```bash
 sh scripts/validate-task.sh

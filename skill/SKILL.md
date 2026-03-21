@@ -50,11 +50,29 @@ Each task lives in its own directory:
 3. Read `.planning/<slug>/task_plan.md`
 4. Fill in missing goal, non-goals, constraints, and open questions before implementation
 
-If multiple sessions are active, pin the current session to one task:
+If multiple sessions are active, give the current session a stable session key and bind one task to it:
 
 ```bash
-export PLAN_TASK=<slug>
+export PLAN_SESSION_KEY=manual:<name>
+sh scripts/set-active-task.sh <slug>
 ```
+
+Use `PLAN_TASK` only for a one-off manual override inside the current shell.
+
+If another session is already writing the same task, use `set-active-task.sh --observe <slug>` instead of creating a second writer. Observers may still work inside delegate lanes.
+
+If the workspace is a parent directory that contains multiple git repos, register repos explicitly before you bind them to tasks:
+
+```bash
+sh scripts/list-repos.sh --discover
+sh scripts/register-repo.sh --id frontend frontend
+sh scripts/register-repo.sh --id backend backend
+sh scripts/set-task-repos.sh <slug> --repo frontend --repo backend --primary frontend
+```
+
+Use auto-discovery only to review candidates. The actual registration step should stay explicit.
+
+Once the parent workspace owns `.planning/`, commands run from that parent directory, any registered repo path, or a recorded `.worktrees/...` checkout should all resolve back to the same shared workspace. Ignore unrelated ancestor `.planning/` directories unless the current path actually belongs to that older workspace.
 
 ## Workflow
 
@@ -97,7 +115,7 @@ Every task should declare its verification targets and record actual results in 
 
 ### 6. Archive, do not overwrite
 
-When a task is complete, keep the task directory as history. Switch or remove the active pointer instead of reusing the directory for unrelated work.
+When a task is complete, keep the task directory as history. Switch or remove the session binding or workspace fallback pointer instead of reusing the directory for unrelated work.
 
 ### 7. Guard against task drift on hosts without runtime adapters
 
@@ -161,6 +179,8 @@ Only the coordinator updates:
 
 Delegates should write only inside their own scratch folders.
 
+In session terms: one task may have one writer session and additional observer sessions. Observers may create or update delegate lanes, but they must not edit `task_plan.md`, `progress.md`, `state.json`, or `findings.md`.
+
 ## Recovery order
 
 When resuming a task, recover in this order:
@@ -175,12 +195,17 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 ## Scripts
 
 - `scripts/init-task.sh` - create or resume `.planning/<slug>/`, warning before switching away from dirty git work
-- `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, `.active_task`, or latest plan
+- `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, session binding, `.active_task`, or latest plan
 - `scripts/current-task.sh` - show the resolved task for shells, status bars, or host adapters
 - `scripts/check-task-drift.sh` - classify whether a new prompt still fits the active task
 - `scripts/check-switch-safety.sh` - inspect whether a git worktree should be stashed or committed before switching tasks
+- `scripts/list-repos.sh --discover` - show registered repos plus direct-child git repos that could be registered under the current workspace
+- `scripts/register-repo.sh --id <repo-id> <path>` - explicitly register a repo under a parent workspace
+- `scripts/set-task-repos.sh <slug> --repo <repo-id> [--repo ...] [--primary <repo-id>]` - declare which registered repos a task is allowed to touch
+- `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task
+- `scripts/list-worktrees.sh` - inspect task-specific worktree bindings
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
-- `scripts/set-active-task.sh <slug>` - update shared default pointer, with a dirty-worktree guard in git repos
+- `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
 - `scripts/create-delegate.sh` - create a delegate lane under the current task
@@ -193,7 +218,7 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/promote-delegate.sh <delegate-id>` - append delegate results into `findings.md`
 - `scripts/list-tasks.sh` - show all task workspaces and their states
 - `scripts/pause-task.sh [slug]` - pause a task without losing its current phase or next action
-- `scripts/resume-task.sh [slug]` - reactivate a paused task, auto-pause the previously active task, and guard dirty git worktrees before switching
+- `scripts/resume-task.sh [slug]` - reactivate a paused task, bind it as the writer for the current session or workspace fallback, and guard dirty git worktrees before switching
 - `scripts/ensure-switch-safety.sh` - enforce the dirty-worktree guard, prompting to stash, commit manually, or continue dirty
 - `scripts/done-task.sh [slug]` - mark a task done after verification and clear the shared pointer if needed
 - `scripts/archive-task.sh [slug]` - archive a task and clear the shared pointer if needed

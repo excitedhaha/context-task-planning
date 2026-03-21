@@ -22,18 +22,31 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 0
 fi
 
-"$PYTHON_BIN" - "$STATE_FILE" <<'PY'
+"$PYTHON_BIN" - "$STATE_FILE" "$PLAN_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 state_path = Path(sys.argv[1])
+plan_dir = Path(sys.argv[2])
 state = json.loads(state_path.read_text(encoding="utf-8"))
 phases = state.get("phases", [])
 complete = sum(1 for phase in phases if phase.get("status") == "complete")
 blocked = [phase["id"] for phase in phases if phase.get("status") == "blocked"]
 active = [phase["id"] for phase in phases if phase.get("status") == "in_progress"]
-delegates = state.get("delegation", {}).get("active", [])
+delegates = []
+delegates_dir = plan_dir / "delegates"
+if delegates_dir.is_dir():
+    for entry in delegates_dir.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        status_path = entry / "status.json"
+        if not status_path.exists():
+            continue
+        delegate_state = json.loads(status_path.read_text(encoding="utf-8"))
+        if delegate_state.get("status") in {"complete", "cancelled"}:
+            continue
+        delegates.append(delegate_state.get("delegate_id", entry.name))
 
 print(f"[context-task-planning] Task: {state.get('slug', '(unknown)')}")
 print(f"[context-task-planning] Title: {state.get('title', '(unknown)')}")

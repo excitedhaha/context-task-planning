@@ -10,7 +10,9 @@ try:
         load_state,
         pre_tool_payload,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         state_summary,
         task_drift_hint,
         task_drift_result,
@@ -23,7 +25,9 @@ except ImportError:
         load_state,
         pre_tool_payload,
         read_hook_input,
+        resolve_task_meta,
         resolve_plan_dir,
+        session_key_from_payload,
         state_summary,
         task_drift_hint,
         task_drift_result,
@@ -33,9 +37,11 @@ except ImportError:
 def main():
     payload = read_hook_input()
     cwd = payload.get("cwd")
+    session_key = session_key_from_payload(payload)
     tool_name = payload.get("tool_name")
     tool_input = payload.get("tool_input") or {}
-    plan_dir = resolve_plan_dir(cwd=cwd)
+    plan_dir = resolve_plan_dir(cwd=cwd, session_key=session_key)
+    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
 
     if not plan_dir:
         return
@@ -51,13 +57,13 @@ def main():
             str(tool_input.get(key, ""))
             for key in ("description", "prompt", "command", "subagent_type")
         )
-        drift_result = task_drift_result(task_text, cwd)
+        drift_result = task_drift_result(task_text, cwd, session_key=session_key)
 
     summary_tool_name = tool_name
     if tool_name == "Task" and not allow_delegate_hint(drift_result):
         summary_tool_name = None
 
-    context = state_summary(state, tool_name=summary_tool_name)
+    context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name)
     if tool_name == "Task":
         drift_hint = task_drift_hint(drift_result, tool_name=tool_name)
         if drift_hint:
