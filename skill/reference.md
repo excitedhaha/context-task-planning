@@ -70,6 +70,8 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 
 Use `current-task.sh` when a shell prompt, tmux status line, or host adapter needs a compact view of the current task.
 
+For the deeper architecture behind session bindings, repo scope, and worktree isolation, see `docs/design.md`.
+
 Resolution order is: explicit `--task`, `PLAN_TASK`, the session binding selected by `PLAN_SESSION_KEY`, `.planning/.active_task`, then the latest auto-selectable task.
 
 `set-active-task.sh` accepts `--observe` for read-only bindings and `--steal` when a new session intentionally takes over the writer lease.
@@ -84,7 +86,7 @@ Observer sessions may still create or update delegate lanes under `delegates/<de
 
 For parent workspaces that contain multiple repos, register repos explicitly with `register-repo.sh`, attach them to tasks with `set-task-repos.sh`, and only use auto-discovery as a review aid before you confirm the registrations.
 
-Workspace resolution only reuses an ancestor `.planning/` when the current path still belongs to that workspace root, its planning tree, a registered repo, or a recorded worktree checkout. Otherwise the tools fall back to the current directory so unrelated parent workspaces do not capture a new task accidentally.
+Parent-workspace resolution is path-aware: unrelated ancestor `.planning/` roots should not capture the current session.
 
 If two writer tasks need the same repo concurrently, prepare a dedicated checkout for the overlapping repo with `prepare-task-worktree.sh --task <slug> --repo <repo-id>`.
 

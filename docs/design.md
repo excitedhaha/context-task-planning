@@ -1,142 +1,335 @@
 # Design Notes
 
-## Goal
+## Purpose And Scope
 
-Build a planning skill that treats context engineering as a first-class system, not only a set of reminders.
+This document describes the architecture that is implemented in this repository
+today.
 
-## Non-goals for v0.1.0
+`context-task-planning` is no longer just a task-folder convention. The current
+system combines three layers that have to work together:
 
-- no Claude plugin packaging
-- no full host-specific session-history parsing
-- no cross-machine git sync
-- no mega-plan or story graph orchestration
-- no GUI or MCP server
+- durable task records under `.planning/<slug>/`
+- runtime routing state for multi-session and multi-repo coordination
+- checkout isolation through repo bindings and task-specific worktrees
 
-## Design pillars
+The design goal is to keep the source of truth file-based and portable while
+still making parallel AI coding work safe enough for daily use.
 
-### 1. Task-scoped isolation
+What this design optimizes for:
 
-Every task lives in `.planning/<slug>/`.
+- recovery after context loss without host-specific history replay
+- independent routing for parallel agent sessions
+- explicit repo ownership in parent-directory multi-repo workspaces
+- checkout-aware writer isolation instead of optimistic shared-state editing
+- thin host adapters that expose the same core state instead of replacing it
 
-This avoids the root-level file collision model and makes multiple long-running tasks practical in a single repository.
+What this design does not try to solve:
 
-### 2. Dual state
+- cross-machine sync or distributed locking
+- a GUI, MCP server, or central database
+- silent automatic task switching
+- silent repo or workspace inference that mutates state behind the user's back
 
-The system keeps both:
+## System Model
 
-- markdown files for narrative, reasoning, and human review
-- `state.json` for machine-readable state and deterministic recovery
+The system is easiest to understand as one planning tree plus one local checkout
+tree:
 
-`state.json` is the authoritative operational snapshot.
+```text
+.planning/
+  .active_task
+  .sessions/
+    <session-binding>.json
+  .runtime/
+    repos.json
+    task_repo_bindings/
+      <task-slug>.json
+  <task-slug>/
+    task_plan.md
+    progress.md
+    findings.md
+    state.json
+    delegates/
+      <delegate-id>/
+        brief.md
+        result.md
+        status.json
 
-### 3. Hot context vs cold context
+.worktrees/
+  <repo-id>/
+    <task-slug>/
+```
 
-Not all task data should be repeatedly re-read.
+The important distinction is:
 
-- `Hot Context` lives at the top of `task_plan.md`
-- durable conclusions live in `findings.md`
-- chronological evidence lives in `progress.md`
-- large or untrusted inputs stay out of repeatedly-read sections
+- `.planning/<slug>/` stores the durable task narrative and machine-readable
+  task state
+- `.planning/.sessions/` stores who is currently attached to which task and in
+  what role
+- `.planning/.runtime/` stores workspace-level repo registration and per-task
+  checkout overrides
+- `.worktrees/` stores local git checkouts used to isolate overlapping writer
+  tasks
 
-### 4. Single writer
+This separation is deliberate. Task files explain the work. Runtime metadata
+routes sessions and repos to the right task. Worktrees isolate concurrent code
+changes without turning `.planning/` into a second git state store.
 
-Only the coordinator updates:
+Inside each task, the document roles remain stable:
 
-- `task_plan.md`
-- `progress.md`
-- `state.json`
+- `task_plan.md` holds the framing and hot context snapshot
+- `progress.md` records chronological execution history
+- `findings.md` keeps distilled conclusions worth re-reading later
+- `state.json` is the authoritative operational snapshot for lifecycle,
+  verification, repo scope, and routing metadata
 
-Delegates may write only inside `delegates/<delegate-id>/`.
+## Task Resolution And Workspace Boundaries
 
-Session-scoped routing does not change that rule: a task may have one writer session plus additional observer sessions, and observers stay out of the main planning files.
+The first architectural question is not "how do we read the task files?" It is
+"which task should this session resolve to right now?"
 
-For parent workspaces that contain multiple git repos, the planning root stays shared at the parent level, while repo ownership is declared per task through explicit repo registration and repo scope metadata.
+That resolution happens in two stages.
 
-Ancestor `.planning/` directories are only reused when the current path still belongs to that workspace root, its planning tree, a registered repo, or a recorded worktree checkout. Otherwise resolution falls back to the current session directory so unrelated parent workspaces do not capture a new task by accident.
+- **Workspace root resolution** starts from the current working directory and
+  walks upward.
+- **Task selection** then resolves the active task inside that workspace.
 
-### 5. Pure-file recovery
+Workspace resolution is intentionally conservative. An ancestor `.planning/`
+directory is reused only when the current path still belongs to that workspace
+through one of these relationships:
 
-Recovery should work even when:
+- the current path is the workspace root itself
+- the current path is inside that workspace's `.planning/`
+- the current path is inside a registered repo for that workspace
+- the current path is inside a recorded task worktree for that workspace
 
-- the agent is switched
-- the session is cleared
-- a host does not expose reliable session history
+There is one compatibility path for simpler setups:
 
-The recovery order is:
+- if the workspace has no explicit repo registrations or recorded worktrees yet,
+  a direct child git repo may still attach back to the parent workspace
 
-1. `state.json`
-2. `task_plan.md` Hot Context
-3. latest `progress.md` entries
-4. unresolved delegate statuses
+If those checks fail, the resolver falls back to the current directory or git
+root instead of silently attaching to an unrelated ancestor `.planning/`.
 
-### 6. Verification as a contract
+Once the workspace is known, task selection uses this precedence:
 
-A task is not complete only because phases are checked off. It should define:
+1. explicit `--task <slug>`
+2. `PLAN_TASK`
+3. the session binding selected by `PLAN_SESSION_KEY`
+4. `.planning/.active_task`
+5. the latest auto-selectable task
 
-- what done means
-- which commands or checks validate it
-- what remains blocked when validation fails
+Those sources are not interchangeable.
 
-## Lifecycle model
+- `--task` is an explicit command-level override
+- `PLAN_TASK` is a temporary shell-level override
+- `PLAN_SESSION_KEY` is the normal path for host-managed parallel sessions
+- `.active_task` is the compatibility fallback for hosts or shells that do not
+  provide session identity
 
-Task mode:
+That ordering is what lets the same workspace support host adapters, manual
+shell usage, and backward-compatible fallback behavior at the same time.
 
-- `clarify`
-- `plan`
-- `execute`
-- `verify`
-- `archive`
+## Concurrency Model: Sessions, Roles, And Worktrees
 
-Task status:
+The concurrency story has two separate safety rules:
 
-- `active`
-- `paused`
-- `blocked`
-- `verifying`
-- `done`
-- `archived`
+- one writer owns the main planning lane for a task
+- different writer tasks must not share the same repo checkout
 
-Additional intent:
+The first rule protects planning files. The second rule protects code state.
 
-- `paused` preserves the current phase and next action for later resumption
-- `done` means completion is recorded, but the task can still be reviewed before archival
+### Session bindings and roles
 
-Phase status:
+Session bindings are persisted under `.planning/.sessions/*.json`. Each binding
+stores:
 
-- `pending`
-- `in_progress`
-- `complete`
-- `blocked`
+- `session_key`
+- `task_slug`
+- `role`
+- `updated_at`
 
-## Delegate protocol
+There are two roles:
 
-Delegates are optional. They exist to isolate independent work such as:
+- `writer` - owns the main planning lane for that task
+- `observer` - can inspect the task and work inside delegate lanes, but must not
+  edit `task_plan.md`, `progress.md`, `state.json`, or `findings.md`
+
+Important invariants:
+
+- a task may have one writer plus additional observers
+- a new writer may take over only with an explicit `--steal`
+- taking over the writer lease demotes the previous writer to observer instead of
+  silently allowing two writers
+- lifecycle commands enforce the same access rules instead of assuming every
+  attached session is allowed to mutate the task
+
+Observers are not "inactive" sessions. They are intentionally useful for bounded
+parallel work, but their safe write surface is limited to delegate lanes.
+
+### Why worktrees are a first-class part of the design
+
+Worktrees are not a minor implementation detail. They are the core mechanism
+that makes parallel writer tasks safe in the same parent workspace.
+
+Repo scope alone is not enough. Two tasks can both be legitimate writer tasks
+and still be unsafe if they resolve to the same checkout of the same repo.
+
+So the design tracks two different things:
+
+- **task repo scope** - which repos a task is allowed to touch
+- **task repo bindings** - which checkout that task should use for each repo
+
+Each binding resolves to one of two modes:
+
+- `shared` - use the repo's normal checkout in the workspace
+- `worktree` - use a task-specific checkout, usually under
+  `.worktrees/<repo-id>/<task-slug>/`
+
+That means worktrees are the concurrency boundary for code changes, not just a
+convenience feature.
+
+### Writer isolation rule
+
+The system treats these cases differently:
+
+- **safe** - two writer tasks touch different repos
+- **safe** - two writer tasks touch the same repo id but through different
+  checkout paths
+- **unsafe** - two writer tasks resolve to the same repo checkout path
+
+When an unsafe overlap is detected, the second task cannot bind as a writer
+until a dedicated checkout exists.
+
+Typical flow:
+
+```text
+Task A
+  writer session: s1
+  frontend -> shared checkout frontend/
+  backend  -> shared checkout backend/
+
+Task B
+  writer session: s2
+  frontend -> conflict with Task A
+  resolve by creating .worktrees/frontend/task-b/
+  frontend -> worktree checkout .worktrees/frontend/task-b/
+```
+
+`prepare-task-worktree.sh` is the explicit command that turns that conflict into
+a safe layout by creating the checkout and recording the task's repo binding.
+
+### Delegates are the observer-safe concurrency lane
+
+Because observers may not mutate the main planning files, delegate lanes are the
+sanctioned place for bounded parallel work such as:
 
 - repository exploration
 - design spikes
 - verification triage
-- implementation review
-- catchup summarization
+- focused review
+- catch-up summaries
 
-Each delegate has a scratch folder:
+Each delegate keeps its own scratch state under `delegates/<delegate-id>/`.
 
-```text
-delegates/<delegate-id>/
-  brief.md
-  result.md
-  status.json
-```
+That is why the system can support one writer plus multiple useful parallel
+sessions without turning task planning into uncontrolled shared editing.
 
-The coordinator decides whether findings should be promoted into the main task files.
+## Repo Model In Parent Workspaces
 
-## Cross-agent portability
+Single-repo workspaces can still work implicitly when the workspace root is
+itself a git root.
 
-The canonical bundle lives in `skill/` and avoids host-specific hooks in v0.1.0.
+Parent-directory workspaces need a more explicit model.
 
-This keeps the workflow usable in:
+- **Workspace repo registry** lives in `.planning/.runtime/repos.json`
+- **Task repo scope** lives in `state.json` as `repo_scope` and `primary_repo`
+- **Task checkout bindings** live in
+  `.planning/.runtime/task_repo_bindings/<task-slug>.json`
 
-- Claude Code
-- Codex
-- OpenCode
+Auto-discovery exists only as a review aid. Registration stays explicit so the
+workspace does not accidentally claim unrelated repos.
 
-Host-specific enhancements can be added later as thin wrappers.
+This design gives each task three levels of repo intent:
+
+- which repos exist in the workspace
+- which of those repos the task is allowed to touch
+- which checkout path the task should actually use for each repo
+
+That last level is what lets multi-session parallelism stay safe when two tasks
+both need the same repo but cannot share the same checkout.
+
+The same worktree metadata also feeds workspace resolution. Once a task has a
+recorded worktree binding, entering from that `.worktrees/...` path still
+resolves back to the same parent workspace and the same task state.
+
+## Recovery And Guardrails
+
+Recovery is a two-step process:
+
+1. resolve the workspace and current task
+2. rebuild the task snapshot from task files
+
+After the task is selected, recovery order is:
+
+1. `state.json`
+2. the hot context at the top of `task_plan.md`
+3. recent `progress.md` entries
+4. unresolved delegate status files
+
+Several guardrails reuse the same core routing model.
+
+- **Task-focus guard** uses the resolved task to decide whether a new prompt
+  looks related, unclear, or likely unrelated
+- **Switch-safety guard** checks dirty git worktrees before task switching so
+  code changes are not silently carried across tasks
+- **Validation** checks consistency across task files, delegate state, session
+  bindings, and runtime metadata
+
+These guards are intentionally lightweight. They do not attempt to become a hard
+transaction manager. Their job is to prevent the most common silent failures in
+long-running agent work.
+
+## Host Adapters And Boundaries
+
+The canonical truth still lives in `skill/scripts/` plus the files under
+`.planning/`.
+
+Host adapters are optional layers on top of that core.
+
+- **Claude Code hooks** surface the current task, role, repo context, and drift
+  reminders on top of the shared resolver
+- **OpenCode plugin** injects task summaries, exports `PLAN_SESSION_KEY`, and
+  surfaces repo and role context without becoming a second planner
+- **Codex and shell-only workflows** fall back to the same scripts and file
+  protocol, which is why `.active_task` still exists
+
+Adapters must not become the source of truth. They surface and route the same
+file-backed state; they do not replace it.
+
+## Tradeoffs
+
+This architecture keeps the system local, inspectable, and portable, but it also
+comes with explicit tradeoffs.
+
+- `.active_task` remains for compatibility even though session bindings are the
+  preferred model
+- repo auto-discovery stays advisory because silent wrong registration is worse
+  than an extra explicit step
+- workspace resolution prefers conservative fallback over aggressive ancestor
+  reuse
+- worktree management is explicit because safe parallelism is more important than
+  hiding concurrency costs
+- the system optimizes for local durability and coordination, not distributed
+  collaboration semantics
+
+In practice, the design settled into its current shape because real AI coding
+work exposed three constraints at once:
+
+- one global active-task pointer was not enough for parallel sessions
+- one shared parent workspace needed repo-aware boundaries
+- one shared repo checkout was not enough for overlapping writer tasks
+
+The result is still one file-backed protocol, but now with session routing,
+repo-aware task scope, and worktree-aware writer isolation as first-class parts
+of the architecture rather than afterthoughts.

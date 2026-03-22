@@ -23,6 +23,8 @@ Shared pieces:
 
 The wrappers stay shell-friendly. The Python core owns the selection logic and drift heuristics so Claude Code, OpenCode, and Codex can reuse one contract.
 
+For the deeper architecture behind session bindings, repo scope, and worktree-aware routing, see `docs/design.md`.
+
 ## Current-task contract
 
 `current-task.sh` resolves the task the same way the workflow already does:
@@ -106,11 +108,9 @@ Recommended JSON fields:
 |------|-------------------------|-----------------------|--------------------|---------|------------|
 | Claude Code | `current-task.sh` in shell or tmux now; `statusLine` can also render the active task natively | `UserPromptSubmit` can call the shared checker | `PreToolUse` can reuse the same result or re-check tool text | shared core + Claude hooks + `claude-hooks/scripts/statusline.py` | high |
 | OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title, and show a toast | plugin can call the shared checker on chat messages | plugin can warn before `Task` and bind shell commands to the OpenCode session with `PLAN_SESSION_KEY` | shared core + `skill/opencode-plugin/task-focus-guard.js` (quiet outside repos that already use `.planning/`) | medium |
-
-Session bindings are not the same thing as writer ownership: one task may have one writer session plus additional observers.
-
-In parent-directory multi-repo workspaces, the canonical task still lives under `.planning/<slug>/`, but the task may also declare explicit repo scope and checkout bindings so host adapters can show the right repo context.
 | Codex | `current-task.sh` in shell or tmux now | best-effort reminder through skill text, docs, and future metadata | none in P0 | shared core + skill-level policy | medium-low |
+
+The guard consumes session, role, repo, and checkout context from the shared resolver, but the full concurrency and workspace model lives in `docs/design.md` rather than in this guard-specific note.
 
 ## Rollout
 
