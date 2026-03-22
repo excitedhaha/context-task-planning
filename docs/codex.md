@@ -1,5 +1,7 @@
 # Codex Notes
 
+This page only covers Codex-specific setup and behavior. Use `README.md` for the first success case and `docs/onboarding.md` for the shared workflow.
+
 ## Install
 
 Recommended install:
@@ -22,77 +24,47 @@ A global install makes the skill available under:
 ~/.codex/skills/context-task-planning
 ```
 
-## Usage
-
-Use the skill when work is large enough that normal context retention is not reliable.
-
-Most teammates should start with normal conversation, not with shell scripts.
-
-Good asks for Codex:
-
-- describe the real task in normal language
-- mention when the work is multi-step, long-running, or likely to be resumed later
-- expect Codex to create or resume the task under `.planning/<slug>/` when needed
-- ask for bounded discovery, review, or verify subproblems when they should stay isolated
-
-Example prompts:
-
-```text
-Refactor the auth flow across backend and frontend. This will take multiple steps, may get interrupted, and should be verified before you wrap up.
-```
-
-```text
-I lost context. Recover the active task from .planning/ and continue from next_action.
-```
-
-```text
-Review the risky parts of this diff. Keep the main task focused, and if you need a bounded side investigation, promote only the distilled findings back.
-```
-
-For multi-step or recovery-sensitive work, Codex should usually pick the skill automatically. If it does not, mention `context-task-planning` explicitly or fall back to the scripts.
-
-## What users should notice
+## What Codex relies on
 
 Codex does not currently have a bundled native task UI adapter like Claude Code's status line or OpenCode's plugin.
 
-So the intended fallback is:
+So the intended Codex path is the shared file-backed core plus shell-first visibility:
 
-- keep the active task visible with `sh skill/scripts/current-task.sh --compact` in your shell prompt, tmux status line, or a quick manual check
+- keep the active task visible with `sh skill/scripts/current-task.sh --compact`
 - use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
-- expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the request looks mismatched
+- expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the match looks wrong
+- use `PLAN_SESSION_KEY` when multiple Codex shells or wrappers should keep different current tasks
+- rely on the same parent-workspace repo registration and recorded worktree rules as the other hosts
 
-If you keep several Codex threads open in one repository, give each shell or wrapper a different `PLAN_SESSION_KEY`, then use `set-active-task.sh` or `resume-task.sh` inside that session to keep the task bindings separate. Use `set-active-task.sh --observe <slug>` when a second thread should watch the same task without becoming a second writer.
+## Recommended Codex setup
 
-If you run Codex from a parent directory that contains several repos, explicitly register those repos first and bind them to the task before you start editing. Treat `list-repos.sh --discover` as a candidate list, not as an automatic mutation step.
+If you keep several Codex threads open in one repository, give each shell or wrapper a different `PLAN_SESSION_KEY`, then bind the session explicitly:
 
-After that parent workspace owns `.planning/`, the same task should still resolve when Codex is started from a registered repo path or a recorded `.worktrees/...` checkout. Unrelated ancestor `.planning/` directories should not capture the session.
-
-If you want to force that behavior in a prompt, say it explicitly:
-
-```text
-Before mixing this request into the active task, check whether it still fits the current task and ask me whether to continue, switch tasks, or create a new task if it does not.
+```bash
+export PLAN_SESSION_KEY=manual:feature-auth
+sh skill/scripts/set-active-task.sh feature-auth
 ```
 
-Quick check:
+Use observe mode when a second thread should watch the same task without becoming a second writer:
+
+```bash
+sh skill/scripts/set-active-task.sh --observe feature-auth
+```
+
+If you want the current task visible all the time, put this in your shell prompt, tmux status line, or a quick manual check:
 
 ```bash
 sh skill/scripts/current-task.sh --compact
 ```
 
-If that prints `task=<slug> ...`, the fallback visibility path is working.
+## What you should notice
 
-The portable contract is file-based, so even without host-specific hooks you can recover from:
+- there is no bundled native Codex task UI today
+- `current-task.sh --compact` should still show the resolved task
+- `check-task-drift.sh` should help when a new ask may be a different task
+- the same task should still resolve from a registered repo path or recorded `.worktrees/...` checkout inside a parent workspace
 
-- long sessions
-- model switches
-- agent changes
-
-The core recovery sequence is always:
-
-1. `state.json`
-2. `task_plan.md`
-3. `progress.md`
-4. unresolved delegates
+If that quick check prints `task=<slug> ...`, the fallback visibility path is working.
 
 ## Manual fallback
 
@@ -103,3 +75,5 @@ Useful commands when you want direct control:
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/validate-task.sh`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
+
+For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind session bindings, repo scope, and worktree attachment, use `docs/design.md`.
