@@ -1304,8 +1304,10 @@ def resolve_task(cwd: str, requested_slug: str, session_key: str = "") -> dict:
         if selected_slug
         else []
     )
+    repo_summary = summarize_repo_bindings(repo_bindings)
+    resume_candidates = resumable_task_candidates(plan_root, selected_slug)
 
-    return {
+    result = {
         "found": plan_dir is not None,
         "selection_source": selection_source,
         "workspace_root": str(workspace_root),
@@ -1324,6 +1326,7 @@ def resolve_task(cwd: str, requested_slug: str, session_key: str = "") -> dict:
         "repo_scope": repo_scope,
         "primary_repo": primary_repo,
         "repo_bindings": repo_bindings,
+        "repo_summary": repo_summary,
         "slug": state.get("slug", "") if isinstance(state, dict) else "",
         "title": state.get("title", "") if isinstance(state, dict) else "",
         "status": state.get("status", "") if isinstance(state, dict) else "",
@@ -1342,7 +1345,10 @@ def resolve_task(cwd: str, requested_slug: str, session_key: str = "") -> dict:
         if isinstance(state, dict)
         else [],
         "phases": state.get("phases", []) if isinstance(state, dict) else [],
+        "resume_candidates": resume_candidates,
     }
+    result.update(guidance_for_current_task(result))
+    return result
 
 
 def task_snapshot(plan_dir: Path | None, source: str) -> dict:
@@ -1403,6 +1409,187 @@ def latest_updated_task(plan_root: Path, exclude_slug: str = "") -> Path | None:
         return None
 
     return max(candidates, key=lambda item: item[0])[1]
+
+
+def resumable_task_candidates(
+    plan_root: Path, exclude_slug: str = "", limit: int = 3
+) -> list[dict]:
+    if not plan_root.is_dir():
+        return []
+
+    candidates = []
+    for entry in plan_root.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+
+        state = load_task_state(entry)
+        slug = str(state.get("slug") or entry.name)
+        if exclude_slug and slug == exclude_slug:
+            continue
+
+        status = str(state.get("status") or "")
+        if status in {"archived", "done"}:
+            continue
+
+        candidates.append(
+            {
+                "slug": slug,
+                "title": str(state.get("title") or slug),
+                "status": status or "unknown",
+                "mode": str(state.get("mode") or ""),
+                "updated_at": str(state.get("updated_at") or ""),
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (item.get("updated_at") or "", item.get("slug") or ""),
+        reverse=True,
+    )
+    return candidates[:limit]
+
+
+def summarize_repo_bindings(repo_bindings: list[dict]) -> dict:
+    shared = []
+    worktree = []
+
+    for binding in repo_bindings:
+        item = {
+            "repo_id": str(binding.get("repo_id") or ""),
+            "repo_path": str(binding.get("repo_path") or ""),
+            "checkout_path": str(binding.get("checkout_path") or ""),
+            "branch": str(binding.get("branch") or ""),
+        }
+        if binding.get("mode") == "worktree":
+            worktree.append(item)
+        else:
+            shared.append(item)
+
+    return {
+        "total": len(repo_bindings),
+        "shared": shared,
+        "worktree": worktree,
+        "shared_repo_ids": [item["repo_id"] for item in shared],
+        "worktree_repo_ids": [item["repo_id"] for item in worktree],
+    }
+
+
+def summarize_repo_isolation(
+    plan_root: Path, workspace_root: Path, task_slug: str, session_key: str = ""
+) -> dict:
+    bindings = effective_task_repo_bindings(plan_root, workspace_root, task_slug)
+    conflicts = shared_checkout_conflicts(plan_root, workspace_root, task_slug, session_key)
+    conflict_by_repo = {}
+    for item in conflicts:
+        repo_entry = conflict_by_repo.setdefault(
+            item["repo_id"],
+            {
+                "checkout_path": item["checkout_path"],
+                "other_tasks": [],
+            },
+        )
+        repo_entry["other_tasks"].append(item["other_task"])
+
+    summary = {
+        "safe_shared": [],
+        "needs_worktree": [],
+        "already_isolated": [],
+        "recommended_commands": [],
+        "has_conflicts": bool(conflicts),
+    }
+
+    for binding in bindings:
+        entry = {
+            "repo_id": str(binding.get("repo_id") or ""),
+            "repo_path": str(binding.get("repo_path") or ""),
+            "checkout_path": str(binding.get("checkout_path") or ""),
+            "branch": str(binding.get("branch") or ""),
+        }
+        if binding.get("mode") == "worktree":
+            summary["already_isolated"].append(entry)
+            continue
+
+        repo_conflict = conflict_by_repo.get(entry["repo_id"])
+        if repo_conflict:
+            entry["other_tasks"] = sorted(set(repo_conflict["other_tasks"]))
+            entry["recommended_command"] = (
+                f"sh skill/scripts/prepare-task-worktree.sh --task {task_slug} --repo {entry['repo_id']}"
+            )
+            summary["needs_worktree"].append(entry)
+            summary["recommended_commands"].append(entry["recommended_command"])
+            continue
+
+        summary["safe_shared"].append(entry)
+
+    return summary
+
+
+def guidance_for_current_task(task: dict) -> dict:
+    slug = str(task.get("slug") or "")
+    repo_summary = task.get("repo_summary", {}) if isinstance(task, dict) else {}
+    repo_count = int(repo_summary.get("total", 0) or 0)
+    has_worktree = bool(repo_summary.get("worktree"))
+
+    if not task.get("found"):
+        candidates = task.get("resume_candidates", []) if isinstance(task, dict) else []
+        if candidates:
+            best = candidates[0]
+            return {
+                "recommended_action": "resume-task",
+                "recommended_reason": "No active task is selected, and the most recent resumable task looks like the best continuation point.",
+                "recommended_commands": [
+                    f"sh skill/scripts/resume-task.sh {best['slug']}",
+                    "sh skill/scripts/list-tasks.sh",
+                ],
+            }
+        return {
+            "recommended_action": "init-task",
+            "recommended_reason": "No active or resumable task is selected, so the next step is to start a new task.",
+            "recommended_commands": [
+                'sh skill/scripts/init-task.sh "Task Title"',
+            ],
+        }
+
+    if task.get("status") == "done":
+        commands = [
+            f"sh skill/scripts/archive-task.sh {slug}",
+            'sh skill/scripts/init-task.sh "Next task title"',
+        ]
+        return {
+            "recommended_action": "archive-or-open-new-task",
+            "recommended_reason": "This task is already done, so the next step is usually to archive it or start a fresh task.",
+            "recommended_commands": commands,
+        }
+
+    if task.get("binding_role") == ROLE_OBSERVER:
+        commands = [
+            f"sh skill/scripts/validate-task.sh --task {slug}",
+            f"sh skill/scripts/set-active-task.sh --steal {slug}",
+        ]
+        if repo_count > 1 or has_worktree:
+            commands.append(f"sh skill/scripts/list-worktrees.sh --task {slug}")
+        return {
+            "recommended_action": "observe-or-steal-writer",
+            "recommended_reason": "This session is observe-only, so you can review the task safely or explicitly take the writer lease if you need to edit.",
+            "recommended_commands": commands,
+        }
+
+    commands = [f"sh skill/scripts/validate-task.sh --task {slug}"]
+    if repo_count > 1 or has_worktree:
+        commands.append(f"sh skill/scripts/list-worktrees.sh --task {slug}")
+
+    if task.get("mode") == "verify" or task.get("current_phase") == "verify":
+        commands.append(f"sh skill/scripts/done-task.sh {slug}")
+        return {
+            "recommended_action": "run-verification",
+            "recommended_reason": "The task is in verify mode, so the next step is to run validation and then close it out if the checks pass.",
+            "recommended_commands": commands,
+        }
+
+    return {
+        "recommended_action": "continue-current-task",
+        "recommended_reason": "The task is active and already has a recorded next action, so the next step is to continue from that state.",
+        "recommended_commands": commands,
+    }
 
 
 def git_root_for(workspace_root: Path) -> Path | None:
@@ -1811,12 +1998,46 @@ def ensure_switch_safety(args: argparse.Namespace) -> None:
 
 def compact_current_task(task: dict) -> str:
     if not task["found"]:
-        return "task=(none) source=none"
+        return (
+            f"task=(none) source=none action={task.get('recommended_action') or 'init-task'}"
+        )
     return (
         f"task={task['slug']} status={task['status'] or '-'} mode={task['mode'] or '-'} "
         f"phase={task['current_phase'] or '-'} source={task['selection_source']} "
-        f"role={task.get('binding_role') or '-'}"
+        f"role={task.get('binding_role') or '-'} action={task.get('recommended_action') or '-'}"
     )
+
+
+def format_repo_binding_items(items: list[dict]) -> str:
+    if not items:
+        return "(none)"
+    return ", ".join(
+        f"{item['repo_id']} ({item['checkout_path']})" for item in items if item.get("repo_id")
+    )
+
+
+def print_recommended_commands(commands: list[str]) -> None:
+    if not commands:
+        print("[context-task-planning] Suggested commands: none")
+        return
+
+    print("[context-task-planning] Suggested commands:")
+    for command in commands:
+        print(f"  - {command}")
+
+
+def print_resume_candidates(candidates: list[dict]) -> None:
+    if not candidates:
+        print("[context-task-planning] Resume candidates: none")
+        return
+
+    print("[context-task-planning] Resume candidates:")
+    for item in candidates:
+        print(
+            "  - "
+            f"{item['slug']} status={item['status']} updated={item.get('updated_at') or '-'} "
+            f"title={item.get('title') or '-'}"
+        )
 
 
 def print_current_task(task: dict, as_json: bool, compact: bool) -> None:
@@ -1845,6 +2066,14 @@ def print_current_task(task: dict, as_json: bool, compact: bool) -> None:
 
     if not task["found"]:
         print("[context-task-planning] No active task found.")
+        print(
+            f"[context-task-planning] Recommended next step: {task.get('recommended_action') or 'init-task'}"
+        )
+        print(
+            f"[context-task-planning] Why: {task.get('recommended_reason') or '(none)'}"
+        )
+        print_resume_candidates(task.get("resume_candidates", []))
+        print_recommended_commands(task.get("recommended_commands", []))
         return
 
     print(f"[context-task-planning] Task: {task['slug']}")
@@ -1867,6 +2096,13 @@ def print_current_task(task: dict, as_json: bool, compact: bool) -> None:
         print(
             f"[context-task-planning] Repos: primary={task.get('primary_repo') or '(none)'} | scope={', '.join(repo_scope)}"
         )
+    repo_summary = task.get("repo_summary", {})
+    if repo_summary.get("shared") or repo_summary.get("worktree"):
+        print(
+            "[context-task-planning] Repo bindings: "
+            f"shared={format_repo_binding_items(repo_summary.get('shared', []))} | "
+            f"worktree={format_repo_binding_items(repo_summary.get('worktree', []))}"
+        )
 
     blockers = task["blockers"]
     if blockers:
@@ -1881,6 +2117,13 @@ def print_current_task(task: dict, as_json: bool, compact: bool) -> None:
         )
     else:
         print("[context-task-planning] Active delegates: none")
+    print(
+        f"[context-task-planning] Recommended next step: {task.get('recommended_action') or 'continue-current-task'}"
+    )
+    print(
+        f"[context-task-planning] Why: {task.get('recommended_reason') or '(none)'}"
+    )
+    print_recommended_commands(task.get("recommended_commands", []))
 
 
 def looks_complex(prompt: str) -> bool:
@@ -2202,6 +2445,57 @@ def print_list_worktrees(result: dict, as_json: bool) -> None:
         )
 
 
+def print_repo_isolation_summary(summary: dict) -> None:
+    safe_shared = summary.get("safe_shared", [])
+    needs_worktree = summary.get("needs_worktree", [])
+    already_isolated = summary.get("already_isolated", [])
+
+    print(
+        "[context-task-planning] Safe shared repos: "
+        f"{format_repo_binding_items(safe_shared)}"
+    )
+
+    if needs_worktree:
+        print("[context-task-planning] Repos that need a worktree:")
+        for item in needs_worktree:
+            other_tasks = ", ".join(item.get("other_tasks", [])) or "(unknown)"
+            print(
+                "  - "
+                f"{item['repo_id']} shares `{item['checkout_path']}` with {other_tasks}; "
+                f"run `{item['recommended_command']}`"
+            )
+    else:
+        print("[context-task-planning] Repos that need a worktree: none")
+
+    print(
+        "[context-task-planning] Already isolated repos: "
+        f"{format_repo_binding_items(already_isolated)}"
+    )
+
+
+def render_repo_isolation_error(summary: dict) -> str:
+    lines = [
+        "Writer isolation required before binding this task.",
+        f"[context-task-planning] Safe shared repos: {format_repo_binding_items(summary.get('safe_shared', []))}",
+    ]
+
+    needs_worktree = summary.get("needs_worktree", [])
+    if needs_worktree:
+        lines.append("[context-task-planning] Repos that need a worktree:")
+        for item in needs_worktree:
+            other_tasks = ", ".join(item.get("other_tasks", [])) or "(unknown)"
+            lines.append(
+                f"  - {item['repo_id']} shares `{item['checkout_path']}` with {other_tasks}; run `{item['recommended_command']}`"
+            )
+    else:
+        lines.append("[context-task-planning] Repos that need a worktree: none")
+
+    lines.append(
+        f"[context-task-planning] Already isolated repos: {format_repo_binding_items(summary.get('already_isolated', []))}"
+    )
+    return "\n".join(lines)
+
+
 def handle_list_repos(args: argparse.Namespace) -> None:
     workspace_root = resolve_workspace_root(args.cwd)
     plan_root = workspace_root / ".planning"
@@ -2224,25 +2518,15 @@ def handle_set_task_repos(args: argparse.Namespace) -> None:
     result = set_task_repo_scope(
         plan_root, workspace_root, args.task.strip(), args.repo, args.primary
     )
-    conflicts = shared_checkout_conflicts(
-        plan_root, workspace_root, result["task_slug"]
-    )
+    isolation = summarize_repo_isolation(plan_root, workspace_root, result["task_slug"])
     scope_text = ", ".join(result["repo_scope"]) if result["repo_scope"] else "(unset)"
     print(f"[context-task-planning] Task: {result['task_slug']}")
     print(
         f"[context-task-planning] Primary repo: {result['primary_repo'] or '(unset)'}"
     )
     print(f"[context-task-planning] Repo scope: {scope_text}")
-    if conflicts:
-        first_repo = conflicts[0]["repo_id"]
-        detail = "; ".join(
-            f"repo `{item['repo_id']}` still shares `{item['checkout_path']}` with task `{item['other_task']}`"
-            for item in conflicts
-        )
-        print(
-            "[context-task-planning] Writer isolation warning: "
-            f"{detail}. Prepare a dedicated checkout, for example `prepare-task-worktree.sh --task {result['task_slug']} --repo {first_repo}`."
-        )
+    if isolation["has_conflicts"] or isolation.get("already_isolated"):
+        print_repo_isolation_summary(isolation)
 
 
 def handle_task_repo_binding(args: argparse.Namespace) -> None:
@@ -2298,20 +2582,11 @@ def bind_session_task(args: argparse.Namespace) -> None:
         raise SystemExit(f"Task not found: {plan_dir}")
 
     if role == ROLE_WRITER:
-        conflicts = shared_checkout_conflicts(
+        isolation = summarize_repo_isolation(
             plan_root, workspace_root, task_slug, session_key
         )
-        if conflicts:
-            detail = "; ".join(
-                f"repo `{item['repo_id']}` shares `{item['checkout_path']}` with task `{item['other_task']}`"
-                for item in conflicts
-            )
-            first_repo = conflicts[0]["repo_id"]
-            raise SystemExit(
-                "Writer isolation required before binding this task. "
-                f"{detail}. "
-                f"Create a dedicated checkout first, for example: `prepare-task-worktree.sh --task {task_slug} --repo {first_repo}`."
-            )
+        if isolation["has_conflicts"]:
+            raise SystemExit(render_repo_isolation_error(isolation))
 
     existing_writer = writer_binding_for_task(plan_root, task_slug)
     existing_writer_key = str(existing_writer.get("session_key") or "").strip()

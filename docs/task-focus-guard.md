@@ -37,7 +37,7 @@ For the deeper architecture behind session bindings, repo scope, and worktree-aw
 
 P0 outputs:
 
-- human-readable summary by default
+- human-readable summary by default, including the recommended next step
 - `--compact` for shell prompt, tmux, or status bar usage
 - `--json` for host adapters and plugins
 
@@ -59,6 +59,7 @@ Recommended JSON fields:
 - `primary_repo`
 - `repo_scope`
 - `repo_bindings`
+- `repo_summary`
 - `slug`
 - `title`
 - `status`
@@ -67,6 +68,10 @@ Recommended JSON fields:
 - `next_action`
 - `blockers`
 - `active_delegates`
+- `recommended_action`
+- `recommended_reason`
+- `recommended_commands`
+- `resume_candidates`
 
 ## Drift-check contract
 

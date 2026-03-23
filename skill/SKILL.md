@@ -131,6 +131,8 @@ When the host does not provide native task UI or prompt hooks, use the shared sc
 
 This is especially important for Codex-style environments where the file protocol exists but host-native reminder surfaces may not.
 
+When you need more than the prompt-friendly cue, `scripts/current-task.sh` now prints a human-readable summary with the recommended next step, suggested commands, and repo/worktree context. Keep `--compact` for prompts, tmux, or status bars.
+
 ## Delegate protocol
 
 Delegates are optional and should be used only for isolated work such as:
@@ -200,17 +202,17 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 
 - `scripts/init-task.sh` - create or resume `.planning/<slug>/`, warning before switching away from dirty git work
 - `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, session binding, `.active_task`, or latest plan
-- `scripts/current-task.sh` - show the resolved task for shells, status bars, or host adapters
+- `scripts/current-task.sh` - show the resolved task; default output is an action-oriented summary, `--compact` stays short for prompts and status bars, and `--json` adds recommendation metadata for host adapters
 - `scripts/check-task-drift.sh` - classify whether a new prompt still fits the active task
 - `scripts/check-switch-safety.sh` - inspect whether a git worktree should be stashed or committed before switching tasks
 - `scripts/list-repos.sh --discover` - show registered repos plus direct-child git repos that could be registered under the current workspace
 - `scripts/register-repo.sh --id <repo-id> <path>` - explicitly register a repo under a parent workspace
-- `scripts/set-task-repos.sh <slug> --repo <repo-id> [--repo ...] [--primary <repo-id>]` - declare which registered repos a task is allowed to touch
+- `scripts/set-task-repos.sh <slug> --repo <repo-id> [--repo ...] [--primary <repo-id>]` - declare which registered repos a task is allowed to touch and print which repos are safe to keep shared versus which now need a worktree
 - `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task; the standard location is `.worktrees/<task-slug>/<repo-id>/`
 - `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
-- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates
+- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates; add `--fix-warnings` to resync warning-level snapshot drift from `state.json`
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
 - `scripts/create-delegate.sh` - create a delegate lane under the current task
 - `scripts/list-delegates.sh` - show delegate lanes for the current task

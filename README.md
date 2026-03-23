@@ -48,7 +48,7 @@ For multi-step or recovery-sensitive work, the agent should usually pick this sk
 
 - `Claude Code` - look for `task:<slug>` in the status line
 - `OpenCode` - look for `task:<slug> | ...` in the session title plus task/drift toasts
-- `Codex` - run `sh skill/scripts/current-task.sh --compact`
+- `Codex` - run `sh skill/scripts/current-task.sh` for the full summary and recommended next step, or `sh skill/scripts/current-task.sh --compact` for a prompt-friendly cue
 
 ### 4. Simulate one recovery
 
@@ -87,6 +87,12 @@ Add the deeper layers only when you need them:
 - bounded side quests - delegate lanes
 
 `docs/onboarding.md` walks through those layers in order and explains when each one is worth learning.
+
+The shared shell entry points now map cleanly to those basics:
+
+- `sh skill/scripts/current-task.sh` - human-readable summary of the resolved task plus the recommended next step
+- `sh skill/scripts/current-task.sh --compact` - short status for prompts, tmux, or status bars
+- `sh skill/scripts/validate-task.sh --fix-warnings` - repair warning-level snapshot drift after manual edits or long-running work
 
 ## What stays on disk
 

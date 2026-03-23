@@ -30,7 +30,7 @@ Codex does not currently have a bundled native task UI adapter like Claude Code'
 
 So the intended Codex path is the shared file-backed core plus shell-first visibility:
 
-- keep the active task visible with `sh skill/scripts/current-task.sh --compact`
+- keep the active task visible with `sh skill/scripts/current-task.sh` when you want the full summary and next step, or `sh skill/scripts/current-task.sh --compact` when you only need a short cue
 - use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
 - expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the match looks wrong
 - use `PLAN_SESSION_KEY` when multiple Codex shells or wrappers should keep different current tasks
@@ -57,10 +57,17 @@ If you want the current task visible all the time, put this in your shell prompt
 sh skill/scripts/current-task.sh --compact
 ```
 
+If you want the shell to answer "what should I do next?" instead of only "what task is active?", use:
+
+```bash
+sh skill/scripts/current-task.sh
+```
+
 ## What you should notice
 
 - there is no bundled native Codex task UI today
-- `current-task.sh --compact` should still show the resolved task
+- `current-task.sh` should show the resolved task, access mode, repo/worktree summary, and a recommended next step
+- `current-task.sh --compact` should still show the resolved task in prompt-friendly form
 - `check-task-drift.sh` should help when a new ask may be a different task
 - the same task should still resolve from a registered repo path or recorded `.worktrees/...` checkout inside a parent workspace
 
@@ -71,9 +78,11 @@ If that quick check prints `task=<slug> ...`, the fallback visibility path is wo
 Useful commands when you want direct control:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
+- `sh skill/scripts/current-task.sh`
 - `sh skill/scripts/current-task.sh --compact`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/validate-task.sh`
+- `sh skill/scripts/validate-task.sh --fix-warnings`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind session bindings, repo scope, and worktree attachment, use `docs/design.md`.

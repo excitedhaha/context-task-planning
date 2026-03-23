@@ -58,7 +58,7 @@ You should see one of these:
 
 - `Claude Code` - `task:<slug>` in the status line
 - `OpenCode` - `task:<slug> | ...` in the session title
-- `Codex` - `sh skill/scripts/current-task.sh --compact` prints the active task
+- `Codex` - `sh skill/scripts/current-task.sh` prints the active task plus the recommended next step; `--compact` stays available for prompts and status bars
 
 If that cue is missing, use:
 
@@ -272,6 +272,12 @@ sh skill/scripts/prepare-task-worktree.sh --task frontend-billing-cleanup --repo
 That checkout lands under `.worktrees/frontend-billing-cleanup/frontend/` by
 default, so one task's isolated repo work stays together.
 
+If the task spans more than one repo, `set-task-repos.sh` and writer-bind failures now classify the result for you:
+
+- `safe shared` repos can stay on the normal checkout
+- `needs worktree` repos must run `prepare-task-worktree.sh`
+- `already isolated` repos are already on a task worktree
+
 You can ignore until later:
 
 - if your tasks run serially or touch different repos, shared checkouts are still fine
@@ -343,6 +349,7 @@ Useful commands:
 ```bash
 sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"
 sh skill/scripts/validate-task.sh
+sh skill/scripts/validate-task.sh --fix-warnings
 ```
 
 Do not use delegates for:
@@ -358,9 +365,11 @@ You do not need this section for the normal path. Use it when auto-invoke does n
 Start with the smallest useful commands:
 
 ```bash
+sh skill/scripts/current-task.sh
 sh skill/scripts/current-task.sh --compact
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 sh skill/scripts/validate-task.sh
+sh skill/scripts/validate-task.sh --fix-warnings
 ```
 
 Add the deeper commands only when the workflow actually needs them:

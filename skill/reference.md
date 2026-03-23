@@ -65,14 +65,24 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
 - softer warnings can cover stale `progress.md` snapshots or other recoverable drift
+- `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift, not hard failures or operational truth in `state.json`
 
 ## Task focus guard
 
-Use `current-task.sh` when a shell prompt, tmux status line, or host adapter needs a compact view of the current task.
+Use `current-task.sh` when you need the resolved task plus the next recommended action. Keep `current-task.sh --compact` for shell prompts, tmux status lines, or other space-constrained surfaces.
 
 For the deeper architecture behind session bindings, repo scope, and worktree isolation, see `docs/design.md`.
 
 Resolution order is: explicit `--task`, `PLAN_TASK`, the session binding selected by `PLAN_SESSION_KEY`, `.planning/.active_task`, then the latest auto-selectable task.
+
+The default human-readable output should answer:
+
+- what task is currently selected
+- whether this session is writer or observer
+- which repos are shared versus isolated worktrees
+- what command the operator should run next
+
+The JSON output keeps the existing task fields and appends recommendation metadata such as `repo_summary`, `recommended_action`, `recommended_reason`, `recommended_commands`, and `resume_candidates`.
 
 `set-active-task.sh` accepts `--observe` for read-only bindings and `--steal` when a new session intentionally takes over the writer lease.
 
@@ -93,6 +103,12 @@ checkout for the overlapping repo with
 `prepare-task-worktree.sh --task <slug> --repo <repo-id>`. By default that
 creates `.worktrees/<task-slug>/<repo-id>/`. Use `--path` only when you
 intentionally need a nonstandard checkout location.
+
+`set-task-repos.sh` and writer-bind failures should also tell you which repos are:
+
+- safe to keep shared
+- already isolated in a task worktree
+- blocked until you run `prepare-task-worktree.sh`
 
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
 

@@ -61,11 +61,14 @@ Then fill in:
 ## Example 2b: Check for task drift before switching scope
 
 ```bash
+sh scripts/current-task.sh
 sh scripts/current-task.sh --compact
 sh scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 ```
 
 If the result is `likely-unrelated` or `unclear`, confirm whether to continue the current task, switch tasks, or create a new task before editing `.planning/`.
+
+The default `current-task.sh` output is the operator-facing summary: it shows the resolved task, access mode, repo/worktree state, and the next recommended command.
 
 ## Example 3: Use a delegate lane
 
@@ -136,11 +139,14 @@ If another writer task needs `frontend` at the same time, prepare a dedicated ch
 
 ```bash
 sh scripts/prepare-task-worktree.sh --task billing-cleanup --repo frontend
+sh scripts/set-task-repos.sh cross-repo-auth-flow --repo frontend --repo backend --primary frontend
 sh scripts/list-worktrees.sh
 ```
 
 The default checkout path is `.worktrees/billing-cleanup/frontend/`, and
-`list-worktrees.sh` shows isolated checkouts grouped by task.
+`list-worktrees.sh` shows isolated checkouts grouped by task. `set-task-repos.sh`
+now also tells you which repos are safe to keep shared, which already have a
+task worktree, and which need `prepare-task-worktree.sh` next.
 
 ## Example 6: List tasks in one repository
 
@@ -210,6 +216,7 @@ If `delegation.active` still contains delegates, `done-task.sh` will refuse to m
 
 ```bash
 sh scripts/validate-task.sh
+sh scripts/validate-task.sh --fix-warnings
 ```
 
-Use this before wrapping up a long task or after a manual edit to planning files.
+Use `validate-task.sh` before wrapping up a long task or after a manual edit to planning files. Use `--fix-warnings` when the only drift is warning-level markdown snapshot staleness that should be resynced from `state.json`.
