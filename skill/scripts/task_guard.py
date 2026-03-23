@@ -2181,16 +2181,23 @@ def print_list_worktrees(result: dict, as_json: bool) -> None:
         return
 
     print(f"[context-task-planning] Workspace: {result['workspace_root']}")
-    worktrees = result.get("worktrees", [])
+    worktrees = sorted(
+        result.get("worktrees", []),
+        key=lambda row: (row["task_slug"], row["repo_id"], row["checkout_path"]),
+    )
     if not worktrees:
         print("[context-task-planning] Worktrees: none")
         return
 
     print("[context-task-planning] Worktrees:")
+    current_task = ""
     for row in worktrees:
+        if row["task_slug"] != current_task:
+            current_task = row["task_slug"]
+            print(f"  - task={current_task}")
         print(
-            "  - "
-            f"task={row['task_slug']} repo={row['repo_id']} path={row['checkout_path']} "
+            "    "
+            f"repo={row['repo_id']} path={row['checkout_path']} "
             f"branch={row.get('branch') or '-'}"
         )
 

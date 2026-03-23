@@ -88,7 +88,11 @@ For parent workspaces that contain multiple repos, register repos explicitly wit
 
 Parent-workspace resolution is path-aware: unrelated ancestor `.planning/` roots should not capture the current session.
 
-If two writer tasks need the same repo concurrently, prepare a dedicated checkout for the overlapping repo with `prepare-task-worktree.sh --task <slug> --repo <repo-id>`.
+If two writer tasks need the same repo concurrently, prepare a dedicated
+checkout for the overlapping repo with
+`prepare-task-worktree.sh --task <slug> --repo <repo-id>`. By default that
+creates `.worktrees/<task-slug>/<repo-id>/`. Use `--path` only when you
+intentionally need a nonstandard checkout location.
 
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
 

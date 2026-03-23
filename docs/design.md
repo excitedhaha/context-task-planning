@@ -56,8 +56,8 @@ tree:
         status.json
 
 .worktrees/
-  <repo-id>/
-    <task-slug>/
+  <task-slug>/
+    <repo-id>/
 ```
 
 The important distinction is:
@@ -68,12 +68,13 @@ The important distinction is:
   what role
 - `.planning/.runtime/` stores workspace-level repo registration and per-task
   checkout overrides
-- `.worktrees/` stores local git checkouts used to isolate overlapping writer
-  tasks
+- `.worktrees/` stores task-scoped git checkouts used to isolate overlapping
+  writer tasks while keeping one task's repo work together
 
 This separation is deliberate. Task files explain the work. Runtime metadata
 routes sessions and repos to the right task. Worktrees isolate concurrent code
-changes without turning `.planning/` into a second git state store.
+changes without turning `.planning/` into a second git state store. The layout
+is task-first so a multi-repo task can keep its isolated checkouts together.
 
 Inside each task, the document roles remain stable:
 
@@ -184,10 +185,11 @@ Each binding resolves to one of two modes:
 
 - `shared` - use the repo's normal checkout in the workspace
 - `worktree` - use a task-specific checkout, usually under
-  `.worktrees/<repo-id>/<task-slug>/`
+  `.worktrees/<task-slug>/<repo-id>/`
 
 That means worktrees are the concurrency boundary for code changes, not just a
-convenience feature.
+convenience feature. The directory layout is task-first even though the safety
+check still happens at the repo binding level.
 
 ### Writer isolation rule
 
@@ -212,12 +214,13 @@ Task A
 Task B
   writer session: s2
   frontend -> conflict with Task A
-  resolve by creating .worktrees/frontend/task-b/
-  frontend -> worktree checkout .worktrees/frontend/task-b/
+  resolve by creating .worktrees/task-b/frontend/
+  frontend -> worktree checkout .worktrees/task-b/frontend/
 ```
 
 `prepare-task-worktree.sh` is the explicit command that turns that conflict into
-a safe layout by creating the checkout and recording the task's repo binding.
+a safe task-scoped layout by creating the checkout and recording the task's
+repo binding.
 
 ### Delegates are the observer-safe concurrency lane
 

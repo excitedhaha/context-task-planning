@@ -269,6 +269,9 @@ If you are using shell fallback for the new writer task:
 sh skill/scripts/prepare-task-worktree.sh --task frontend-billing-cleanup --repo frontend
 ```
 
+That checkout lands under `.worktrees/frontend-billing-cleanup/frontend/` by
+default, so one task's isolated repo work stays together.
+
 You can ignore until later:
 
 - if your tasks run serially or touch different repos, shared checkouts are still fine
@@ -369,6 +372,8 @@ sh skill/scripts/prepare-task-worktree.sh --task feature-auth --repo frontend
 sh skill/scripts/register-repo.sh --id frontend frontend
 sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"
 ```
+
+By default that worktree lives at `.worktrees/feature-auth/frontend/`.
 
 If you want the full command contract instead of the progressive usage guide, use `skill/reference.md`.
 

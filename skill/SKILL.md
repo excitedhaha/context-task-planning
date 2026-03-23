@@ -72,7 +72,11 @@ sh scripts/set-task-repos.sh <slug> --repo frontend --repo backend --primary fro
 
 Use auto-discovery only to review candidates. The actual registration step should stay explicit.
 
-Once the parent workspace owns `.planning/`, commands run from that parent directory, any registered repo path, or a recorded `.worktrees/...` checkout should all resolve back to the same shared workspace. Ignore unrelated ancestor `.planning/` directories unless the current path actually belongs to that older workspace.
+Once the parent workspace owns `.planning/`, commands run from that parent
+directory, any registered repo path, or a recorded
+`.worktrees/<task-slug>/<repo-id>/` checkout should all resolve back to the
+same shared workspace. Ignore unrelated ancestor `.planning/` directories
+unless the current path actually belongs to that older workspace.
 
 ## Workflow
 
@@ -202,8 +206,8 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/list-repos.sh --discover` - show registered repos plus direct-child git repos that could be registered under the current workspace
 - `scripts/register-repo.sh --id <repo-id> <path>` - explicitly register a repo under a parent workspace
 - `scripts/set-task-repos.sh <slug> --repo <repo-id> [--repo ...] [--primary <repo-id>]` - declare which registered repos a task is allowed to touch
-- `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task
-- `scripts/list-worktrees.sh` - inspect task-specific worktree bindings
+- `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task; the standard location is `.worktrees/<task-slug>/<repo-id>/`
+- `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates

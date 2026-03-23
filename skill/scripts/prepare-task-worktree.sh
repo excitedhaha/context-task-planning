@@ -92,7 +92,7 @@ if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "HEAD" ]; then
 fi
 
 if [ -z "$CUSTOM_PATH" ]; then
-    CUSTOM_PATH="$WORKSPACE_ROOT/.worktrees/$REPO_ID/$TASK_SLUG"
+    CUSTOM_PATH="$WORKSPACE_ROOT/.worktrees/$TASK_SLUG/$REPO_ID"
 fi
 
 CHECKOUT_REL=$($PYTHON_BIN - "$WORKSPACE_ROOT" "$CUSTOM_PATH" <<'PY'

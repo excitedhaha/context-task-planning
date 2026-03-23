@@ -139,6 +139,9 @@ sh scripts/prepare-task-worktree.sh --task billing-cleanup --repo frontend
 sh scripts/list-worktrees.sh
 ```
 
+The default checkout path is `.worktrees/billing-cleanup/frontend/`, and
+`list-worktrees.sh` shows isolated checkouts grouped by task.
+
 ## Example 6: List tasks in one repository
 
 ```bash

@@ -100,7 +100,8 @@ Usually all you need to care about is:
   state.json
 ```
 
-Advanced workflows may also add session bindings, repo metadata, and `.worktrees/`, but they stay local and inspectable.
+Advanced workflows may also add session bindings, repo metadata, and
+task-scoped `.worktrees/`, but they stay local and inspectable.
 
 ## Limitations
 
