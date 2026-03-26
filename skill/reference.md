@@ -75,6 +75,8 @@ For the deeper architecture behind session bindings, repo scope, and worktree is
 
 Resolution order is: explicit `--task`, `PLAN_TASK`, the session binding selected by `PLAN_SESSION_KEY`, `.planning/.active_task`, then the latest auto-selectable task.
 
+Treat those sources differently in UI: `session_binding` is the strong per-session signal, `.planning/.active_task` is the shared `workspace-default` fallback, and `latest` is only a recovery/default guess.
+
 The default human-readable output should answer:
 
 - what task is currently selected
@@ -90,7 +92,7 @@ Use `check-task-drift.sh` when you want a lightweight answer to: does this new r
 
 Use `check-switch-safety.sh --target-task <slug> --json` when you are about to switch tasks in a git repository and want to know whether the current worktree should be stashed or committed first.
 
-`init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately. When `PLAN_SESSION_KEY` is present, those commands update the current session binding instead of treating `.planning/.active_task` as the only live pointer.
+`init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately. When `PLAN_SESSION_KEY` is present, those commands update the current session binding instead of treating `.planning/.active_task` as the only live pointer; without a session key, they operate on the shared `workspace-default` fallback.
 
 Observer sessions may still create or update delegate lanes under `delegates/<delegate-id>/`, but they must leave `task_plan.md`, `progress.md`, `state.json`, and `findings.md` to the writer.
 

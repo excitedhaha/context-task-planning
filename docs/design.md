@@ -125,11 +125,36 @@ Those sources are not interchangeable.
 - `--task` is an explicit command-level override
 - `PLAN_TASK` is a temporary shell-level override
 - `PLAN_SESSION_KEY` is the normal path for host-managed parallel sessions
-- `.active_task` is the compatibility fallback for hosts or shells that do not
-  provide session identity
+- `.active_task` is the compatibility fallback for the shared
+  `workspace-default` actor when a host or shell does not provide session
+  identity
+
+That means `.active_task` is still useful, but it is no longer the same kind of
+signal as an explicit session binding. In multi-session workflows, the real
+ownership model lives in `.planning/.sessions/*.json`, while `.active_task`
+remains the shared anonymous default.
 
 That ordering is what lets the same workspace support host adapters, manual
 shell usage, and backward-compatible fallback behavior at the same time.
+
+### Resolver precedence vs host-visible binding
+
+The resolver may still pick a task from `.active_task` or `latest`, but host
+adapters should not treat every resolved task as an equally strong binding.
+
+- `selection_source = session_binding` means the current session is explicitly
+  attached to that task
+- `selection_source = active_pointer` means the workspace fallback selected the
+  task for an anonymous `workspace-default` actor
+- `selection_source = latest` is a recovery/default guess, not a stable binding
+
+Recommended adapter behavior:
+
+- use `session_binding` for strong UI such as `task:<slug>` titles, native task
+  cues, or write ownership indicators
+- treat `active_pointer` as a weaker workspace fallback hint unless the host is
+  intentionally running without per-session identity
+- never present `latest` as if the session had already been explicitly bound
 
 ## Concurrency Model: Sessions, Roles, And Worktrees
 
@@ -315,8 +340,8 @@ file-backed state; they do not replace it.
 This architecture keeps the system local, inspectable, and portable, but it also
 comes with explicit tradeoffs.
 
-- `.active_task` remains for compatibility even though session bindings are the
-  preferred model
+- `.active_task` remains for compatibility as the `workspace-default` fallback
+  even though session bindings are the preferred model
 - repo auto-discovery stays advisory because silent wrong registration is worse
   than an extra explicit step
 - workspace resolution prefers conservative fallback over aggressive ancestor
