@@ -33,6 +33,7 @@ After you enable the bundled adapter, Claude Code can surface the shared file-ba
 - task recovery on session start from the session binding or workspace fallback
 - prompt-time reminders when a request looks like likely task drift
 - stronger warnings before `Task` launches on mismatched work
+- shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related work and routing or delegate escalation when the fit is wrong
 - repo context such as `primary_repo` and `repo_scope` when a task spans multiple repos
 
 ## Enable the Claude adapter
@@ -62,6 +63,27 @@ Sample illustration:
 
 This is a sample illustration of the expected task cue, not a live screenshot from your machine.
 
+## Task preflight
+
+Claude's `PreToolUse` hook now calls the shared shell-first helper before native `Task` launches:
+
+```bash
+sh skill/scripts/subagent-preflight.sh \
+  --cwd "$PWD" \
+  --host claude \
+  --tool-name Task \
+  --task-text "Implement the auth migration subagent" \
+  --json
+```
+
+The helper returns one decision for the launch:
+
+- `payload_only` or `payload_plus_delegate_recommended` - Claude prepends the canonical task and repo/worktree prefix
+- `routing_only` - Claude shows routing confirmation only and does not inject the repo/worktree payload
+- `delegate_required` - Claude tells you to create or reuse a delegate lane first
+
+`UserPromptSubmit` stays advisory; the actual native-Task preflight happens in `PreToolUse`.
+
 ## If you prefer no hooks
 
 The core skill still works without Claude-specific hooks. You keep the file-backed task workflow, but you lose the native status line and the extra prompt/tool reminders.
@@ -73,6 +95,7 @@ Useful commands when you want direct control:
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh --compact`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
+- `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host claude --tool-name Task --task-text "Investigate auth entry points" --text`
 - `sh skill/scripts/validate-task.sh`
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind Claude's task resolution, use `docs/design.md`.

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -135,6 +136,122 @@ COMPLEX_SIGNALS = [
     "步骤",
 ]
 
+DELEGATE_KIND_PATTERNS = [
+    (
+        "review",
+        ["review", "diff review", "code review", "pr review", "审查", "评审"],
+    ),
+    (
+        "verify",
+        [
+            "verify",
+            "validation",
+            "regression",
+            "failing test",
+            "test failure",
+            "triage",
+            "验证",
+            "回归",
+            "测试失败",
+            "失败排查",
+        ],
+    ),
+    (
+        "spike",
+        [
+            "spike",
+            "prototype",
+            "poc",
+            "feasibility",
+            "compare options",
+            "方案对比",
+            "可行性",
+        ],
+    ),
+    (
+        "discovery",
+        [
+            "investigate",
+            "analyze",
+            "map",
+            "scan",
+            "explore",
+            "entry point",
+            "dependency",
+            "research",
+            "调研",
+            "分析",
+            "找入口",
+            "排查",
+        ],
+    ),
+]
+
+DELEGATE_RECOMMEND_SESSION_CUES = [
+    "resume later",
+    "pick up later",
+    "later session",
+    "follow up later",
+    "后续继续",
+    "之后继续",
+    "跨会话",
+]
+
+DELEGATE_RECOMMEND_ARTIFACT_CUES = [
+    "write up",
+    "report",
+    "summary",
+    "matrix",
+    "research notes",
+    "record findings",
+    "整理结论",
+    "输出报告",
+    "记录结果",
+]
+
+DELEGATE_RECOMMEND_MULTI_CUES = [
+    "multiple repos",
+    "across repos",
+    "each repo",
+    "for every repo",
+    "parallel",
+    "多个仓库",
+    "多个子问题",
+    "逐个仓库",
+]
+
+DELEGATE_REQUIRED_LIFECYCLE_CUES = [
+    "durable lifecycle",
+    "lifecycle state",
+    "track lifecycle",
+    "resume and promote",
+    "blocked then resume",
+    "持久生命周期",
+    "跟踪生命周期",
+    "恢复并提升",
+]
+
+DELEGATE_REQUIRED_CLOSEOUT_CUES = [
+    "before done",
+    "before archive",
+    "block done",
+    "block archive",
+    "gate closeout",
+    "完成前",
+    "归档前",
+    "阻塞 done",
+]
+
+DELEGATE_REQUIRED_CONTEXT_CUES = [
+    "survive context loss",
+    "after context loss",
+    "promote later",
+    "review later before promote",
+    "上下文丢失后",
+    "之后再提升",
+    "稍后再评审",
+]
+
 SPECIAL_TOKEN_RE = re.compile(
     r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+"
     r"|[A-Za-z0-9_.-]+\.(?:sh|py|md|json|yaml|yml|toml|txt)"
@@ -180,6 +297,17 @@ def parse_args() -> argparse.Namespace:
     drift.add_argument("--prompt", default="")
     drift.add_argument("--json", action="store_true")
     drift.add_argument("--compact", action="store_true")
+
+    preflight = subparsers.add_parser("subagent-preflight")
+    preflight.add_argument("--task", default="")
+    preflight.add_argument("--cwd", default="")
+    preflight.add_argument("--session-key", default="")
+    preflight.add_argument("--host", default="generic")
+    preflight.add_argument("--task-text", default="")
+    preflight.add_argument("--tool-name", default="Task")
+    preflight.add_argument("--json", action="store_true")
+    preflight.add_argument("--text", action="store_true")
+    preflight.add_argument("--compact", action="store_true")
 
     switch = subparsers.add_parser("check-switch-safety")
     switch.add_argument("--cwd", default="")
@@ -1477,7 +1605,9 @@ def summarize_repo_isolation(
     plan_root: Path, workspace_root: Path, task_slug: str, session_key: str = ""
 ) -> dict:
     bindings = effective_task_repo_bindings(plan_root, workspace_root, task_slug)
-    conflicts = shared_checkout_conflicts(plan_root, workspace_root, task_slug, session_key)
+    conflicts = shared_checkout_conflicts(
+        plan_root, workspace_root, task_slug, session_key
+    )
     conflict_by_repo = {}
     for item in conflicts:
         repo_entry = conflict_by_repo.setdefault(
@@ -1998,9 +2128,7 @@ def ensure_switch_safety(args: argparse.Namespace) -> None:
 
 def compact_current_task(task: dict) -> str:
     if not task["found"]:
-        return (
-            f"task=(none) source=none action={task.get('recommended_action') or 'init-task'}"
-        )
+        return f"task=(none) source=none action={task.get('recommended_action') or 'init-task'}"
     return (
         f"task={task['slug']} status={task['status'] or '-'} mode={task['mode'] or '-'} "
         f"phase={task['current_phase'] or '-'} source={task['selection_source']} "
@@ -2012,7 +2140,9 @@ def format_repo_binding_items(items: list[dict]) -> str:
     if not items:
         return "(none)"
     return ", ".join(
-        f"{item['repo_id']} ({item['checkout_path']})" for item in items if item.get("repo_id")
+        f"{item['repo_id']} ({item['checkout_path']})"
+        for item in items
+        if item.get("repo_id")
     )
 
 
@@ -2120,9 +2250,7 @@ def print_current_task(task: dict, as_json: bool, compact: bool) -> None:
     print(
         f"[context-task-planning] Recommended next step: {task.get('recommended_action') or 'continue-current-task'}"
     )
-    print(
-        f"[context-task-planning] Why: {task.get('recommended_reason') or '(none)'}"
-    )
+    print(f"[context-task-planning] Why: {task.get('recommended_reason') or '(none)'}")
     print_recommended_commands(task.get("recommended_commands", []))
 
 
@@ -2282,6 +2410,358 @@ def classify_drift(prompt: str, task: dict) -> dict:
         "followup_prompt": followup,
         "task": task,
     }
+
+
+def text_matches_any(text: str, patterns: list[str]) -> bool:
+    lowered = " ".join(text.lower().split())
+    return any(pattern in lowered for pattern in patterns)
+
+
+def delegate_kind_for_text(text: str) -> str | None:
+    lowered = text.lower()
+    for kind, patterns in DELEGATE_KIND_PATTERNS:
+        if any(pattern in lowered for pattern in patterns):
+            return kind
+    return None
+
+
+def default_delegate_title(kind: str) -> str:
+    titles = {
+        "discovery": "Repo scan",
+        "spike": "Option spike",
+        "verify": "Verification triage",
+        "review": "Review lane",
+        "catchup": "Catchup lane",
+        "other": "Delegate lane",
+    }
+    return titles.get(kind, "Delegate lane")
+
+
+def prepare_delegate_command(text: str, kind: str) -> str:
+    normalized = " ".join(text.split()) or default_delegate_title(kind)
+    if len(normalized) > 80:
+        normalized = normalized[:77].rstrip() + "..."
+    script_path = Path(__file__).resolve().with_name("prepare-delegate.sh")
+    return f"sh {shlex.quote(str(script_path))} --kind {kind} {shlex.quote(normalized)}"
+
+
+def repo_entries_for_task(task: dict) -> list[dict]:
+    entries = []
+    for binding in task.get("repo_bindings", []):
+        repo_id = str(binding.get("repo_id") or "").strip()
+        if not repo_id:
+            continue
+        binding_mode = "worktree" if binding.get("mode") == "worktree" else "shared"
+        repo_path = str(binding.get("repo_path") or ".")
+        checkout_path = str(binding.get("checkout_path") or repo_path or ".")
+        entries.append(
+            {
+                "id": repo_id,
+                "path": repo_path,
+                "binding_mode": binding_mode,
+                "checkout_path": checkout_path,
+                "branch": str(binding.get("branch") or ""),
+                "base_branch": str(binding.get("base_branch") or ""),
+                "write_policy": "prefer_isolated"
+                if binding_mode == "worktree"
+                else "allowed",
+            }
+        )
+    return entries
+
+
+def repo_scope_for_payload(task: dict, repos: list[dict]) -> list[str]:
+    scope = [
+        str(repo_id).strip()
+        for repo_id in task.get("repo_scope", [])
+        if str(repo_id).strip()
+    ]
+    if scope:
+        return scope
+    return [repo["id"] for repo in repos if repo.get("id")]
+
+
+def repo_summary_text(repos: list[dict]) -> str:
+    if not repos:
+        return ""
+    return "; ".join(
+        f"{repo['id']} {repo['binding_mode']} at {repo['checkout_path']}"
+        for repo in repos
+        if repo.get("id")
+    )
+
+
+def preflight_binding_role(task: dict) -> str:
+    role = str(task.get("binding_role") or "").strip()
+    if role in {ROLE_WRITER, ROLE_OBSERVER}:
+        return role
+    return ROLE_WRITER if task.get("found") else ""
+
+
+def unique_strings(values: list[str]) -> list[str]:
+    seen = set()
+    ordered = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        ordered.append(text)
+    return ordered
+
+
+def delegate_analysis_for_text(text: str, task: dict) -> dict:
+    normalized = " ".join(text.lower().split())
+    kind = delegate_kind_for_text(normalized) or ""
+    recommended_reasons = []
+    required_reasons = []
+
+    if kind:
+        recommended_reasons.append(f"bounded {kind} work")
+    if text_matches_any(normalized, DELEGATE_RECOMMEND_SESSION_CUES):
+        recommended_reasons.append("work may outlive the current session")
+    if text_matches_any(normalized, DELEGATE_RECOMMEND_ARTIFACT_CUES):
+        recommended_reasons.append("durable artifacts would help")
+    if text_matches_any(normalized, DELEGATE_RECOMMEND_MULTI_CUES):
+        recommended_reasons.append(
+            "multiple sibling side quests may need explicit tracking"
+        )
+
+    if task.get("binding_role") == ROLE_OBSERVER:
+        required_reasons.append("current session is observe-only")
+    if text_matches_any(normalized, DELEGATE_REQUIRED_CLOSEOUT_CUES):
+        required_reasons.append("side work must block done or archive")
+    if text_matches_any(normalized, DELEGATE_REQUIRED_LIFECYCLE_CUES):
+        required_reasons.append("side work needs durable lifecycle states")
+    if text_matches_any(normalized, DELEGATE_REQUIRED_CONTEXT_CUES):
+        required_reasons.append("side work must survive context loss before promotion")
+
+    required_reasons = unique_strings(required_reasons)
+    recommended_reasons = unique_strings(recommended_reasons)
+    command_kind = kind or ("other" if required_reasons or recommended_reasons else "")
+    return {
+        "kind": command_kind,
+        "recommended": bool(recommended_reasons) and not required_reasons,
+        "required": bool(required_reasons),
+        "recommended_reasons": recommended_reasons,
+        "required_reasons": required_reasons,
+        "reason": "; ".join(required_reasons or recommended_reasons),
+        "command": prepare_delegate_command(text, command_kind) if command_kind else "",
+    }
+
+
+def prompt_prefix_for_preflight(
+    task: dict, routing: dict, repos: list[dict], delegate: dict
+) -> str:
+    role = preflight_binding_role(task) or "unbound"
+    primary_repo = str(task.get("primary_repo") or "") or (
+        repos[0]["id"] if repos else ""
+    )
+    repo_scope = repo_scope_for_payload(task, repos)
+    lines = [
+        f"[context-task-planning] Current task: {task.get('slug') or '(none)'} | role: {role} | routing: {routing.get('classification') or '-'}",
+        "Treat this subagent request as part of the current task only. Do not silently broaden scope.",
+        f"Primary repo: {primary_repo or '(none)'}",
+        f"Repo scope: {', '.join(repo_scope) if repo_scope else '(none)'}",
+        "Repo/worktree bindings:",
+    ]
+    for repo in repos:
+        lines.append(
+            f"- {repo['id']}: {repo['binding_mode']} at {repo['checkout_path']}"
+        )
+    lines.append(
+        "If repo ownership or task fit becomes unclear, report that back instead of switching tasks implicitly."
+    )
+    if delegate.get("recommended") and delegate.get("kind"):
+        lines.append(
+            f"Delegate recommended: this looks like bounded {delegate['kind']} work and may benefit from a durable lane."
+        )
+        if delegate.get("command"):
+            lines.append(f"Optional command: {delegate['command']}")
+    return "\n".join(lines)
+
+
+def subagent_preflight_result(
+    cwd: str,
+    task_slug: str,
+    session_key: str,
+    host: str,
+    task_text: str,
+    tool_name: str,
+) -> dict:
+    task = resolve_task(cwd, task_slug, session_key)
+    routing = classify_drift(task_text, task)
+    repos = repo_entries_for_task(task)
+    repo_scope = repo_scope_for_payload(task, repos)
+    primary_repo = str(task.get("primary_repo") or "") or (
+        repos[0]["id"] if repos else ""
+    )
+    delegate = delegate_analysis_for_text(task_text, task)
+    binding_role = preflight_binding_role(task)
+    normalized_host = (
+        host if host in {"claude", "opencode", "codex", "generic"} else "generic"
+    )
+    normalized_tool = tool_name or "Task"
+
+    decision = "routing_only"
+    decision_reason = ""
+    operator_message = ""
+    prompt_prefix = ""
+    classification = routing.get("classification") or ""
+
+    if normalized_tool != "Task":
+        decision_reason = "P0 preflight only injects payloads for native Task launches"
+        operator_message = "[context-task-planning] Native subagent preflight is only active for `Task` launches in P0."
+    elif classification == "empty-prompt":
+        decision_reason = "empty task text"
+        operator_message = "[context-task-planning] Task text is empty, so no canonical repo/worktree payload will be injected."
+    elif classification == "no-active-task":
+        decision_reason = "no active task"
+        operator_message = "[context-task-planning] No active task is resolved, so there is no current task payload to inject before launching a subagent."
+    elif classification == "likely-unrelated":
+        decision_reason = "task fit looks likely unrelated"
+        operator_message = (
+            f"[context-task-planning] This Task request looks likely unrelated to the current task `{task.get('slug') or '(none)'}`. "
+            "Confirm whether to continue the current task, switch tasks, or initialize a new task before launching a subagent."
+        )
+    elif classification == "unclear":
+        decision_reason = "task fit is unclear"
+        operator_message = (
+            f"[context-task-planning] Task fit is unclear for `{task.get('slug') or '(none)'}`. "
+            "Confirm whether this still belongs to the current task before launching a subagent."
+        )
+    elif not repos:
+        decision_reason = "no meaningful repo/worktree context exists"
+        operator_message = "[context-task-planning] The current task does not expose meaningful repo/worktree bindings yet, so there is no canonical payload to inject."
+    elif delegate.get("required"):
+        decision = "delegate_required"
+        decision_reason = delegate.get("reason") or "delegate is required"
+        operator_message = "[context-task-planning] Delegate required: do not treat this side work as a free-form native subagent task under the current session."
+        if delegate.get("command"):
+            operator_message += (
+                f" Create or reuse a delegate lane first: {delegate['command']}"
+            )
+    elif delegate.get("recommended"):
+        decision = "payload_plus_delegate_recommended"
+        decision_reason = (
+            delegate.get("reason")
+            or "task-related request with meaningful repo context and a bounded side-work pattern"
+        )
+        prompt_prefix = prompt_prefix_for_preflight(task, routing, repos, delegate)
+    else:
+        decision = "payload_only"
+        decision_reason = "task-related request with meaningful repo/worktree context"
+        prompt_prefix = prompt_prefix_for_preflight(task, routing, repos, delegate)
+
+    return {
+        "found": bool(task.get("found")),
+        "host": normalized_host,
+        "tool_name": normalized_tool,
+        "decision": decision,
+        "decision_reason": decision_reason,
+        "routing": {
+            "classification": classification,
+            "recommendation": routing.get("recommendation") or "",
+        },
+        "task": {
+            "slug": str(task.get("slug") or ""),
+            "status": str(task.get("status") or ""),
+            "mode": str(task.get("mode") or ""),
+            "current_phase": str(task.get("current_phase") or ""),
+            "binding_role": binding_role,
+            "writer_display": str(task.get("writer_display") or ""),
+            "observer_count": int(task.get("observer_count") or 0),
+        },
+        "repo_context": {
+            "primary_repo": primary_repo,
+            "repo_scope": repo_scope,
+            "repo_summary": repo_summary_text(repos),
+            "repos": repos,
+        },
+        "delegate": {
+            "kind": str(delegate.get("kind") or ""),
+            "recommended": bool(delegate.get("recommended")),
+            "required": bool(delegate.get("required")),
+            "reason": str(delegate.get("reason") or ""),
+            "command": str(delegate.get("command") or ""),
+        },
+        "prompt_prefix": prompt_prefix,
+        "operator_message": operator_message,
+    }
+
+
+def subagent_preflight_text(result: dict) -> str:
+    sections = []
+    prompt_prefix = str(result.get("prompt_prefix") or "").strip()
+    operator_message = str(result.get("operator_message") or "").strip()
+    if prompt_prefix:
+        sections.append(prompt_prefix)
+    if operator_message:
+        sections.append(operator_message)
+    return "\n\n".join(section for section in sections if section)
+
+
+def compact_subagent_preflight(result: dict) -> str:
+    task = result.get("task", {})
+    delegate = result.get("delegate", {})
+    if delegate.get("required"):
+        delegate_state = "required"
+    elif delegate.get("recommended"):
+        delegate_state = "recommended"
+    else:
+        delegate_state = "none"
+    return (
+        f"decision={result.get('decision') or 'routing_only'} "
+        f"task={task.get('slug') or '(none)'} "
+        f"routing={result.get('routing', {}).get('classification') or '-'} "
+        f"delegate={delegate_state}"
+    )
+
+
+def print_subagent_preflight(
+    result: dict, as_json: bool, as_text: bool, compact: bool
+) -> None:
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    if compact:
+        print(compact_subagent_preflight(result))
+        return
+
+    if as_text:
+        text = subagent_preflight_text(result)
+        if text:
+            print(text)
+        return
+
+    print(
+        "[context-task-planning] Subagent preflight: "
+        f"decision={result.get('decision') or 'routing_only'} "
+        f"host={result.get('host') or 'generic'} tool={result.get('tool_name') or 'Task'}"
+    )
+    print(
+        f"[context-task-planning] Reason: {result.get('decision_reason') or '(none)'}"
+    )
+    routing = result.get("routing", {})
+    print(
+        "[context-task-planning] Routing: "
+        f"{routing.get('classification') or '-'} -> {routing.get('recommendation') or '-'}"
+    )
+    task = result.get("task", {})
+    print(
+        "[context-task-planning] Task: "
+        f"{task.get('slug') or '(none)'} role={task.get('binding_role') or '-'}"
+    )
+    repo_context = result.get("repo_context", {})
+    print(
+        "[context-task-planning] Repo context: "
+        f"primary={repo_context.get('primary_repo') or '(none)'} "
+        f"scope={', '.join(repo_context.get('repo_scope') or []) or '(none)'}"
+    )
+    text = subagent_preflight_text(result)
+    if text:
+        print(text)
 
 
 def compact_drift(result: dict) -> str:
@@ -2677,6 +3157,18 @@ def main() -> None:
     if args.command == "resolve-plan-dir":
         task = resolve_task(args.cwd, args.task, args.session_key)
         print_plan_dir(task)
+        return
+
+    if args.command == "subagent-preflight":
+        result = subagent_preflight_result(
+            args.cwd,
+            args.task,
+            args.session_key,
+            args.host,
+            args.task_text,
+            args.tool_name,
+        )
+        print_subagent_preflight(result, args.json, args.text, args.compact)
         return
 
     if args.command == "check-switch-safety":

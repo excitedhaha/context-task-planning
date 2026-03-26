@@ -14,8 +14,10 @@ try:
         resolve_plan_dir,
         session_key_from_payload,
         state_summary,
+        subagent_preflight_result,
         task_drift_hint,
         task_drift_result,
+        task_tool_text,
     )
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -29,8 +31,10 @@ except ImportError:
         resolve_plan_dir,
         session_key_from_payload,
         state_summary,
+        subagent_preflight_result,
         task_drift_hint,
         task_drift_result,
+        task_tool_text,
     )
 
 
@@ -50,21 +54,35 @@ def main():
     if not state:
         return
 
-    task_text = ""
-    drift_result = None
     if tool_name == "Task":
-        task_text = " ".join(
-            str(tool_input.get(key, ""))
-            for key in ("description", "prompt", "command", "subagent_type")
+        task_text = task_tool_text(tool_input)
+        preflight = subagent_preflight_result(
+            task_text,
+            cwd=cwd,
+            session_key=session_key,
+            host="claude",
+            tool_name=tool_name,
         )
+        if preflight:
+            context = state_summary(state, task_meta=task_meta)
+            decision = preflight.get("decision")
+            prompt_prefix = str(preflight.get("prompt_prefix") or "").strip()
+            operator_message = str(preflight.get("operator_message") or "").strip()
+            if (
+                decision in {"payload_only", "payload_plus_delegate_recommended"}
+                and prompt_prefix
+            ):
+                context += "\n" + prompt_prefix
+            if operator_message and (
+                decision in {"routing_only", "delegate_required"} or not prompt_prefix
+            ):
+                context += "\n" + operator_message
+            print(pre_tool_payload(context))
+            return
+
         drift_result = task_drift_result(task_text, cwd, session_key=session_key)
-
-    summary_tool_name = tool_name
-    if tool_name == "Task" and not allow_delegate_hint(drift_result):
-        summary_tool_name = None
-
-    context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name)
-    if tool_name == "Task":
+        summary_tool_name = tool_name if allow_delegate_hint(drift_result) else None
+        context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name)
         drift_hint = task_drift_hint(drift_result, tool_name=tool_name)
         if drift_hint:
             context += "\n" + drift_hint
@@ -72,6 +90,10 @@ def main():
             delegate_hint = delegate_hint_for_text(task_text, state)
             if delegate_hint:
                 context += "\n" + delegate_hint
+        print(pre_tool_payload(context))
+        return
+
+    context = state_summary(state, task_meta=task_meta, tool_name=tool_name)
 
     print(pre_tool_payload(context))
 

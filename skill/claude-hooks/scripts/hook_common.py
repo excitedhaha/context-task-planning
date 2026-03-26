@@ -130,6 +130,68 @@ def resolve_plan_dir(
     return Path(output) if output else None
 
 
+def task_tool_text(tool_input: dict) -> str:
+    if not isinstance(tool_input, dict):
+        return ""
+    parts = []
+    for key in ("description", "prompt", "command", "subagent_type"):
+        value = str(tool_input.get(key, "")).strip()
+        if value:
+            parts.append(value)
+    return " ".join(parts)
+
+
+def subagent_preflight_result(
+    task_text: str,
+    cwd: str | None = None,
+    session_key: str | None = None,
+    host: str = "claude",
+    tool_name: str = "Task",
+    task_slug: str | None = None,
+) -> dict | None:
+    script = skill_root() / "scripts" / "subagent-preflight.sh"
+    command = [
+        "sh",
+        str(script),
+        "--json",
+        "--host",
+        host,
+        "--tool-name",
+        tool_name,
+        "--task-text",
+        task_text,
+    ]
+    if cwd:
+        command.extend(["--cwd", cwd])
+    if session_key:
+        command.extend(["--session-key", session_key])
+    if task_slug:
+        command.extend(["--task", task_slug])
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd or os.getcwd(),
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    output = result.stdout.strip()
+    if not output:
+        return None
+
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        return None
+
+
 def load_state(plan_dir: Path) -> dict:
     state_file = plan_dir / "state.json"
     if not state_file.exists():
@@ -240,8 +302,8 @@ def delegate_hint_for_text(text: str, state: dict | None = None) -> str | None:
 
     command = prepare_delegate_command(text, kind)
     base = (
-        f"[context-task-planning] This looks like a bounded `{kind}` subproblem. "
-        f"Use `{command}` to create and start a delegate lane, then keep subagent work inside `delegates/<delegate-id>/`."
+        f"[context-task-planning] If this turns into a bounded `{kind}` side quest, a delegate lane may help. "
+        f"Optional command: `{command}`. Keep it optional unless observe-only routing or durable lifecycle tracking makes a delegate required."
     )
 
     if state:
@@ -383,11 +445,12 @@ def state_summary(
             )
     elif tool_name == "Task":
         lines.append(
-            f'If this Task call is a bounded discovery, review, verify, or spike problem, prefer `{installed_skill_command("prepare-delegate.sh")} "<description>"` before launching the subagent.'
+            "Keep Task launches scoped to the current task. If repo ownership or task fit becomes unclear, report that back instead of switching tasks implicitly."
         )
-        lines.append(
-            "Subagents should write only inside `delegates/<delegate-id>/`; keep main planning files single-writer, and mark the lane running with `start-delegate.sh` when work begins."
-        )
+        if role == "observer":
+            lines.append(
+                "Observe-only sessions should use explicit delegate lanes for side work that needs durable tracking."
+            )
     else:
         lines.append(
             "Keep external or untrusted material in `findings.md`, not in Hot Context."
