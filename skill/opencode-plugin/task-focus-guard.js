@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { statSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
@@ -150,6 +151,36 @@ function visibleTaskSlug(task) {
   }
 
   return task.slug
+}
+
+function taskStateForSlug(planRoot, taskSlug) {
+  if (!planRoot || !taskSlug) {
+    return null
+  }
+
+  const statePath = path.join(planRoot, taskSlug, "state.json")
+  if (!existsSync(statePath)) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(statePath, "utf8"))
+    return parsed && typeof parsed === "object" ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function completedTaskPrompt(taskSlug) {
+  if (!taskSlug) {
+    return null
+  }
+
+  return [
+    `[context-task-planning] Nice work - the last bound task \`${taskSlug}\` is done.`,
+    "Congratulate the user briefly, then ask whether they want to archive it now or start a new task.",
+    "If the user already clearly chose one of those options, follow that choice instead of asking again.",
+  ].join(" ")
 }
 
 function pluginSessionKey(sessionID) {
@@ -335,6 +366,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const driftBySession = new Map()
   const promptBySession = new Map()
   const taskBySession = new Map()
+  const completedTaskBySession = new Map()
   const freshnessBySession = new Map()
   const observedSessionIDs = new Set()
   let lastExplicitSessionID = ""
@@ -429,6 +461,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     if (taskSlug) {
       taskBySession.set(sessionID, taskSlug)
+      completedTaskBySession.delete(sessionID)
     } else {
       taskBySession.delete(sessionID)
     }
@@ -527,9 +560,20 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     "experimental.chat.system.transform": async (input, output) => {
       const session = sessionContext(input)
+      const visibleSessionID = session.explicitSessionID || session.fallbackSessionID
       const cacheSessionID = sessionCacheKey(session, true)
       const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
+        return
+      }
+
+      const completedTaskSlug = visibleSessionID ? completedTaskBySession.get(visibleSessionID) || "" : ""
+      if (completedTaskSlug && !task?.found) {
+        const prompt = completedTaskPrompt(completedTaskSlug)
+        if (prompt) {
+          output.system.push(prompt)
+        }
+        completedTaskBySession.delete(visibleSessionID)
         return
       }
 
@@ -641,16 +685,31 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     "tool.execute.after": async (input, output) => {
       const session = sessionContext(input, output)
+      const visibleSessionID = session.explicitSessionID || session.fallbackSessionID
+      const previousTaskSlug = visibleSessionID ? taskBySession.get(visibleSessionID) || "" : ""
       const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      if (session.explicitSessionID) {
-        const previousTaskSlug = taskBySession.get(session.explicitSessionID) || ""
+      if (visibleSessionID) {
         const currentTaskSlug = visibleTaskSlug(task)
         if (currentTaskSlug !== previousTaskSlug) {
-          await syncVisibleTask(session.explicitSessionID, task, null)
+          await syncVisibleTask(visibleSessionID, task, null)
+        }
+
+        if (!currentTaskSlug && previousTaskSlug) {
+          const previousTask = taskStateForSlug(task?.plan_root, previousTaskSlug)
+          if (previousTask?.status === "done") {
+            completedTaskBySession.set(visibleSessionID, previousTaskSlug)
+            await showToast(
+              "Nice work",
+              `${previousTaskSlug} is done. Want to archive it or start a new task?`,
+              "info",
+            )
+          } else {
+            completedTaskBySession.delete(visibleSessionID)
+          }
         }
       }
 

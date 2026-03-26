@@ -57,6 +57,11 @@ function writeBinding(planRoot, sessionID, taskSlug) {
   )
 }
 
+function clearBinding(planRoot, sessionID) {
+  const sessionKey = `opencode:${sessionID}`
+  unlinkSync(path.join(planRoot, ".sessions", sessionBindingName(sessionKey)))
+}
+
 const workspace = mkdtempSync(path.join(os.tmpdir(), "ctp-opencode-title-smoke."))
 
 try {
@@ -77,6 +82,7 @@ try {
     ["A", "Session A"],
     ["B", "Session B"],
   ])
+  const toasts = []
   const client = {
     session: {
       async get({ path: { id } }) {
@@ -88,7 +94,9 @@ try {
       },
     },
     tui: {
-      async showToast() {},
+      async showToast({ body }) {
+        toasts.push(body)
+      },
     },
   }
 
@@ -111,6 +119,33 @@ try {
   await plugin["tool.execute.after"]({ tool: "read" }, {})
   assert.equal(titles.get("A"), "task:base-app-mobile | Session A")
   assert.equal(titles.get("B"), "task:base-app-mobile-coldstart-optimization | Session B")
+
+  writeTask(planRoot, "archive-me", "Archive Me")
+  writeBinding(planRoot, "A", "archive-me")
+  await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
+  assert.equal(titles.get("A"), "task:archive-me | Session A")
+
+  setTaskStatus(planRoot, "archive-me", "done")
+  clearBinding(planRoot, "A")
+  await plugin["tool.execute.after"]({ tool: "bash", sessionID: "A" }, {})
+  assert.equal(titles.get("A"), "Session A")
+  assert.deepEqual(toasts.at(-1), {
+    title: "Nice work",
+    message: "archive-me is done. Want to archive it or start a new task?",
+    variant: "info",
+    duration: 2600,
+  })
+
+  const transformOutput = { system: [] }
+  await plugin["experimental.chat.system.transform"]({ sessionID: "A" }, transformOutput)
+  assert.match(
+    transformOutput.system.join("\n"),
+    /congratulate the user briefly, then ask whether they want to archive it now or start a new task/i,
+  )
+
+  const secondTransformOutput = { system: [] }
+  await plugin["experimental.chat.system.transform"]({ sessionID: "A" }, secondTransformOutput)
+  assert.equal(secondTransformOutput.system.length, 0)
 
   console.log("[context-task-planning] smoke test passed: OpenCode multi-session titles stay isolated")
 } finally {
