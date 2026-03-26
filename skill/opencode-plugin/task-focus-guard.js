@@ -201,6 +201,14 @@ function defaultFreshnessState(planning) {
 
 function refreshFreshnessState(store, sessionID, task) {
   const planning = latestPlanningInfo(task)
+  if (!sessionID) {
+    return {
+      state: defaultFreshnessState(planning),
+      planning,
+      planningUpdated: false,
+    }
+  }
+
   const state = store.get(sessionID) || defaultFreshnessState(planning)
   const planningUpdated = Boolean(planning && planning.latestMtimeMs > state.lastPlanningMtimeMs)
 
@@ -282,7 +290,7 @@ function trackableTool(toolName) {
   return FRESHNESS_TRACKED_TOOLS.has(String(toolName || "").toLowerCase())
 }
 
-function resolveSessionID(...values) {
+function resolveExplicitSessionID(...values) {
   for (const value of values) {
     if (!value) {
       continue
@@ -294,7 +302,7 @@ function resolveSessionID(...values) {
 
     if (typeof value === "object") {
       const nested =
-        resolveSessionID(
+        resolveExplicitSessionID(
           value.sessionID,
           value.sessionId,
           value.id,
@@ -316,14 +324,37 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const promptBySession = new Map()
   const taskBySession = new Map()
   const freshnessBySession = new Map()
-  let lastSessionID = ""
+  const observedSessionIDs = new Set()
+  let lastExplicitSessionID = ""
 
-  function rememberSessionID(...values) {
-    const sessionID = resolveSessionID(...values)
-    if (sessionID) {
-      lastSessionID = sessionID
+  function sessionContext(...values) {
+    const explicitSessionID = resolveExplicitSessionID(...values)
+    if (explicitSessionID) {
+      observedSessionIDs.add(explicitSessionID)
+      lastExplicitSessionID = explicitSessionID
     }
-    return sessionID || lastSessionID
+
+    const fallbackSessionID =
+      !explicitSessionID && observedSessionIDs.size === 1 ? lastExplicitSessionID : ""
+
+    return {
+      explicitSessionID,
+      fallbackSessionID,
+      readSessionID: explicitSessionID || fallbackSessionID,
+      ambiguous: !explicitSessionID && observedSessionIDs.size > 1,
+    }
+  }
+
+  function sessionCacheKey(context, allowFallback = false) {
+    if (context.explicitSessionID) {
+      return context.explicitSessionID
+    }
+
+    if (allowFallback && context.fallbackSessionID) {
+      return context.fallbackSessionID
+    }
+
+    return ""
   }
 
   async function showToast(title, message, variant = "info") {
@@ -435,41 +466,47 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
   return {
     "chat.message": async (input, output) => {
-      const sessionID = rememberSessionID(input, output)
-      const currentTask = readCurrentTask(baseCwd, sessionID)
+      const session = sessionContext(input, output)
+      const currentTask = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(currentTask)) {
-        if (sessionID) {
-          driftBySession.delete(sessionID)
-          promptBySession.delete(sessionID)
-          taskBySession.delete(sessionID)
+        if (session.explicitSessionID) {
+          driftBySession.delete(session.explicitSessionID)
+          promptBySession.delete(session.explicitSessionID)
+          taskBySession.delete(session.explicitSessionID)
         }
         return
       }
 
       const prompt = collectPromptText(output.parts)
-      if (sessionID) {
-        promptBySession.set(sessionID, prompt)
+      const cacheSessionID = sessionCacheKey(session, true)
+      if (cacheSessionID) {
+        promptBySession.set(cacheSessionID, prompt)
       }
 
-      const drift = readDrift(prompt, baseCwd, sessionID)
-      if (drift && sessionID) {
-        driftBySession.set(sessionID, drift)
+      const drift = readDrift(prompt, baseCwd, session.readSessionID)
+      if (drift && cacheSessionID) {
+        driftBySession.set(cacheSessionID, drift)
       }
 
       const task = drift?.task?.found ? drift.task : currentTask
-      await syncVisibleTask(sessionID, task, drift)
+      if (session.explicitSessionID) {
+        await syncVisibleTask(session.explicitSessionID, task, drift)
+      }
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      const sessionID = rememberSessionID(input)
-      const mapSessionID = sessionID || "default"
-      const task = readCurrentTask(baseCwd, sessionID)
+      const session = sessionContext(input)
+      const cacheSessionID = sessionCacheKey(session, true)
+      const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      const drift = driftBySession.get(mapSessionID) || readDrift(promptBySession.get(mapSessionID) || "", baseCwd, sessionID)
-      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, mapSessionID, task)
+      const prompt = cacheSessionID ? promptBySession.get(cacheSessionID) || "" : ""
+      const drift =
+        (cacheSessionID ? driftBySession.get(cacheSessionID) : null) ||
+        readDrift(prompt, baseCwd, session.readSessionID)
+      const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, cacheSessionID, task)
 
       if (task && task.found) {
         output.system.push(currentTaskSummary(task))
@@ -491,8 +528,8 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "tool.execute.before": async (input, output) => {
-      const sessionID = rememberSessionID(input, output)
-      const currentTask = readCurrentTask(baseCwd, sessionID)
+      const session = sessionContext(input, output)
+      const currentTask = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(currentTask)) {
         return
       }
@@ -502,11 +539,12 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const drift = sessionID ? driftBySession.get(sessionID) : null
+      const cacheSessionID = sessionCacheKey(session, true)
+      const drift = cacheSessionID ? driftBySession.get(cacheSessionID) : null
       if (!drift) {
         const { state: freshnessState, planning } = refreshFreshnessState(
           freshnessBySession,
-          sessionID || "default",
+          cacheSessionID,
           currentTask,
         )
         const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
@@ -526,7 +564,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const { state: freshnessState, planning } = refreshFreshnessState(
         freshnessBySession,
-        sessionID || "default",
+        cacheSessionID,
         task,
       )
       const prefixes = [taskToolPrefix(task, drift), freshnessTaskPrefix(task, freshnessState, planning)].filter(
@@ -543,13 +581,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "shell.env": async (input, output) => {
-      const sessionID = rememberSessionID(input, output)
-      const task = readCurrentTask(input.cwd || baseCwd, sessionID)
+      const session = sessionContext(input, output)
+      const task = readCurrentTask(input.cwd || baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
       if (!task || !task.found || !task.slug) {
+        return
+      }
+
+      const sessionID = session.explicitSessionID || session.fallbackSessionID
+      if (!sessionID) {
         return
       }
 
@@ -560,16 +603,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     "tool.execute.after": async (input, output) => {
-      const sessionID = rememberSessionID(input, output)
-      const task = readCurrentTask(baseCwd, sessionID)
+      const session = sessionContext(input, output)
+      const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      const previousTaskSlug = sessionID ? taskBySession.get(sessionID) || "" : ""
-      const currentTaskSlug = visibleTaskSlug(task)
-      if (currentTaskSlug !== previousTaskSlug) {
-        await syncVisibleTask(sessionID, task, null)
+      if (session.explicitSessionID) {
+        const previousTaskSlug = taskBySession.get(session.explicitSessionID) || ""
+        const currentTaskSlug = visibleTaskSlug(task)
+        if (currentTaskSlug !== previousTaskSlug) {
+          await syncVisibleTask(session.explicitSessionID, task, null)
+        }
       }
 
       if (!task?.found) {
@@ -577,20 +622,21 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       const toolName = String(input.tool || "").toLowerCase()
+      const cacheSessionID = sessionCacheKey(session, true)
       const { state, planning, planningUpdated } = refreshFreshnessState(
         freshnessBySession,
-        sessionID || "default",
+        cacheSessionID,
         task,
       )
 
-      if (!planning || !trackableTool(toolName) || planningUpdated) {
+      if (!planning || !trackableTool(toolName) || planningUpdated || !cacheSessionID) {
         return
       }
 
       state.workEventsSincePlanning += 1
       state.lastWorkTool = toolName
       state.lastWorkAt = Date.now()
-      freshnessBySession.set(sessionID || "default", state)
+      freshnessBySession.set(cacheSessionID, state)
 
       const toast = freshnessToastMessage(task, state, planning)
       if (!toast || state.toastPlanningMtimeMs === planning.latestMtimeMs) {
@@ -598,7 +644,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       state.toastPlanningMtimeMs = planning.latestMtimeMs
-      freshnessBySession.set(sessionID || "default", state)
+      freshnessBySession.set(cacheSessionID, state)
       await showToast(toast.title, toast.message, toast.variant)
     },
 
@@ -607,14 +653,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      const sessionID = rememberSessionID(event)
-      const task = readCurrentTask(baseCwd, sessionID)
+      const session = sessionContext(event)
+      if (!session.explicitSessionID) {
+        return
+      }
+
+      const task = readCurrentTask(baseCwd, session.explicitSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      refreshFreshnessState(freshnessBySession, sessionID, task)
-      await syncVisibleTask(sessionID, task, null)
+      refreshFreshnessState(freshnessBySession, session.explicitSessionID, task)
+      await syncVisibleTask(session.explicitSessionID, task, null)
     },
   }
 }
