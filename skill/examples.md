@@ -111,7 +111,7 @@ PLAN_SESSION_KEY=manual:feature-auth sh scripts/set-active-task.sh feature-auth
 PLAN_SESSION_KEY=manual:bugfix-login sh scripts/set-active-task.sh bugfix-login
 ```
 
-Host adapters can do this automatically with their own session IDs. `PLAN_TASK` remains a one-off manual override, while `.planning/.active_task` is only the workspace fallback.
+Host adapters can do this automatically with their own session IDs. `PLAN_TASK` remains a one-off manual override, while `.planning/.active_task` is only the shared `workspace-default` fallback. In host UI, treat explicit session bindings as the only strong source for per-session task cues.
 
 If two sessions need the same task, keep one writer and bind the others as observers:
 

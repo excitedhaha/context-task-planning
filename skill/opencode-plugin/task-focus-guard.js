@@ -133,6 +133,10 @@ function visibleTaskSlug(task) {
     return ""
   }
 
+  if (task.selection_source !== "session_binding") {
+    return ""
+  }
+
   return task.slug
 }
 
