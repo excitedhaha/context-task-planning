@@ -8,6 +8,7 @@ const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
 const SKILL_ROOT = path.resolve(PLUGIN_DIR, "..")
 const CURRENT_TASK_SCRIPT = path.join(SKILL_ROOT, "scripts", "current-task.sh")
 const CHECK_DRIFT_SCRIPT = path.join(SKILL_ROOT, "scripts", "check-task-drift.sh")
+const SUBAGENT_PREFLIGHT_SCRIPT = path.join(SKILL_ROOT, "scripts", "subagent-preflight.sh")
 const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
 const FRESHNESS_WORK_THRESHOLD = 2
 const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
@@ -117,6 +118,17 @@ function taskToolPrefix(task, result) {
       ? "This session is observe-only for the main planning files; keep any subagent output inside delegate lanes instead."
       : "",
   ].filter(Boolean).join("\n")
+}
+
+function taskTextFromArgs(args) {
+  if (!args || typeof args !== "object") {
+    return ""
+  }
+
+  return [args.description, args.prompt, args.command, args.subagent_type]
+    .filter((value) => typeof value === "string" && value.trim())
+    .join(" ")
+    .trim()
 }
 
 function stripTaskPrefix(title) {
@@ -464,6 +476,25 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     )
   }
 
+  function readSubagentPreflight(args, cwd = baseCwd, sessionID = "") {
+    const scriptArgs = [
+      "--json",
+      "--cwd",
+      cwd,
+      "--host",
+      "opencode",
+      "--tool-name",
+      "Task",
+      "--task-text",
+      taskTextFromArgs(args),
+    ]
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      scriptArgs.push("--session-key", sessionKey)
+    }
+    return runJsonScript(SUBAGENT_PREFLIGHT_SCRIPT, scriptArgs, cwd)
+  }
+
   return {
     "chat.message": async (input, output) => {
       const session = sessionContext(input, output)
@@ -540,36 +571,42 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
 
       const cacheSessionID = sessionCacheKey(session, true)
+      const preflight = readSubagentPreflight(
+        output.args || input.args || {},
+        baseCwd,
+        session.readSessionID,
+      )
       const drift = cacheSessionID ? driftBySession.get(cacheSessionID) : null
-      if (!drift) {
-        const { state: freshnessState, planning } = refreshFreshnessState(
-          freshnessBySession,
-          cacheSessionID,
-          currentTask,
-        )
-        const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
-        if (!freshnessPrefix || !output.args || typeof output.args !== "object") {
-          return
-        }
-        if (typeof output.args.prompt === "string" && !output.args.prompt.includes("Task files may be stale")) {
-          output.args.prompt = `${freshnessPrefix}\n\n${output.args.prompt}`
-        }
-        return
-      }
-
-      const task = drift.task && drift.task.found ? drift.task : currentTask
-      if (!task || !task.found) {
-        return
-      }
 
       const { state: freshnessState, planning } = refreshFreshnessState(
         freshnessBySession,
         cacheSessionID,
-        task,
+        currentTask,
       )
-      const prefixes = [taskToolPrefix(task, drift), freshnessTaskPrefix(task, freshnessState, planning)].filter(
-        Boolean,
-      )
+      const prefixes = []
+
+      if (preflight) {
+        if (
+          (preflight.decision === "payload_only" ||
+            preflight.decision === "payload_plus_delegate_recommended") &&
+          preflight.prompt_prefix
+        ) {
+          prefixes.push(preflight.prompt_prefix)
+        } else if (preflight.operator_message) {
+          prefixes.push(preflight.operator_message)
+        }
+      } else if (drift) {
+        const task = drift.task && drift.task.found ? drift.task : currentTask
+        if (task && task.found) {
+          prefixes.push(taskToolPrefix(task, drift))
+        }
+      }
+
+      const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
+      if (freshnessPrefix) {
+        prefixes.push(freshnessPrefix)
+      }
+
       const prefix = prefixes.join("\n\n")
       if (!prefix || !output.args || typeof output.args !== "object") {
         return

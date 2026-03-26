@@ -32,6 +32,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - show toasts when the current task is first detected or when drift looks likely
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
+- call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
 - carry repo context for parent-workspace multi-repo tasks
 - stay quiet in repositories that do not already use `.planning/`
 
@@ -81,6 +82,27 @@ Sample illustration:
 
 This is a sample illustration of the expected title/toast fallback, not a live screenshot from your machine.
 
+## Task preflight
+
+The plugin's `tool.execute.before` hook now calls the same shell-first helper as Claude:
+
+```bash
+sh skill/scripts/subagent-preflight.sh \
+  --cwd "$PWD" \
+  --host opencode \
+  --tool-name Task \
+  --task-text "Investigate the auth entry points across repos" \
+  --json
+```
+
+OpenCode keeps freshness reminders separate from the preflight decision:
+
+- `payload_only` or `payload_plus_delegate_recommended` - prepend the canonical task and repo/worktree prefix to the outbound `Task` prompt
+- `routing_only` - prepend routing confirmation only
+- `delegate_required` - prepend delegate-required guidance instead of treating the native `Task` launch as sufficient
+
+The plugin still keeps title and toast behavior unchanged in this first pass.
+
 ## Current limits
 
 - the plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar or status bar widget API
@@ -94,6 +116,7 @@ Useful commands when you want direct control:
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh --compact`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
+- `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host opencode --tool-name Task --task-text "Investigate auth entry points" --text`
 - `sh skill/scripts/validate-task.sh`
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind OpenCode's task resolution and repo/worktree behavior, use `docs/design.md`.

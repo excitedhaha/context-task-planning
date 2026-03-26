@@ -59,6 +59,28 @@ Minimal delegate loop:
 
 Use delegate lanes proactively for discovery, review, and verify subproblems instead of mixing those side quests into the coordinator's main context.
 
+## Subagent preflight
+
+Use `subagent-preflight.sh` when a host or wrapper is about to launch a native subagent and needs one shared routing and repo/worktree decision:
+
+```bash
+sh skill/scripts/subagent-preflight.sh \
+  --cwd "$PWD" \
+  --host claude \
+  --tool-name Task \
+  --task-text "Investigate auth entry points" \
+  --json
+```
+
+The shared decisions are:
+
+- `routing_only` - do not inject canonical repo/worktree payload; show routing confirmation only
+- `payload_only` - inject the canonical prompt prefix for a related native `Task` launch
+- `payload_plus_delegate_recommended` - inject the canonical prompt prefix and add non-blocking delegate guidance
+- `delegate_required` - do not treat the native subagent launch as sufficient; create or reuse a delegate lane first
+
+The shell wrapper calls `task_guard.py subagent-preflight`, so task resolution, drift classification, repo scope, and worktree bindings stay in one place.
+
 ## Validation
 
 Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown snapshots, and delegate status files.
