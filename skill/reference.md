@@ -18,6 +18,8 @@ Capture goals, non-goals, constraints, and open questions before implementation.
 
 Repeated reads should prefer a compact snapshot over reloading entire notes.
 
+When task files start to sprawl, use `sh skill/scripts/compact-context.sh` to read the derived compact view. It prefers a fresh `.planning/<slug>/.derived/context_compact.json` when one exists and otherwise rebuilds an ephemeral compact view from the current task files.
+
 ### Markdown for humans, JSON for tools
 
 Use markdown for explanation and review. Use `state.json` for stable machine-readable state.
@@ -86,8 +88,8 @@ The shell wrapper calls `task_guard.py subagent-preflight`, so task resolution, 
 Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown snapshots, and delegate status files.
 
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
-- softer warnings can cover stale `progress.md` snapshots or other recoverable drift
-- `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift, not hard failures or operational truth in `state.json`
+- softer warnings can cover stale `progress.md` snapshots, stale compact artifacts, or other recoverable drift
+- `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift or refresh a derived compact artifact, not hard failures or operational truth in `state.json`
 
 ## Task focus guard
 
@@ -156,10 +158,11 @@ Poor delegate candidates:
 If context feels stale, answer these in order:
 
 1. Which task is active?
-2. What mode is it in?
-3. What is the next action?
-4. What is blocked?
-5. What proves the task is done?
+2. Can `sh skill/scripts/compact-context.sh` answer the rest without replaying the full task files?
+3. What mode is it in?
+4. What is the next action?
+5. What is blocked?
+6. What proves the task is done?
 
 Those answers should be available from the task folder without relying on session history.
 

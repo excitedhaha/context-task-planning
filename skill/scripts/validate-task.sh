@@ -41,7 +41,7 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-"$PYTHON_BIN" - "$PLAN_DIR" "$FIX_WARNINGS" <<'PY'
+"$PYTHON_BIN" - "$PLAN_DIR" "$FIX_WARNINGS" "$SCRIPT_DIR" <<'PY'
 import json
 import re
 import sys
@@ -49,6 +49,11 @@ from pathlib import Path
 
 plan_dir = Path(sys.argv[1])
 fix_warnings = sys.argv[2] == "1"
+script_dir = Path(sys.argv[3])
+if str(script_dir) not in sys.path:
+    sys.path.insert(0, str(script_dir))
+
+import compact_context
 
 state_file = plan_dir / "state.json"
 task_plan_file = plan_dir / "task_plan.md"
@@ -244,6 +249,54 @@ def sync_progress_snapshot(path: Path, state: dict) -> list[str]:
     if applied:
         path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
     return applied
+
+
+def compact_validation_context(state: dict) -> dict | None:
+    if not state:
+        return None
+
+    source_path = str(state.get("source_path") or "").strip()
+    workspace_root = Path(source_path) if source_path else plan_dir.parent.parent
+    task = {
+        "workspace_root": str(workspace_root),
+        "plan_dir": str(plan_dir),
+    }
+    artifact_path, _, current, is_fresh = compact_context.freshness_state(task)
+    read_policy = current.get("read_policy", {})
+    payload_profile = str(read_policy.get("payload_profile") or "compact_optional")
+    artifact_exists = artifact_path.exists()
+    warning = ""
+    if artifact_exists and not is_fresh:
+        warning = (
+            "Derived compact context artifact is stale: "
+            f"{compact_context.rel_path(workspace_root, artifact_path)}"
+        )
+    elif not artifact_exists and read_policy.get("should_prefer_compact"):
+        warning = (
+            "Derived compact context artifact is missing for a "
+            f"`{payload_profile}` task: {compact_context.rel_path(workspace_root, artifact_path)}"
+        )
+
+    return {
+        "workspace_root": workspace_root,
+        "artifact_path": artifact_path,
+        "current": current,
+        "artifact_exists": artifact_exists,
+        "warning": warning,
+    }
+
+
+def refresh_compact_artifact(state: dict) -> str | None:
+    context = compact_validation_context(state)
+    if not context or not context.get("warning"):
+        return None
+
+    compact_context.persist_payload(context["current"], plan_dir)
+    rel_artifact = compact_context.rel_path(
+        context["workspace_root"], context["artifact_path"]
+    )
+    action = "refreshed" if context.get("artifact_exists") else "created"
+    return f"{rel_artifact} -> {action} derived compact context"
 
 
 def validate_task() -> tuple[dict, list[str], list[str]]:
@@ -474,6 +527,11 @@ def validate_task() -> tuple[dict, list[str], list[str]]:
                     f"Delegate `{delegate_id}` has terminal status `{status}` but is still listed as active"
                 )
 
+    if state and not issues:
+        compact_info = compact_validation_context(state)
+        if compact_info and compact_info.get("warning"):
+            warnings.append(str(compact_info["warning"]))
+
     return state, issues, warnings
 
 
@@ -513,6 +571,9 @@ if fix_warnings and not issues:
     if progress_file.exists():
         for line in sync_progress_snapshot(progress_file, state):
             applied_fixes.append(f"progress.md -> {line}")
+    compact_fix = refresh_compact_artifact(state)
+    if compact_fix:
+        applied_fixes.append(compact_fix)
 
     if applied_fixes:
         print(

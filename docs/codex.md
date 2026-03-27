@@ -100,10 +100,13 @@ Useful commands when you want direct control:
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh`
 - `sh skill/scripts/current-task.sh --compact`
+- `sh skill/scripts/compact-context.sh`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host codex --tool-name Task --task-text "Investigate auth entry points" --json`
 - `sh skill/scripts/validate-task.sh`
 - `sh skill/scripts/validate-task.sh --fix-warnings`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
+
+Keep `current-task.sh --compact` for prompt-sized status. Use `compact-context.sh` when you want the richer derived recovery view for a larger task. `validate-task.sh --fix-warnings` also refreshes stale derived compact artifacts when needed.
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind session bindings, repo scope, and worktree attachment, use `docs/design.md`.

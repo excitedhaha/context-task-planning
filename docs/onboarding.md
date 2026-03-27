@@ -76,6 +76,8 @@ I lost context on this task. Recover the active task from local planning files a
 
 If the agent can continue from `.planning/<slug>/` without you re-teaching the whole task, the workflow is working.
 
+If the task later grows into a noisier recovery case, use `sh skill/scripts/compact-context.sh` before replaying the full markdown files. `current-task.sh --compact` stays a prompt-sized cue; `compact-context.sh` is the richer derived recovery surface.
+
 #### Step 5: Stop learning there
 
 You do not need the advanced layers yet. For your first few uses, ignore:
@@ -352,6 +354,8 @@ sh skill/scripts/validate-task.sh
 sh skill/scripts/validate-task.sh --fix-warnings
 ```
 
+`validate-task.sh --fix-warnings` can now do two small repairs: resync warning-level markdown snapshot drift from `state.json`, and refresh a stale derived compact artifact.
+
 Do not use delegates for:
 
 - broad open-ended implementation
@@ -367,6 +371,7 @@ Start with the smallest useful commands:
 ```bash
 sh skill/scripts/current-task.sh
 sh skill/scripts/current-task.sh --compact
+sh skill/scripts/compact-context.sh
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 sh skill/scripts/validate-task.sh
 sh skill/scripts/validate-task.sh --fix-warnings

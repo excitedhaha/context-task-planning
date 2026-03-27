@@ -224,6 +224,10 @@ if allow_main_plan_writes and progress_path.exists():
         fh.write(f"  - Result: `{result_path}`\n")
 PY
 
+if [ "$ALLOW_MAIN_PLAN_WRITES" -eq 1 ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_NAME" --refresh --json >/dev/null
+fi
+
 echo "[context-task-planning] Delegate ready: $DELEGATE_ID"
 echo "[context-task-planning] Task directory: $PLAN_DIR"
 echo "[context-task-planning] Delegate directory: $DELEGATE_DIR"

@@ -212,7 +212,7 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
-- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates; add `--fix-warnings` to resync warning-level snapshot drift from `state.json`
+- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, delegates, and derived compact artifacts; add `--fix-warnings` to resync warning-level snapshot drift from `state.json` and refresh compact artifacts when needed
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
 - `scripts/create-delegate.sh` - create a delegate lane under the current task
 - `scripts/list-delegates.sh` - show delegate lanes for the current task

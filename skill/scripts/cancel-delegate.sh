@@ -129,6 +129,10 @@ if allow_main_plan_writes and progress_path.exists():
         fh.write("  - Delegate cancelled via cancel-delegate.sh\n")
 PY
 
+if [ "$ALLOW_MAIN_PLAN_WRITES" -eq 1 ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_SLUG" --refresh --json >/dev/null
+fi
+
 echo "[context-task-planning] Cancelled delegate: $DELEGATE_ID"
 echo "[context-task-planning] Delegate directory: $DELEGATE_DIR"
 if [ "$ALLOW_MAIN_PLAN_WRITES" -eq 0 ]; then

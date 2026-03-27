@@ -134,5 +134,7 @@ fi
 
 "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" clear-task-sessions --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG"
 
+"$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_SLUG" --refresh --json >/dev/null
+
 echo "[context-task-planning] Marked done: $TASK_SLUG"
 echo "[context-task-planning] Task directory: $PLAN_DIR"
