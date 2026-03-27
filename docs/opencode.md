@@ -74,6 +74,7 @@ After the plugin is enabled and OpenCode is restarted, you should see:
 - an info toast when the current task is first detected
 - a warning toast when a prompt looks like likely task drift
 - a warning toast when tracked work has happened but planning files look stale
+- the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
 - the same task still resolving when OpenCode starts inside a registered repo path or recorded worktree under a parent workspace
 
 Sample illustration:

@@ -668,10 +668,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      if (!task || !task.found || !task.slug) {
-        return
-      }
-
       const sessionID = session.explicitSessionID || session.fallbackSessionID
       if (!sessionID) {
         return
