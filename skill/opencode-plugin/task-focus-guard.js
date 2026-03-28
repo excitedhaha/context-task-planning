@@ -350,6 +350,8 @@ function resolveExplicitSessionID(...values) {
           value.sessionId,
           value.id,
           value.session,
+          value.properties?.sessionID,
+          value.properties?.sessionId,
           value.properties?.info?.id,
         ) || ""
       if (nested) {
@@ -363,6 +365,7 @@ function resolveExplicitSessionID(...values) {
 
 export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, worktree }) => {
   const baseCwd = worktree || directory || process.cwd()
+  const normalizedBaseCwd = path.resolve(baseCwd)
   const driftBySession = new Map()
   const promptBySession = new Map()
   const taskBySession = new Map()
@@ -370,6 +373,32 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const freshnessBySession = new Map()
   const observedSessionIDs = new Set()
   let lastExplicitSessionID = ""
+
+  function normalizeDirectory(value) {
+    const text = String(value || "").trim()
+    return text ? path.resolve(text) : ""
+  }
+
+  function sameWorkspaceDirectory(value) {
+    const normalized = normalizeDirectory(value)
+    return !normalized || normalized === normalizedBaseCwd
+  }
+
+  function visibleSessionEvent(event, sessionID) {
+    if (!sessionID) {
+      return false
+    }
+
+    if (!sameWorkspaceDirectory(event?.properties?.info?.directory)) {
+      return false
+    }
+
+    if (event?.type === "session.updated" && observedSessionIDs.size > 0) {
+      return observedSessionIDs.has(sessionID)
+    }
+
+    return true
+  }
 
   function sessionContext(...values) {
     const explicitSessionID = resolveExplicitSessionID(...values)
@@ -432,7 +461,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         query: { directory: baseCwd },
       })
       const session = response?.data
-      if (!session?.title) {
+      if (!session?.title || !sameWorkspaceDirectory(session?.directory)) {
         return
       }
 
@@ -741,14 +770,24 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     event: async ({ event }) => {
-      if (event?.type !== "session.created") {
+      if (
+        event?.type !== "session.created" &&
+        event?.type !== "session.updated" &&
+        event?.type !== "tui.session.select"
+      ) {
+        return
+      }
+
+      const explicitSessionID = resolveExplicitSessionID(event)
+      if (!explicitSessionID) {
+        return
+      }
+
+      if (!visibleSessionEvent(event, explicitSessionID)) {
         return
       }
 
       const session = sessionContext(event)
-      if (!session.explicitSessionID) {
-        return
-      }
 
       const task = readCurrentTask(baseCwd, session.explicitSessionID)
       if (!pluginEnabled(task)) {
