@@ -83,6 +83,36 @@ Sample illustration:
 
 This is a sample illustration of the expected title/toast fallback, not a live screenshot from your machine.
 
+## Plugin lifecycle
+
+The OpenCode plugin is event-driven. It is not a file watcher, background sync daemon, or guaranteed writeback layer for `.planning/` files.
+
+Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these moments:
+
+- `chat.message` - after a user message is assembled; cache prompt text, classify drift, and try to sync the visible task title
+- `experimental.chat.system.transform` - right before the model receives system context; inject current-task, drift, and freshness reminders
+- `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance
+- `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
+- `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed
+- `event` - on host events such as `session.created`, `session.updated`, and `tui.session.select`; sync session titles for already-bound tasks
+
+Typical message flow:
+
+1. select or create a session -> `event`
+2. send a user message -> `chat.message`
+3. build model system context -> `experimental.chat.system.transform`
+4. execute tools -> `tool.execute.before` / `shell.env` / `tool.execute.after`
+
+## Why task files do not always auto-sync
+
+The plugin can make session state visible and inject reminders, but it does not deterministically rewrite `state.json`, `progress.md`, `task_plan.md`, or `findings.md` on its own.
+
+In practice this means:
+
+- session-title sync can be host-driven and deterministic once the session binding is correct
+- planning-file sync is still agent-driven unless you add a dedicated post-response writeback path
+- writer-session reminders should explicitly say to sync `progress.md` and `state.json` whenever a turn materially changes progress, blockers, or `next_action`
+
 ## Task preflight
 
 The plugin's `tool.execute.before` hook now calls the same shell-first helper as Claude:

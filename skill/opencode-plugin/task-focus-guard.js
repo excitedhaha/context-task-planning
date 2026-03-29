@@ -63,6 +63,10 @@ function currentTaskSummary(task) {
       lines.push(
         "Observe-only session: do not edit task_plan.md, progress.md, or state.json here. Delegate lane updates under delegates/<delegate-id>/ are still allowed.",
       )
+    } else {
+      lines.push(
+        "If this turn materially changes task progress, blockers, or next_action, sync progress.md and state.json before you finish; if Hot Context changes, sync task_plan.md too.",
+      )
     }
   }
 
