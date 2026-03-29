@@ -124,6 +124,6 @@ learning.
 ## Limitations
 
 - the portable contract is file-based, so host-specific UI differs
-- no cross-machine sync
+- no built-in cross-machine coordination; `.planning/` can be mirrored across machines, but session bindings and local checkout/worktree state remain machine-local
 - no host-specific session-history catchup layer
 - the optional adapters are reminders and visibility aids, not a hard transaction system

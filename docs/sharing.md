@@ -92,6 +92,8 @@ sh skill/scripts/validate-task.sh || true
 
 ## Notes on `.planning/`
 
-The repository itself can have a local `.planning/` directory while you are building the skill. That state is intentionally not part of the shared artifact.
+The repository itself can have a local `.planning/` directory while you are building the skill. That state is intentionally not part of the shared artifact you commit or publish from this repo.
+
+That is separate from mirroring `.planning/` in your own environment across machines; the skill simply does not provide built-in coordination or conflict resolution for that mirrored state.
 
 If you want to publish an example planning task, create a scrubbed example under `docs/` instead of committing a real local workspace.

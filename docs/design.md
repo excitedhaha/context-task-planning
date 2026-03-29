@@ -25,7 +25,7 @@ What this design optimizes for:
 
 What this design does not try to solve:
 
-- cross-machine sync or distributed locking
+- built-in cross-machine coordination, conflict resolution, or distributed locking for mirrored planning state
 - a GUI, MCP server, or central database
 - silent automatic task switching
 - silent repo or workspace inference that mutates state behind the user's back
