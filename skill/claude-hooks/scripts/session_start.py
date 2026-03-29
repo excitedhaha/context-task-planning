@@ -38,7 +38,11 @@ def main():
     if plan_dir:
         state = load_state(plan_dir)
         if state:
-            print(session_start_payload(state_summary(state, task_meta=task_meta)))
+            print(
+                session_start_payload(
+                    state_summary(state, task_meta=task_meta, include_spec=True)
+                )
+            )
             return
 
     hint = no_active_task_hint(cwd)

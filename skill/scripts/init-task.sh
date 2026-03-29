@@ -116,7 +116,7 @@ repo_registry_path = workspace_root / ".planning" / ".runtime" / "repos.json"
 
 timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 planning_path = Path(".planning") / task_slug
-initial_next_action = "Fill in goal, non-goals, constraints, and open questions before implementation."
+initial_next_action = "Fill in goal, non-goals, acceptance criteria, constraints, and open questions before implementation."
 
 
 def normalize_repo_id(value: str) -> str:
@@ -190,6 +190,7 @@ if not state_path.exists():
         "mode": "clarify",
         "goal": "",
         "non_goals": [],
+        "acceptance_criteria": [],
         "constraints": [
             f"Source path: {workspace_root}",
             f"Planning path: {planning_path}",
@@ -198,6 +199,15 @@ if not state_path.exists():
             "Only the coordinator updates task_plan.md, progress.md, and state.json",
         ],
         "open_questions": [],
+        "edge_cases": [],
+        "spec_context": {
+            "mode": "embedded",
+            "provider": "none",
+            "status": "none",
+            "primary_ref": "",
+            "artifact_refs": [],
+            "summary": [],
+        },
         "repo_scope": repo_scope,
         "primary_repo": primary_repo,
         "source_path": str(workspace_root),
@@ -213,7 +223,7 @@ if not state_path.exists():
                 "title": "Clarify Requirements",
                 "status": "in_progress",
                 "definition_of_done": [
-                    "Goal, non-goals, constraints, and open questions are captured"
+                    "Goal, non-goals, acceptance criteria, constraints, and open questions are captured"
                 ],
                 "verification": [
                     "Critical ambiguities are either resolved or explicitly tracked"

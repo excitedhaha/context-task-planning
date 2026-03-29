@@ -12,7 +12,7 @@ This skill treats context engineering as three coordinated layers:
 
 ### Clarify before build
 
-Capture goals, non-goals, constraints, and open questions before implementation.
+Capture goals, non-goals, acceptance criteria, constraints, and open questions before implementation.
 
 ### Hot context over full replay
 
@@ -83,6 +83,8 @@ The shared decisions are:
 
 The shell wrapper calls `task_guard.py subagent-preflight`, so task resolution, drift classification, repo scope, and worktree bindings stay in one place.
 
+When the active task carries linked spec context, the preflight text prefix includes the same spec summary. If that spec context is `status=ambiguous`, the preflight JSON now also exposes `task.spec_candidate_refs`, `task.spec_resolution_hint`, and `task.spec_resolution_commands`, and the text prefix tells the subagent to resolve one candidate explicitly before treating it as authoritative unless the work is exploratory only.
+
 ## Validation
 
 Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown snapshots, and delegate status files.
@@ -106,9 +108,10 @@ The default human-readable output should answer:
 - what task is currently selected
 - whether this session is writer or observer
 - which repos are shared versus isolated worktrees
+- whether the runtime is using embedded brief context or an auto-detected linked provider such as OpenSpec
 - what command the operator should run next
 
-The JSON output keeps the existing task fields and appends recommendation metadata such as `repo_summary`, `recommended_action`, `recommended_reason`, `recommended_commands`, and `resume_candidates`.
+The JSON output keeps the existing task fields and appends recommendation metadata such as `repo_summary`, `recommended_action`, `recommended_reason`, `recommended_commands`, and `resume_candidates`. It also surfaces brief-oriented fields such as `acceptance_criteria`, `edge_cases`, `spec_context`, `brief_quality`, and `brief_missing_fields` for adapters. When a repo exposes a clear OpenSpec candidate, `spec_context` carries the linked provider metadata and stable refs without writing back to OpenSpec files. When detection lands in `status=ambiguous`, the resolved task JSON also exposes `spec_candidate_refs`, `spec_resolution_hint`, and `spec_resolution_commands` so hosts can surface a thin manual override UX without inventing provider-specific logic.
 
 `set-active-task.sh` accepts `--observe` for read-only bindings and `--steal` when a new session intentionally takes over the writer lease.
 
@@ -137,6 +140,10 @@ intentionally need a nonstandard checkout location.
 - blocked until you run `prepare-task-worktree.sh`
 
 On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
+
+Linked provider refs from `spec_context` also feed `check-task-drift.sh` and `subagent-preflight.sh`, so prompts that mention the chosen OpenSpec change or spec artifact continue to route as part of the current task.
+
+If OpenSpec detection lands in `status=ambiguous`, `current-task` and `compact-context` now show the candidate refs plus an explicit `set-task-spec-context.sh` hint. Use `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>` to record the manual override in `.planning/<slug>/state.json` without editing provider files. Add `--artifact <ref>` when you want the linked artifact refs to stay explicit, or `--clear` to return to the default embedded fallback.
 
 For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.
 

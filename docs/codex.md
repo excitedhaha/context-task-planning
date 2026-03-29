@@ -33,6 +33,7 @@ So the intended Codex path is the shared file-backed core plus shell-first visib
 - keep the active task visible with `sh skill/scripts/current-task.sh` when you want the full summary and next step, or `sh skill/scripts/current-task.sh --compact` when you only need a short cue
 - use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
 - use `sh skill/scripts/subagent-preflight.sh --task-text "..." --text` before manual or wrapper-driven native subagent launches when you want the same routing and repo/worktree context as Claude or OpenCode
+- rely on the same auto-detected linked spec context that the other hosts expose through `current-task` and preflight, treating linked refs or short candidate hints as scoping help rather than a new mode you have to manage
 - expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the match looks wrong
 - use `PLAN_SESSION_KEY` when multiple Codex shells or wrappers should keep different current tasks
 - rely on the same parent-workspace repo registration and recorded worktree rules as the other hosts
@@ -68,6 +69,8 @@ sh skill/scripts/current-task.sh
 
 - there is no bundled native Codex task UI today
 - `current-task.sh` should show the resolved task, access mode, repo/worktree summary, and a recommended next step
+- `current-task.sh` can also show one linked spec ref, or a few candidate refs when the runtime refuses to guess
+- treat that spec line as scoping help; only use the manual override path when the work really needs one authoritative ref
 - `current-task.sh --compact` should still show the resolved task in prompt-friendly form
 - `check-task-drift.sh` should help when a new ask may be a different task
 - the same task should still resolve from a registered repo path or recorded `.worktrees/...` checkout inside a parent workspace
@@ -93,6 +96,8 @@ Use `--json` instead of `--text` when a wrapper wants the structured decision. T
 - `routing_only` - stop and confirm routing instead of injecting repo/worktree context
 - `delegate_required` - create or reuse a delegate lane first, then launch the bounded side work from there
 
+When the shared core auto-links a clear OpenSpec artifact, the preflight text and JSON now include that spec context so Codex-side wrappers can keep native subagents scoped to the same external change or spec. When the runtime reports `status=ambiguous`, the same preflight payload now includes candidate refs plus the explicit manual-override hint so wrappers can preserve the "do not guess" behavior. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
+
 ## Manual fallback
 
 Useful commands when you want direct control:
@@ -105,8 +110,9 @@ Useful commands when you want direct control:
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host codex --tool-name Task --task-text "Investigate auth entry points" --json`
 - `sh skill/scripts/validate-task.sh`
 - `sh skill/scripts/validate-task.sh --fix-warnings`
+- `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
 
-Keep `current-task.sh --compact` for prompt-sized status. Use `compact-context.sh` when you want the richer derived recovery view for a larger task. `validate-task.sh --fix-warnings` also refreshes stale derived compact artifacts when needed.
+Keep `current-task.sh --compact` for prompt-sized status. Use `compact-context.sh` when you want the richer derived recovery view for a larger task. `validate-task.sh --fix-warnings` also refreshes stale derived compact artifacts when needed. Use `set-task-spec-context.sh` only when implementation needs one authoritative spec ref; if the summary only shows a few candidates during exploration, you can usually keep going without resolving them yet.
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind session bindings, repo scope, and worktree attachment, use `docs/design.md`.

@@ -48,7 +48,7 @@ Each task lives in its own directory:
 1. Run `scripts/init-task.sh "<task title>"`
 2. Read `.planning/<slug>/state.json`
 3. Read `.planning/<slug>/task_plan.md`
-4. Fill in missing goal, non-goals, constraints, and open questions before implementation
+4. Fill in missing goal, non-goals, acceptance criteria, constraints, and open questions before implementation
 
 If multiple sessions are active, give the current session a stable session key and bind one task to it:
 
@@ -86,6 +86,7 @@ Do not jump into implementation until the task has:
 
 - a clear goal
 - explicit non-goals
+- acceptance criteria
 - constraints
 - open questions or assumptions listed
 

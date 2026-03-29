@@ -37,6 +37,8 @@ PAYLOAD_LIMIT_PROFILES = {
         "findings": {"limit": 12, "head": 8, "tail": 4},
         "decision_log": {"limit": 8, "head": 3, "tail": 5},
         "verify_commands": {"limit": 8, "head": 3, "tail": 5},
+        "acceptance_criteria": {"limit": 6, "head": 6, "tail": 0},
+        "edge_cases": {"limit": 4, "head": 4, "tail": 0},
         "constraints": {"limit": 8, "head": 8, "tail": 0},
         "definition_of_done": {"limit": 6, "head": 6, "tail": 0},
     },
@@ -44,6 +46,8 @@ PAYLOAD_LIMIT_PROFILES = {
         "findings": {"limit": 8, "head": 6, "tail": 2},
         "decision_log": {"limit": 6, "head": 2, "tail": 4},
         "verify_commands": {"limit": 5, "head": 2, "tail": 3},
+        "acceptance_criteria": {"limit": 4, "head": 4, "tail": 0},
+        "edge_cases": {"limit": 3, "head": 3, "tail": 0},
         "constraints": {"limit": 6, "head": 6, "tail": 0},
         "definition_of_done": {"limit": 4, "head": 4, "tail": 0},
     },
@@ -430,6 +434,26 @@ def apply_payload_limits(payload: dict, profile_name: str) -> None:
             "Keep the compact view focused on a short verification slice and preserve the full command matrix by source reference.",
         )
 
+    if "acceptance_criteria" in rules:
+        distilled["acceptance_criteria"] = apply_list_limit(
+            payload,
+            "acceptance_criteria",
+            list(distilled.get("acceptance_criteria", [])),
+            rules["acceptance_criteria"],
+            "state.json#/acceptance_criteria",
+            "Keep the compact view focused on the most important acceptance criteria and preserve the full list by source reference.",
+        )
+
+    if "edge_cases" in rules:
+        distilled["edge_cases"] = apply_list_limit(
+            payload,
+            "edge_cases",
+            list(distilled.get("edge_cases", [])),
+            rules["edge_cases"],
+            "state.json#/edge_cases",
+            "Keep the compact view focused on the highest-risk edge cases and preserve the full list by source reference.",
+        )
+
     if "constraints" in rules:
         distilled["constraints"] = apply_list_limit(
             payload,
@@ -564,6 +588,16 @@ def build_payload(task: dict) -> dict:
     task_plan_sections = extract_level2_sections(task_plan_text)
     findings_sections = extract_level2_sections(findings_text)
     progress_sections = extract_level2_sections(progress_text)
+    plan_root = workspace_root / ".planning"
+    repo_bindings = list(task.get("repo_bindings") or [])
+    if not repo_bindings:
+        repo_bindings = task_guard.effective_task_repo_bindings(
+            plan_root, workspace_root, str(state.get("slug") or plan_dir.name), state
+        )
+    spec_context = task_guard.detect_openspec_spec_context(
+        workspace_root, state, repo_bindings
+    )
+    brief_missing_fields = task_guard.brief_missing_fields_for_state(state)
 
     delegates = delegate_descriptors(plan_dir, workspace_root)
     active_delegate_entries, closed_delegate_count = delegate_compact_entries(delegates)
@@ -707,12 +741,15 @@ def build_payload(task: dict) -> dict:
             },
         },
         "task": {
+            "slug": str(state.get("slug") or plan_dir.name),
             "title": str(state.get("title") or plan_dir.name),
             "status": str(state.get("status") or "unknown"),
             "mode": str(state.get("mode") or "unknown"),
             "current_phase": str(state.get("current_phase") or "unknown"),
             "goal": str(state.get("goal") or ""),
             "next_action": str(state.get("next_action") or ""),
+            "brief_quality": task_guard.brief_quality_for_state(state),
+            "brief_missing_fields": brief_missing_fields,
             "blockers": state_item_refs(list(state.get("blockers") or []), "blockers"),
             "verify_commands": state_item_refs(
                 list(state.get("verify_commands") or []), "verify_commands"
@@ -720,16 +757,38 @@ def build_payload(task: dict) -> dict:
             "latest_checkpoint": str(state.get("latest_checkpoint") or ""),
             "repo_scope": list(state.get("repo_scope") or []),
             "primary_repo": str(state.get("primary_repo") or ""),
+            "spec_context": {
+                "mode": spec_context.get("mode") or "embedded",
+                "provider": spec_context.get("provider") or "none",
+                "status": spec_context.get("status") or "none",
+                "primary_ref": spec_context.get("primary_ref") or "",
+                "artifact_refs": [
+                    item_ref(text, f"state.json#/spec_context/artifact_refs/{index}")
+                    for index, text in enumerate(
+                        spec_context.get("artifact_refs") or []
+                    )
+                ],
+                "summary": [
+                    item_ref(text, f"state.json#/spec_context/summary/{index}")
+                    for index, text in enumerate(spec_context.get("summary") or [])
+                ],
+            },
         },
         "distilled": {
             "non_goals": state_item_refs(
                 list(state.get("non_goals") or []), "non_goals"
+            ),
+            "acceptance_criteria": state_item_refs(
+                list(state.get("acceptance_criteria") or []), "acceptance_criteria"
             ),
             "constraints": state_item_refs(
                 list(state.get("constraints") or []), "constraints"
             ),
             "open_questions": state_item_refs(
                 list(state.get("open_questions") or []), "open_questions"
+            ),
+            "edge_cases": state_item_refs(
+                list(state.get("edge_cases") or []), "edge_cases"
             ),
             "definition_of_done": [
                 item_ref(text, "task_plan.md#definition-of-done")
@@ -845,11 +904,30 @@ def freshness_state(task: dict) -> tuple[Path, dict, dict, bool]:
 
 def render_text(payload: dict) -> str:
     task = payload.get("task", {})
+    brief_summary = task_guard.brief_summary_for_state(
+        {
+            "acceptance_criteria": [
+                item.get("text")
+                for item in payload.get("distilled", {}).get("acceptance_criteria", [])
+            ],
+            "edge_cases": [
+                item.get("text")
+                for item in payload.get("distilled", {}).get("edge_cases", [])
+            ],
+        }
+    )
     lines = [
         f"Task `{payload.get('task_slug')}` | status `{task.get('status')}` | mode `{task.get('mode')}` | phase `{task.get('current_phase')}`",
         f"Goal: {task.get('goal') or '(none recorded)'}",
         f"Next action: {task.get('next_action') or '(none recorded)'}",
+        f"Brief: {task.get('brief_quality') or 'unknown'} | {brief_summary}",
     ]
+
+    spec_context = task.get("spec_context", {})
+    lines.append(f"Spec context: {task_guard.spec_context_summary_text(spec_context)}")
+    brief_missing_fields = list(task.get("brief_missing_fields") or [])
+    if brief_missing_fields:
+        lines.append("Brief gaps: " + ", ".join(brief_missing_fields))
 
     read_policy = payload.get("read_policy", {})
     if read_policy.get("compact_first_required"):
@@ -869,6 +947,60 @@ def render_text(payload: dict) -> str:
         item.get("text") for item in task.get("blockers", []) if item.get("text")
     ]
     lines.append(f"Blockers: {'; '.join(blockers) if blockers else 'none'}")
+
+    acceptance = payload.get("distilled", {}).get("acceptance_criteria", [])
+    if acceptance:
+        lines.append("Acceptance criteria:")
+        for item in acceptance[:5]:
+            lines.append(f"- {item.get('text')}")
+
+    edge_cases = payload.get("distilled", {}).get("edge_cases", [])
+    if edge_cases:
+        lines.append("Edge cases:")
+        for item in edge_cases[:4]:
+            lines.append(f"- {item.get('text')}")
+
+    spec_summary = (
+        spec_context.get("summary", []) if isinstance(spec_context, dict) else []
+    )
+    if spec_summary:
+        lines.append("Spec summary:")
+        for item in spec_summary[:3]:
+            lines.append(f"- {item.get('text')}")
+
+    spec_status = (
+        str(spec_context.get("status") or "").strip()
+        if isinstance(spec_context, dict)
+        else ""
+    )
+    candidate_refs = (
+        spec_context.get("artifact_refs", [])
+        if isinstance(spec_context, dict) and spec_status == "ambiguous"
+        else []
+    )
+    if candidate_refs:
+        lines.append("Spec candidates:")
+        for item in candidate_refs[:4]:
+            lines.append(f"- {item.get('text')}")
+        hint = task_guard.spec_context_resolution_hint(
+            task.get("slug", ""),
+            {
+                "status": spec_status,
+                "artifact_refs": [item.get("text") for item in candidate_refs],
+            },
+        )
+        if hint:
+            lines.append(f"Resolve explicitly: {hint}")
+
+    artifact_refs = (
+        spec_context.get("artifact_refs", [])
+        if isinstance(spec_context, dict) and spec_status != "ambiguous"
+        else []
+    )
+    if artifact_refs:
+        lines.append("Linked artifacts:")
+        for item in artifact_refs[:4]:
+            lines.append(f"- {item.get('text')}")
 
     findings = payload.get("distilled", {}).get("findings", [])
     if findings:

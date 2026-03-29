@@ -218,6 +218,41 @@ def short_list(items, empty_text="none", limit=3):
     return f"{shown}; +{len(values) - limit} more"
 
 
+def spec_summary_lines(task_meta: dict | None) -> list[str]:
+    if not isinstance(task_meta, dict):
+        return []
+
+    spec_context = task_meta.get("spec_context")
+    if not isinstance(spec_context, dict):
+        return []
+
+    provider = str(spec_context.get("provider") or "none")
+    status = str(spec_context.get("status") or "none")
+    if provider == "none" and status == "none":
+        return []
+
+    mode = str(spec_context.get("mode") or "embedded")
+    lines = [f"Spec context: mode={mode} | provider={provider} | status={status}"]
+
+    primary_ref = str(spec_context.get("primary_ref") or "").strip()
+    if primary_ref:
+        lines.append(f"Primary spec ref: {primary_ref}")
+
+    candidate_refs = []
+    for item in task_meta.get("spec_candidate_refs") or []:
+        text = str(item).strip()
+        if text and text not in candidate_refs:
+            candidate_refs.append(text)
+    if candidate_refs:
+        lines.append(f"Spec candidates: {'; '.join(candidate_refs[:3])}")
+
+    resolution_hint = str(task_meta.get("spec_resolution_hint") or "").strip()
+    if resolution_hint:
+        lines.append(f"Resolve explicitly: {resolution_hint}")
+
+    return lines
+
+
 def delegate_kind_for_text(text: str) -> str | None:
     lowered = text.lower()
     patterns = [
@@ -386,7 +421,10 @@ def allow_delegate_hint(result: dict | None) -> bool:
 
 
 def state_summary(
-    state: dict, task_meta: dict | None = None, tool_name: str | None = None
+    state: dict,
+    task_meta: dict | None = None,
+    tool_name: str | None = None,
+    include_spec: bool = False,
 ) -> str:
     slug = state.get("slug", "(unknown)")
     status = state.get("status", "unknown")
@@ -432,6 +470,8 @@ def state_summary(
         lines.append(
             f"Repos: primary={primary_repo or '(none)'} | scope={', '.join(repo_scope)}"
         )
+    if include_spec:
+        lines.extend(spec_summary_lines(task_meta))
 
     if tool_name == "Bash":
         lines.append(f"Verification commands: {verify_commands}")
@@ -518,7 +558,7 @@ def looks_complex(prompt: str) -> bool:
 def init_task_hint() -> str:
     return (
         "[context-task-planning] This looks like multi-step work. Before implementation, initialize a task workspace with "
-        f'`{installed_skill_command("init-task.sh")} "<task title>"`, then capture goal, non-goals, constraints, and next action in `.planning/<slug>/`.'
+        f'`{installed_skill_command("init-task.sh")} "<task title>"`, then capture goal, non-goals, acceptance criteria, constraints, and next action in `.planning/<slug>/`.'
     )
 
 

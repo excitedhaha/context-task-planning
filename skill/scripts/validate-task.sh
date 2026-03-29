@@ -54,6 +54,7 @@ if str(script_dir) not in sys.path:
     sys.path.insert(0, str(script_dir))
 
 import compact_context
+import task_guard
 
 state_file = plan_dir / "state.json"
 task_plan_file = plan_dir / "task_plan.md"
@@ -77,6 +78,10 @@ def extract_inline_value(line: str) -> str:
 
 def normalize_free_text(value: str) -> str:
     return " ".join(value.replace("`", "").split())
+
+
+def normalized_items(values: list[str]) -> list[str]:
+    return [normalize_free_text(str(value)) for value in values if str(value).strip()]
 
 
 def read_json(path: Path, label: str, issues: list[str]):
@@ -202,7 +207,7 @@ def replace_or_insert_section_lines(
     return lines[:start] + section + lines[end:], applied
 
 
-def sync_task_plan_hot_context(path: Path, state: dict) -> list[str]:
+def sync_task_plan_hot_context(path: Path, state: dict, spec_context: dict | None = None) -> list[str]:
     lines = path.read_text(encoding="utf-8").splitlines()
     replacements = []
     state_goal = str(state.get("goal", "")).strip()
@@ -211,6 +216,18 @@ def sync_task_plan_hot_context(path: Path, state: dict) -> list[str]:
     next_action = str(state.get("next_action", "")).strip()
     if next_action:
         replacements.append(("- Next Action:", f"- Next Action: {next_action}"))
+    replacements.append(
+        (
+            "- Acceptance Summary:",
+            f"- Acceptance Summary: {task_guard.brief_summary_for_state(state)}",
+        )
+    )
+    replacements.append(
+        (
+            "- Spec Context:",
+            f"- Spec Context: {task_guard.spec_context_summary_text(spec_context or state.get('spec_context', {}))}",
+        )
+    )
     updated_lines, applied = replace_or_insert_section_lines(
         lines, "## Hot Context", replacements
     )
@@ -299,7 +316,18 @@ def refresh_compact_artifact(state: dict) -> str | None:
     return f"{rel_artifact} -> {action} derived compact context"
 
 
-def validate_task() -> tuple[dict, list[str], list[str]]:
+def effective_spec_context_for_state(state: dict) -> dict:
+    source_path = str(state.get("source_path") or "").strip()
+    workspace_root = Path(source_path) if source_path else plan_dir.parent.parent
+    plan_root = workspace_root / ".planning"
+    task_slug = str(state.get("slug") or plan_dir.name)
+    repo_bindings = task_guard.effective_task_repo_bindings(
+        plan_root, workspace_root, task_slug, state
+    )
+    return task_guard.detect_openspec_spec_context(workspace_root, state, repo_bindings)
+
+
+def validate_task() -> tuple[dict, list[str], list[str], dict]:
     issues: list[str] = []
     warnings: list[str] = []
 
@@ -334,6 +362,26 @@ def validate_task() -> tuple[dict, list[str], list[str]]:
             issues.append(f"Unknown task status in state.json: {state.get('status')}")
         if state.get("mode") not in valid_modes:
             issues.append(f"Unknown task mode in state.json: {state.get('mode')}")
+
+        for key in ("acceptance_criteria", "edge_cases"):
+            if key in state and not isinstance(state.get(key), list):
+                issues.append(f"state.json `{key}` must be a list when present")
+
+        raw_spec_context = state.get("spec_context", {})
+        if "spec_context" in state and not isinstance(raw_spec_context, dict):
+            issues.append("state.json `spec_context` must be an object when present")
+            raw_spec_context = {}
+        if isinstance(raw_spec_context, dict):
+            for field, allowed in (
+                ("mode", task_guard.SPEC_CONTEXT_MODES),
+                ("provider", task_guard.SPEC_CONTEXT_PROVIDERS),
+                ("status", task_guard.SPEC_CONTEXT_STATUSES),
+            ):
+                value = str(raw_spec_context.get(field) or "").strip()
+                if value and value not in allowed:
+                    issues.append(
+                        f"state.json spec_context.{field} has invalid value `{value}`"
+                    )
 
         phases = state.get("phases", [])
         phase_ids = []
@@ -385,6 +433,9 @@ def validate_task() -> tuple[dict, list[str], list[str]]:
                 )
 
     if task_plan_file.exists() and state:
+        task_plan_sections = compact_context.extract_level2_sections(
+            task_plan_file.read_text(encoding="utf-8")
+        )
         hot = parse_task_plan_hot_context(task_plan_file)
         required_hot = ["slug", "status", "goal", "mode", "phase", "next_action"]
         for key in required_hot:
@@ -434,6 +485,24 @@ def validate_task() -> tuple[dict, list[str], list[str]]:
                 warnings.append(
                     "task_plan.md Hot Context goal differs from state.json goal"
                 )
+
+        state_acceptance = task_guard.nonempty_text_list(state.get("acceptance_criteria"))
+        plan_acceptance = compact_context.bullet_items(
+            task_plan_sections.get("Acceptance Criteria", [])
+        )
+        if normalized_items(state_acceptance) != normalized_items(plan_acceptance):
+            warnings.append(
+                "task_plan.md Acceptance Criteria does not match state.json acceptance_criteria"
+            )
+
+        state_edge_cases = task_guard.nonempty_text_list(state.get("edge_cases"))
+        plan_edge_cases = compact_context.bullet_items(
+            task_plan_sections.get("Edge Cases", [])
+        )
+        if normalized_items(state_edge_cases) != normalized_items(plan_edge_cases):
+            warnings.append(
+                "task_plan.md Edge Cases does not match state.json edge_cases"
+            )
 
     if progress_file.exists() and state:
         snapshot = parse_progress_snapshot(progress_file)
@@ -527,12 +596,35 @@ def validate_task() -> tuple[dict, list[str], list[str]]:
                     f"Delegate `{delegate_id}` has terminal status `{status}` but is still listed as active"
                 )
 
+    effective_spec_context = task_guard.normalize_spec_context({})
     if state and not issues:
+        effective_spec_context = effective_spec_context_for_state(state)
+        state_goal = str(state.get("goal") or "").strip()
+        state_acceptance = task_guard.nonempty_text_list(state.get("acceptance_criteria"))
+        if state_goal and not state_acceptance and (
+            state.get("mode") in {"execute", "verify"}
+            or state.get("current_phase") in {"execute", "verify"}
+            or state.get("status") == "verifying"
+        ):
+            warnings.append(
+                "state.json entered execute/verify without acceptance_criteria; capture at least one observable acceptance criterion or move the task back to clarify/plan"
+            )
+
+        spec_context = effective_spec_context
+        if (
+            spec_context.get("status") == "ambiguous"
+            and not task_guard.nonempty_text_list(state.get("open_questions"))
+            and not spec_context.get("summary")
+        ):
+            warnings.append(
+                "state.json spec_context is ambiguous without an open question or summary note recording how to resolve it"
+            )
+
         compact_info = compact_validation_context(state)
         if compact_info and compact_info.get("warning"):
             warnings.append(str(compact_info["warning"]))
 
-    return state, issues, warnings
+    return state, issues, warnings, effective_spec_context
 
 
 def print_report(state: dict, issues: list[str], warnings: list[str]) -> None:
@@ -562,11 +654,11 @@ def print_report(state: dict, issues: list[str], warnings: list[str]) -> None:
     print("[context-task-planning] Validation passed.")
 
 
-state, issues, warnings = validate_task()
+state, issues, warnings, effective_spec_context = validate_task()
 if fix_warnings and not issues:
     applied_fixes = []
     if task_plan_file.exists():
-        for line in sync_task_plan_hot_context(task_plan_file, state):
+        for line in sync_task_plan_hot_context(task_plan_file, state, effective_spec_context):
             applied_fixes.append(f"task_plan.md -> {line}")
     if progress_file.exists():
         for line in sync_progress_snapshot(progress_file, state):
@@ -581,7 +673,7 @@ if fix_warnings and not issues:
         )
         for item in applied_fixes:
             print(f"  - {item}")
-        state, issues, warnings = validate_task()
+        state, issues, warnings, effective_spec_context = validate_task()
     else:
         print(
             f"[context-task-planning] No warning-level fixes were needed for {state.get('slug', plan_dir.name)}."

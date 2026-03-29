@@ -66,6 +66,13 @@
       },
       "default": []
     },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "constraints": {
       "type": "array",
       "items": {
@@ -79,6 +86,70 @@
         "type": "string"
       },
       "default": []
+    },
+    "edge_cases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "spec_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "provider",
+        "status",
+        "primary_ref",
+        "artifact_refs",
+        "summary"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "embedded",
+            "linked"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "none",
+            "openspec",
+            "spec-kit",
+            "generic"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "none",
+            "detected",
+            "linked",
+            "ambiguous"
+          ]
+        },
+        "primary_ref": {
+          "type": "string"
+        },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "summary": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
     },
     "repo_scope": {
       "type": "array",

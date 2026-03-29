@@ -54,6 +54,22 @@ function currentTaskSummary(task) {
     `Next action: ${task.next_action || "(none recorded)"}`,
     "Keep unrelated work out of this task; if the user's request does not belong here, confirm whether to continue, switch tasks, or initialize a new task before updating planning state.",
   ]
+  const spec = task?.spec_context || {}
+  if (spec.provider && spec.provider !== "none") {
+    lines.push(
+      `Spec context: mode=${spec.mode || "embedded"} | provider=${spec.provider} | status=${spec.status || "none"}`,
+    )
+    if (spec.primary_ref) {
+      lines.push(`Primary spec ref: ${spec.primary_ref}`)
+    }
+    const candidateRefs = Array.isArray(task?.spec_candidate_refs) ? task.spec_candidate_refs : []
+    if (candidateRefs.length > 0) {
+      lines.push(`Spec candidates: ${candidateRefs.slice(0, 3).join("; ")}`)
+    }
+    if (typeof task?.spec_resolution_hint === "string" && task.spec_resolution_hint.trim()) {
+      lines.push(`Resolve explicitly: ${task.spec_resolution_hint.trim()}`)
+    }
+  }
 
   if (task.binding_role) {
     lines.push(

@@ -51,7 +51,7 @@ def main():
     if plan_dir:
         state = load_state(plan_dir)
         if state:
-            context = state_summary(state, task_meta=task_meta)
+            context = state_summary(state, task_meta=task_meta, include_spec=True)
             drift_result = task_drift_result(prompt, cwd, session_key=session_key)
             drift_hint = task_drift_hint(drift_result)
             if drift_hint:

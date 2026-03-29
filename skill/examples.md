@@ -48,6 +48,7 @@ Then fill in:
 
 - goal
 - non-goals
+- acceptance criteria
 - constraints
 - verification commands
 

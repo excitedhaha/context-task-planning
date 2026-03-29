@@ -78,6 +78,14 @@ If the agent can continue from `.planning/<slug>/` without you re-teaching the w
 
 If the task later grows into a noisier recovery case, use `sh skill/scripts/compact-context.sh` before replaying the full markdown files. `current-task.sh --compact` stays a prompt-sized cue; `compact-context.sh` is the richer derived recovery surface.
 
+#### You do not need to choose a mode
+
+For first-time use, keep this simple:
+
+- if the repo has no established spec artifacts, the agent keeps a lightweight brief in `.planning/<slug>/`
+- if the repo already has spec artifacts, the runtime may surface a linked ref automatically
+- if the summary shows a few spec candidates instead of one linked ref, you can usually ignore that until the work needs one authoritative reference
+
 #### Step 5: Stop learning there
 
 You do not need the advanced layers yet. For your first few uses, ignore:
@@ -130,6 +138,8 @@ When to learn this:
 What to do:
 
 - start or resume tasks through normal conversation
+- let the agent capture a lightweight brief before deep implementation: goal, non-goals, acceptance criteria, constraints, and verification expectations
+- if the repo already has spec artifacts, let the runtime reuse them for scope; otherwise keep the brief local and lightweight
 - keep the current task visible in your host or shell
 - let the agent keep the current task, next action, and verification state current
 - treat `verify` as part of the contract, not as optional cleanup
@@ -375,6 +385,16 @@ sh skill/scripts/compact-context.sh
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 sh skill/scripts/validate-task.sh
 sh skill/scripts/validate-task.sh --fix-warnings
+```
+
+If the summary shows spec candidates, keep the fallback small too:
+
+- most of the time, keep working or use `sh skill/scripts/compact-context.sh` for a clearer recovery view
+- only record a manual spec ref when the work really needs one authoritative reference
+- exploratory work can usually continue without resolving candidates first
+
+```bash
+sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>
 ```
 
 Add the deeper commands only when the workflow actually needs them:

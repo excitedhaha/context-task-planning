@@ -33,6 +33,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
 - call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
+- surface linked spec context such as auto-detected OpenSpec refs in the injected task summary and native-`Task` preflight payload when available, including a short candidate hint when the runtime refuses to guess
 - carry repo context for parent-workspace multi-repo tasks
 - stay quiet in repositories that do not already use `.planning/`
 
@@ -76,6 +77,8 @@ After the plugin is enabled and OpenCode is restarted, you should see:
 - a warning toast when tracked work has happened but planning files look stale
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
 - the same task still resolving when OpenCode starts inside a registered repo path or recorded worktree under a parent workspace
+- in some repos, the injected task summary can also mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
+- treat that spec line as scoping help, not as extra setup; only use the manual override path if the work really needs one authoritative ref
 
 Sample illustration:
 
@@ -132,6 +135,8 @@ OpenCode keeps freshness reminders separate from the preflight decision:
 - `routing_only` - prepend routing confirmation only
 - `delegate_required` - prepend delegate-required guidance instead of treating the native `Task` launch as sufficient
 
+When `current-task` resolves a linked OpenSpec context, that same preflight prefix now includes the spec context summary plus the primary linked ref so the native `Task` launch stays scoped to the right external artifact. If the runtime stops at `status=ambiguous`, the prefix now carries the candidate refs plus an explicit manual-override hint instead of pretending one candidate is authoritative. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
+
 The plugin still keeps title and toast behavior unchanged in this first pass.
 
 ## Current limits
@@ -149,5 +154,8 @@ Useful commands when you want direct control:
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host opencode --tool-name Task --task-text "Investigate auth entry points" --text`
 - `sh skill/scripts/validate-task.sh`
+- `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>`
+
+Use `set-task-spec-context.sh` only when the work really needs one authoritative spec ref. If OpenCode only shows a few candidate refs during exploration, you can usually keep going without recording a manual override yet.
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind OpenCode's task resolution and repo/worktree behavior, use `docs/design.md`.

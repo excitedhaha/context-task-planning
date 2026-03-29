@@ -5,9 +5,11 @@
 - Task Slug: `{{TASK_SLUG}}`
 - Task Status: `active`
 - Goal: [fill this first]
+- Acceptance Summary: [capture this before implementation]
 - Current Mode: `clarify`
 - Current Phase: `clarify`
 - Next Action: {{INITIAL_NEXT_ACTION}}
+- Spec Context: `embedded` by default until an external spec is linked
 - Primary Repo: (unset)
 - Repo Scope: (unset)
 - Blockers:
@@ -23,6 +25,10 @@
 
 - [What this task will not do]
 
+## Acceptance Criteria
+
+- [Observable result that must be true before this task is done]
+
 ## Constraints
 
 - Source Path: `{{SOURCE_PATH}}`
@@ -35,6 +41,10 @@
 
 - [Question or assumption that must be resolved]
 
+## Edge Cases
+
+- [Optional: important edge case or failure mode]
+
 ## Definition of Done
 
 - [Observable completion condition]
@@ -43,13 +53,23 @@
 
 - [ ] [command or validation step]
 
+## Spec Context
+
+- Mode: `embedded`
+- Provider: `none`
+- Status: `none`
+- Primary Ref: (none)
+- Artifact Refs: none
+- Summary:
+  - [Optional short note about linked or embedded spec context]
+
 ## Phases
 
 ### clarify
 
 - **Status:** in_progress
 - Outcomes:
-  - Goal, non-goals, constraints, and open questions are captured
+  - Goal, non-goals, acceptance criteria, constraints, and open questions are captured
 - Exit Criteria:
   - No critical ambiguity remains unresolved
 

@@ -11,6 +11,10 @@ Keep complex coding tasks recoverable, visible, and isolated across Claude Code,
 
 Most users should talk to the agent, not manage planning files or shell scripts by hand.
 
+For larger tasks, the agent should capture a lightweight brief before deep implementation: goal, non-goals, acceptance criteria, constraints, and verification expectations.
+
+You do not need to choose a spec mode up front. If the repo has no established spec artifacts, the agent keeps that brief in `.planning/<slug>/`. If the repo already has an external spec workflow, the runtime can reuse those refs instead of re-creating them under `.planning/`.
+
 ## When to use it
 
 Use it when the work is:
@@ -50,6 +54,8 @@ For multi-step or recovery-sensitive work, the agent should usually pick this sk
 - `OpenCode` - look for `task:<slug> | ...` in the session title plus task/drift toasts
 - `Codex` - run `sh skill/scripts/current-task.sh` for the full summary and recommended next step, or `sh skill/scripts/current-task.sh --compact` for a prompt-friendly cue
 
+In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.
+
 ### 4. Simulate one recovery
 
 ```text
@@ -67,6 +73,7 @@ When the task has grown enough that replaying multiple markdown files feels nois
 - `docs/opencode.md` - OpenCode-specific plugin behavior and limits
 - `docs/codex.md` - Codex-specific shell-first workflow
 - `docs/design.md` - the deeper architecture
+- `docs/spec-aware-task-runtime.md` - spec-aware design notes, mainly for contributors or deeper implementation questions
 
 If you only wanted one successful first run, you can stop here.
 

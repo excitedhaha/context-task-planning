@@ -175,6 +175,29 @@ Recommended P0 JSON fields:
     "status": "active",
     "mode": "execute",
     "current_phase": "execute",
+    "spec_context": {
+      "mode": "linked",
+      "provider": "openspec",
+      "status": "ambiguous",
+      "primary_ref": "",
+      "artifact_refs": [
+        "openspec/changes/auth-runtime",
+        "openspec/changes/runtime-auth"
+      ],
+      "summary": [
+        "Detected OpenSpec under openspec but found multiple plausible artifact candidates.",
+        "Record a manual link or narrow the task wording before treating one candidate as authoritative."
+      ]
+    },
+    "spec_candidate_refs": [
+      "openspec/changes/auth-runtime",
+      "openspec/changes/runtime-auth"
+    ],
+    "spec_resolution_hint": "sh skill/scripts/set-task-spec-context.sh --task strengthen-subagent-use-in-multi-repo-workflows --ref <chosen-spec-ref>",
+    "spec_resolution_commands": [
+      "sh skill/scripts/set-task-spec-context.sh --task strengthen-subagent-use-in-multi-repo-workflows --ref openspec/changes/auth-runtime",
+      "sh skill/scripts/set-task-spec-context.sh --task strengthen-subagent-use-in-multi-repo-workflows --ref openspec/changes/runtime-auth"
+    ],
     "binding_role": "writer",
     "writer_display": "manual:feature-auth",
     "observer_count": 0
@@ -228,8 +251,14 @@ Repo scope: <repo_scope>
 Repo/worktree bindings:
 - <repo-id>: <binding_mode> at <checkout_path>
 - <repo-id>: <binding_mode> at <checkout_path>
+- Spec context: mode=`linked` | provider=`openspec` | status=`ambiguous`
+- Spec candidates: <candidate-ref>; <candidate-ref>
+- Resolve explicitly: sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <chosen-spec-ref>
+- If this subagent needs an authoritative spec ref, resolve one explicitly first. Exploratory work may reference these as non-authoritative candidates.
 If repo ownership or task fit becomes unclear, report that back instead of switching tasks implicitly.
 ```
+
+When the spec context is already `linked`, keep the existing primary ref or linked artifact refs in the same slot instead of the ambiguous candidate list.
 
 If `decision` is `payload_plus_delegate_recommended`, append:
 
