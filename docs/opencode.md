@@ -97,7 +97,7 @@ Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these mom
 - `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
 - `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed
-- `event` - on host events such as `session.created`, `session.updated`, and `tui.session.select`; sync session titles for already-bound tasks
+- `event` - on host events such as `session.created`, `session.updated`, and `tui.session.select`; sync session titles for already-bound tasks and, when the event payload carries a compact/compression signal, run the shared safe compact-sync helper
 
 Typical message flow:
 
@@ -114,6 +114,7 @@ In practice this means:
 
 - session-title sync can be host-driven and deterministic once the session binding is correct
 - planning-file sync is still agent-driven unless you add a dedicated post-response writeback path
+- the shared `sh skill/scripts/compact-sync.sh` helper is now wired to OpenCode on a best-effort basis when event payloads visibly mention compact/compression; writer sessions may repair warning-level drift and refresh the derived compact artifact, while observer sessions stay derived-only
 - writer-session reminders should explicitly say to sync `progress.md` and `state.json` whenever a turn materially changes progress, blockers, or `next_action`
 
 ## Task preflight
@@ -143,6 +144,7 @@ The plugin still keeps title and toast behavior unchanged in this first pass.
 
 - the plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar or status bar widget API
 - the plugin is advisory, not a second planner; the model and tools still update `.planning/`
+- compact sync is heuristic because the current SDK does not expose a dedicated compaction lifecycle hook; the plugin looks for compact/compression signals on visible session events and otherwise stays silent
 - if you do not see a dedicated sidebar widget, that is expected today
 
 ## Manual fallback
@@ -151,6 +153,7 @@ Useful commands when you want direct control:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh --compact`
+- `sh skill/scripts/compact-sync.sh`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host opencode --tool-name Task --task-text "Investigate auth entry points" --text`
 - `sh skill/scripts/validate-task.sh`

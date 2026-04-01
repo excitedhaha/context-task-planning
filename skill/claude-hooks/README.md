@@ -11,6 +11,7 @@ When enabled, the most visible cue is Claude Code's native status line showing t
 
 - `statusLine` - show the current task in Claude Code's native status line
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/`
+- `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context
 - `UserPromptSubmit` - add planning guidance and task-drift reminders before Claude handles the prompt
 - `PreToolUse` - inject compact task context before key tools run, with a stronger mismatch warning before `Task`
 
@@ -18,7 +19,7 @@ When enabled, the most visible cue is Claude Code's native status line showing t
 
 - they do not replace the core file protocol
 - they do not parse host-specific session history
-- they do not auto-update planning files on your behalf
+- they do not auto-write semantic progress updates from session history; compact-time sync only repairs warning-level drift for writers and refreshes the derived compact artifact
 
 ## Install
 

@@ -92,6 +92,7 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
 - softer warnings can cover stale `progress.md` snapshots, stale compact artifacts, or other recoverable drift
 - `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift or refresh a derived compact artifact, not hard failures or operational truth in `state.json`
+- `compact-sync.sh` is the safe compact-time helper for host adapters and manual recovery. Writers may run warning-level fixes plus a compact artifact refresh; observers only refresh `.derived/context_compact.json`.
 
 ## Task focus guard
 
@@ -165,11 +166,12 @@ Poor delegate candidates:
 If context feels stale, answer these in order:
 
 1. Which task is active?
-2. Can `sh skill/scripts/compact-context.sh` answer the rest without replaying the full task files?
-3. What mode is it in?
-4. What is the next action?
-5. What is blocked?
-6. What proves the task is done?
+2. Can `sh skill/scripts/compact-sync.sh` refresh the local compact artifact safely first?
+3. Can `sh skill/scripts/compact-context.sh` answer the rest without replaying the full task files?
+4. What mode is it in?
+5. What is the next action?
+6. What is blocked?
+7. What proves the task is done?
 
 Those answers should be available from the task folder without relying on session history.
 

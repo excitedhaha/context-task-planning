@@ -10,10 +10,30 @@ const SKILL_ROOT = path.resolve(PLUGIN_DIR, "..")
 const CURRENT_TASK_SCRIPT = path.join(SKILL_ROOT, "scripts", "current-task.sh")
 const CHECK_DRIFT_SCRIPT = path.join(SKILL_ROOT, "scripts", "check-task-drift.sh")
 const SUBAGENT_PREFLIGHT_SCRIPT = path.join(SKILL_ROOT, "scripts", "subagent-preflight.sh")
+const COMPACT_SYNC_SCRIPT = path.join(SKILL_ROOT, "scripts", "compact-sync.sh")
 const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
 const FRESHNESS_WORK_THRESHOLD = 2
 const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
+const COMPACT_SYNC_DEBOUNCE_MS = 1500
 const FRESHNESS_TRACKED_TOOLS = new Set(["bash", "edit", "multiedit", "write", "task"])
+const COMPACT_SIGNAL_RE = /\b(compact|compaction|compress|compression|compressed)\b/i
+const COMPACT_SIGNAL_VALUE_KEYS = new Set([
+  "type",
+  "reason",
+  "action",
+  "event",
+  "kind",
+  "name",
+  "status",
+  "phase",
+  "updateType",
+  "changeType",
+  "mode",
+])
+
+function compactSignalKey(value) {
+  return COMPACT_SIGNAL_RE.test(String(value || ""))
+}
 
 function runJsonScript(script, args, cwd) {
   const result = spawnSync("sh", [script, ...args], {
@@ -46,6 +66,114 @@ function collectPromptText(parts) {
     }
   }
   return lines.join("\n").trim()
+}
+
+function hasCompactSignal(value, seen = new Set(), parentKey = "") {
+  if (!value) {
+    return false
+  }
+
+  if (typeof value === "string") {
+    return (
+      (COMPACT_SIGNAL_VALUE_KEYS.has(parentKey) || compactSignalKey(parentKey)) &&
+      COMPACT_SIGNAL_RE.test(value)
+    )
+  }
+
+  if (typeof value === "boolean") {
+    return compactSignalKey(parentKey) && value
+  }
+
+  if (typeof value === "number") {
+    return compactSignalKey(parentKey) && value > 0
+  }
+
+  if (typeof value !== "object") {
+    return false
+  }
+
+  if (seen.has(value)) {
+    return false
+  }
+  seen.add(value)
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasCompactSignal(item, seen, parentKey))
+  }
+
+  return Object.entries(value).some(([key, nested]) => {
+    if (typeof nested === "boolean" || typeof nested === "number") {
+      return hasCompactSignal(nested, seen, key)
+    }
+    return hasCompactSignal(nested, seen, key)
+  })
+}
+
+function compactSyncIssueDetail(result) {
+  const sources = []
+  if (Array.isArray(result?.warnings)) {
+    sources.push(...result.warnings)
+  }
+  sources.push(result?.main_sync?.message || "")
+  sources.push(result?.artifact_sync?.message || "")
+
+  for (const source of sources) {
+    const lines = String(source || "")
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const cleaned = lines[index]
+        .replace(/^\[context-task-planning\]\s*/u, "")
+        .replace(/^-\s*/u, "")
+        .trim()
+      if (cleaned) {
+        return cleaned
+      }
+    }
+  }
+
+  return ""
+}
+
+function compactSyncWarningToast(task, result) {
+  const slug = result?.task?.slug || task?.slug || "(current task)"
+  const detail = compactSyncIssueDetail(result)
+  const message = !result
+    ? `Compact sync status was unavailable for ${slug}; review .planning/${slug}/ manually if recovery looks stale.`
+    : detail
+      ? `${slug}: ${detail}`
+      : `Compact sync did not complete cleanly for ${slug}; review .planning/${slug}/ manually.`
+
+  return {
+    title: "Compact sync warning",
+    message,
+    variant: "warning",
+  }
+}
+
+function compactEventSignature(event) {
+  try {
+    return JSON.stringify(event) || String(event?.type || "compact")
+  } catch {
+    return String(event?.type || "compact")
+  }
+}
+
+function shouldRunCompactSync(store, sessionID, event) {
+  if (!sessionID || !hasCompactSignal(event)) {
+    return false
+  }
+
+  const now = Date.now()
+  const signature = compactEventSignature(event)
+  const previous = store.get(sessionID)
+  if (previous && previous.signature === signature && now - previous.at < COMPACT_SYNC_DEBOUNCE_MS) {
+    return false
+  }
+
+  store.set(sessionID, { signature, at: now })
+  return true
 }
 
 function currentTaskSummary(task) {
@@ -391,6 +519,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const taskBySession = new Map()
   const completedTaskBySession = new Map()
   const freshnessBySession = new Map()
+  const compactSyncBySession = new Map()
   const observedSessionIDs = new Set()
   let lastExplicitSessionID = ""
 
@@ -575,6 +704,15 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       scriptArgs.push("--session-key", sessionKey)
     }
     return runJsonScript(SUBAGENT_PREFLIGHT_SCRIPT, scriptArgs, cwd)
+  }
+
+  function readCompactSync(cwd = baseCwd, sessionID = "") {
+    const scriptArgs = ["--json", "--host", "opencode"]
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      scriptArgs.push("--session-key", sessionKey)
+    }
+    return runJsonScript(COMPACT_SYNC_SCRIPT, scriptArgs, cwd)
   }
 
   return {
@@ -790,7 +928,9 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     event: async ({ event }) => {
+      const compactEvent = hasCompactSignal(event)
       if (
+        !compactEvent &&
         event?.type !== "session.created" &&
         event?.type !== "session.updated" &&
         event?.type !== "tui.session.select"
@@ -809,12 +949,22 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const session = sessionContext(event)
 
-      const task = readCurrentTask(baseCwd, session.explicitSessionID)
+      let task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
       }
 
-      refreshFreshnessState(freshnessBySession, session.explicitSessionID, task)
+      if (shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
+        const compactSync = readCompactSync(baseCwd, session.readSessionID)
+        task = readCurrentTask(baseCwd, session.readSessionID)
+        if (!compactSync || compactSync.ok === false) {
+          const toast = compactSyncWarningToast(task, compactSync)
+          await showToast(toast.title, toast.message, toast.variant)
+        }
+      }
+
+      const cacheSessionID = sessionCacheKey(session, true)
+      refreshFreshnessState(freshnessBySession, cacheSessionID, task)
       await syncVisibleTask(session.explicitSessionID, task, null)
     },
   }

@@ -423,4 +423,109 @@ FINAL_VALIDATE=$(sh "$SCRIPT_DIR/validate-task.sh" --task warning-demo)
 printf '%s\n' "$FINAL_VALIDATE" | grep -F "Validation passed." >/dev/null || fail "validate-task did not pass cleanly after autofix"
 printf '%s\n' "$FINAL_VALIDATE" | grep -F "warnings" >/dev/null && fail "validate-task still reported warnings after autofix"
 
-echo "[context-task-planning] smoke test passed: CLI guidance and warning autofix"
+"$PYTHON_BIN" - "$VALIDATE_ROOT/.planning/warning-demo" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+plan_dir = Path(sys.argv[1])
+state_path = plan_dir / "state.json"
+progress_path = plan_dir / "progress.md"
+
+state = json.loads(state_path.read_text(encoding="utf-8"))
+state["goal"] = "Refresh compact hook writer coverage."
+state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+progress = progress_path.read_text(encoding="utf-8")
+progress = progress.replace(
+    "- Next Action: Fill in goal, non-goals, acceptance criteria, constraints, and open questions before implementation.",
+    "- Next Action: compact hook stale action",
+)
+progress_path.write_text(progress, encoding="utf-8")
+PY
+
+PLAN_SESSION_KEY=claude:compact-writer sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal warning-demo >/dev/null
+COMPACT_SESSION_START=$(printf '%s' "{\"cwd\":\"$VALIDATE_ROOT\",\"session_id\":\"compact-writer\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
+"$PYTHON_BIN" - "$COMPACT_SESSION_START" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+context = payload.get("hookSpecificOutput", {}).get("additionalContext", "")
+required = [
+    "Task `warning-demo` | status `active`",
+    "Goal: Refresh compact hook writer coverage.",
+    "Compact policy:",
+]
+for item in required:
+    if item not in context:
+        raise SystemExit(f"compact_session_start output missing {item!r}: {context!r}")
+PY
+POST_COMPACT_VALIDATE=$(sh "$SCRIPT_DIR/validate-task.sh" --task warning-demo)
+printf '%s\n' "$POST_COMPACT_VALIDATE" | grep -F "Validation passed." >/dev/null || fail "compact_session_start did not leave writer task clean"
+[ -f "$VALIDATE_ROOT/.planning/warning-demo/.derived/context_compact.json" ] || fail "compact_session_start did not refresh compact artifact"
+
+sh "$SCRIPT_DIR/init-task.sh" --slug compact-fail --title "Compact fail" >/dev/null
+PLAN_SESSION_KEY=claude:compact-fail sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal compact-fail >/dev/null
+rm "$VALIDATE_ROOT/.planning/compact-fail/progress.md"
+COMPACT_FAIL_SESSION_START=$(printf '%s' "{\"cwd\":\"$VALIDATE_ROOT\",\"session_id\":\"compact-fail\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
+"$PYTHON_BIN" - "$COMPACT_FAIL_SESSION_START" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+context = payload.get("hookSpecificOutput", {}).get("additionalContext", "")
+required = [
+    "Compact sync warning for `compact-fail`:",
+    "Missing required file: progress.md",
+    "Task `compact-fail` | status `active`",
+]
+for item in required:
+    if item not in context:
+        raise SystemExit(f"compact_session_start failure output missing {item!r}: {context!r}")
+if "Compression estimate:" in context:
+    raise SystemExit(f"compact_session_start failure output unexpectedly used compact context: {context!r}")
+PY
+
+sh "$SCRIPT_DIR/init-task.sh" --slug observer-demo --title "Observer demo" >/dev/null
+"$PYTHON_BIN" - "$VALIDATE_ROOT/.planning/observer-demo" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+plan_dir = Path(sys.argv[1])
+state_path = plan_dir / "state.json"
+progress_path = plan_dir / "progress.md"
+
+state = json.loads(state_path.read_text(encoding="utf-8"))
+state["goal"] = "Observer compact sync should stay derived-only."
+state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+progress = progress_path.read_text(encoding="utf-8")
+progress = progress.replace(
+    "- Next Action: Fill in goal, non-goals, acceptance criteria, constraints, and open questions before implementation.",
+    "- Next Action: observer stale action",
+)
+progress_path.write_text(progress, encoding="utf-8")
+PY
+PLAN_SESSION_KEY=claude:observer-compact sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --observe observer-demo >/dev/null
+OBSERVER_SYNC_JSON=$(cd "$VALIDATE_ROOT" && PLAN_SESSION_KEY=claude:observer-compact sh "$SCRIPT_DIR/compact-sync.sh" --task observer-demo --json)
+"$PYTHON_BIN" - "$OBSERVER_SYNC_JSON" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+if payload.get("task", {}).get("binding_role") != "observer":
+    raise SystemExit(f"unexpected observer binding role: {payload!r}")
+if payload.get("main_sync", {}).get("status") != "skipped_observer":
+    raise SystemExit(f"observer compact sync unexpectedly touched main planning: {payload!r}")
+if payload.get("artifact_sync", {}).get("status") != "persisted":
+    raise SystemExit(f"observer compact sync did not refresh artifact: {payload!r}")
+PY
+[ -f "$VALIDATE_ROOT/.planning/observer-demo/.derived/context_compact.json" ] || fail "observer compact sync did not write compact artifact"
+OBSERVER_VALIDATE=$(sh "$SCRIPT_DIR/validate-task.sh" --task observer-demo)
+printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "Validation passed with warnings." >/dev/null || fail "observer compact sync should preserve main-planning warnings"
+printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "task_plan.md Hot Context goal differs from state.json goal" >/dev/null || fail "observer compact sync unexpectedly cleared task_plan warning"
+printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "progress.md Snapshot \`next_action\` differs from state.json" >/dev/null || fail "observer compact sync unexpectedly cleared progress warning"
+
+echo "[context-task-planning] smoke test passed: CLI guidance, warning autofix, and compact sync"

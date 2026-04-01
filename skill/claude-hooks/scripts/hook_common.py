@@ -130,6 +130,64 @@ def resolve_plan_dir(
     return Path(output) if output else None
 
 
+def run_compact_sync(
+    cwd: str | None = None, session_key: str | None = None, host: str = "claude"
+) -> dict | None:
+    script = skill_root() / "scripts" / "compact-sync.sh"
+    command = ["sh", str(script), "--json", "--host", host]
+    if session_key:
+        command.extend(["--session-key", session_key])
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd or os.getcwd(),
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    output = result.stdout.strip()
+    if not output:
+        return None
+
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        return None
+
+
+def compact_context_text(
+    cwd: str | None = None, session_key: str | None = None
+) -> str | None:
+    script = skill_root() / "scripts" / "compact-context.sh"
+    command = ["sh", str(script)]
+    if session_key:
+        command.extend(["--session-key", session_key])
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd or os.getcwd(),
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    output = result.stdout.strip()
+    return output or None
+
+
 def task_tool_text(tool_input: dict) -> str:
     if not isinstance(tool_input, dict):
         return ""
