@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 
@@ -25,12 +25,23 @@ function writeTask(planRoot, slug, title, status = "active") {
       mode: "execute",
       current_phase: "execute",
       next_action: "Keep session titles isolated.",
+      latest_checkpoint: "Initial checkpoint.",
       blockers: [],
       phases: [],
       delegation: { enabled: true, single_writer: true, active: [] },
+      updated_at: "2026-03-26T00:00:00Z",
     }, null, 2)}\n`,
     "utf8",
   )
+  writeFileSync(path.join(planDir, "task_plan.md"), `# Task Plan: ${title}\n`, "utf8")
+  writeFileSync(path.join(planDir, "progress.md"), `# Progress Log: ${title}\n`, "utf8")
+  writeFileSync(path.join(planDir, "findings.md"), `# Findings: ${title}\n`, "utf8")
+}
+
+function touchTaskFile(planRoot, slug, name) {
+  const filePath = path.join(planRoot, slug, name)
+  const nextTime = new Date(Date.now() + 2000)
+  utimesSync(filePath, nextTime, nextTime)
 }
 
 function setTaskStatus(planRoot, slug, status) {
@@ -74,6 +85,7 @@ try {
     "base-app-mobile-coldstart-optimization",
     "Base App Mobile Coldstart Optimization",
   )
+  writeTask(planRoot, "base-mobile-number-locale", "Base Mobile Number Locale")
   writeBinding(planRoot, "A", "base-app-mobile")
   writeBinding(planRoot, "B", "base-app-mobile-coldstart-optimization")
   writeFileSync(path.join(planRoot, ".active_task"), "base-app-mobile-coldstart-optimization\n", "utf8")
@@ -81,6 +93,7 @@ try {
   const titles = new Map([
     ["A", "Session A"],
     ["B", "Session B"],
+    ["C", "Session C"],
   ])
   const toasts = []
   const client = {
@@ -104,8 +117,396 @@ try {
 
   await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
   await plugin.event({ event: { type: "session.created", properties: { info: { id: "B" } } } })
+  await plugin.event({ event: { type: "session.created", properties: { info: { id: "C" } } } })
   assert.equal(titles.get("A"), "task:base-app-mobile | Session A")
   assert.equal(titles.get("B"), "task:base-app-mobile-coldstart-optimization | Session B")
+  assert.equal(titles.get("C"), "Session C")
+  assert.equal(toasts.some((toast) => toast.title === "Current task"), false)
+
+  toasts.length = 0
+  await plugin["tool.execute.after"](
+    {
+      tool: "functions.apply_patch",
+      sessionID: "C",
+      args: {
+        patchText: `*** Begin Patch\n*** Update File: .planning/base-mobile-number-locale/state.json\n@@\n-\"mode\": \"execute\"\n+\"mode\": \"execute\"\n*** End Patch`,
+      },
+    },
+    {},
+  )
+  const autoBound = JSON.parse(
+    readFileSync(path.join(planRoot, ".sessions", sessionBindingName("opencode:C")), "utf8"),
+  )
+  assert.equal(autoBound.task_slug, "base-mobile-number-locale")
+  assert.equal(autoBound.role, "writer")
+  assert.equal(titles.get("C"), "task:base-mobile-number-locale | Session C")
+  assert.equal(toasts.some((toast) => toast.title === "Task binding bootstrapped"), true)
+
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-1" },
+    {
+      message: { id: "user-1" },
+      parts: [{ type: "text", text: "Implement idle sync for planning updates" }],
+    },
+  )
+  await plugin.event({
+    event: {
+      type: "message.updated",
+      properties: {
+        sessionID: "B",
+        info: {
+          id: "asst-1",
+          sessionID: "B",
+          role: "assistant",
+          parentID: "user-1",
+          time: { created: 1711600000, completed: 1711600005 },
+          path: { cwd: workspace, root: workspace },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600004,
+        part: {
+          id: "tool-1",
+          sessionID: "B",
+          messageID: "asst-1",
+          type: "tool",
+          callID: "call-1",
+          tool: "functions.apply_patch",
+          state: {
+            status: "completed",
+            input: {},
+            output: "",
+            title: "Updated task guard",
+            metadata: {},
+            time: { start: 1711600001, end: 1711600004 },
+          },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600004,
+        part: {
+          id: "patch-1",
+          sessionID: "B",
+          messageID: "asst-1",
+          type: "patch",
+          hash: "abc123",
+          files: ["skill/opencode-plugin/task-focus-guard.js"],
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.diff",
+      properties: {
+        sessionID: "B",
+        diff: [{ file: "skill/scripts/task_guard.py" }],
+      },
+    },
+  })
+  await plugin.event({ event: { type: "session.idle", properties: { sessionID: "B" } } })
+
+  const syncedState = JSON.parse(
+    readFileSync(path.join(planRoot, "base-app-mobile-coldstart-optimization", "state.json"), "utf8"),
+  )
+  const syncedProgressPath = path.join(planRoot, "base-app-mobile-coldstart-optimization", "progress.md")
+  const syncedProgress = readFileSync(syncedProgressPath, "utf8")
+  assert.equal(syncedState.updated_at, "2024-03-28T04:26:45Z")
+  assert.match(syncedState.latest_checkpoint, /Handled: Implement idle sync for planning updates/)
+  assert.match(syncedProgress, /### Session: 2024-03-28T04:26:45Z/)
+  assert.match(syncedProgress, /Handled: Implement idle sync for planning updates/)
+  assert.match(syncedProgress, /`skill\/opencode-plugin\/task-focus-guard.js`/)
+  assert.match(syncedProgress, /`skill\/scripts\/task_guard.py`/)
+
+  const progressAfterFirstIdle = syncedProgress
+  await plugin.event({ event: { type: "session.idle", properties: { sessionID: "B" } } })
+  assert.equal(readFileSync(syncedProgressPath, "utf8"), progressAfterFirstIdle)
+
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-2" },
+    {
+      message: { id: "user-2" },
+      parts: [{ type: "text", text: "Fallback sync should work without session idle" }],
+    },
+  )
+  await plugin.event({
+    event: {
+      type: "message.updated",
+      properties: {
+        sessionID: "B",
+        info: {
+          id: "asst-2",
+          sessionID: "B",
+          role: "assistant",
+          parentID: "user-2",
+          time: { created: 1711600010000, completed: 1711600015000 },
+          path: { cwd: workspace, root: workspace },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600014,
+        part: {
+          id: "tool-2",
+          sessionID: "B",
+          messageID: "asst-2",
+          type: "tool",
+          callID: "call-2",
+          tool: "functions.apply_patch",
+          state: {
+            status: "completed",
+            input: {},
+            output: "",
+            title: "Updated docs",
+            metadata: {},
+            time: { start: 1711600011, end: 1711600014 },
+          },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600014,
+        part: {
+          id: "patch-2",
+          sessionID: "B",
+          messageID: "asst-2",
+          type: "patch",
+          hash: "def456",
+          files: ["docs/opencode.md"],
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.diff",
+      properties: {
+        sessionID: "B",
+        diff: [{ file: "docs/opencode.md" }],
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.updated",
+      properties: {
+        info: {
+          id: "B",
+          directory: workspace,
+        },
+      },
+    },
+  })
+
+  const fallbackSyncedState = JSON.parse(readFileSync(path.join(planRoot, "base-app-mobile-coldstart-optimization", "state.json"), "utf8"))
+  const fallbackSyncedProgress = readFileSync(syncedProgressPath, "utf8")
+  assert.equal(fallbackSyncedState.updated_at, "2024-03-28T04:26:55Z")
+  assert.match(fallbackSyncedState.latest_checkpoint, /Handled: Fallback sync should work without session idle/)
+  assert.match(fallbackSyncedProgress, /### Session: 2024-03-28T04:26:55Z/)
+  assert.match(fallbackSyncedProgress, /`docs\/opencode\.md`/)
+
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-2b" },
+    {
+      message: { id: "user-2b" },
+      parts: [{ type: "text", text: "Out-of-order fallback sync should wait for files" }],
+    },
+  )
+  await plugin.event({
+    event: {
+      type: "message.updated",
+      properties: {
+        sessionID: "B",
+        info: {
+          id: "asst-2b",
+          sessionID: "B",
+          role: "assistant",
+          parentID: "user-2b",
+          time: { created: 1711600016, completed: 1711600018 },
+          path: { cwd: workspace, root: workspace },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600017,
+        part: {
+          id: "tool-2b",
+          sessionID: "B",
+          messageID: "asst-2b",
+          type: "tool",
+          callID: "call-2b",
+          tool: "functions.bash",
+          state: {
+            status: "completed",
+            input: {},
+            output: "",
+            title: "Checked changed files",
+            metadata: {},
+            time: { start: 1711600016, end: 1711600017 },
+          },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.updated",
+      properties: {
+        info: {
+          id: "B",
+          directory: workspace,
+        },
+      },
+    },
+  })
+
+  const noPrematureSyncState = JSON.parse(readFileSync(path.join(planRoot, "base-app-mobile-coldstart-optimization", "state.json"), "utf8"))
+  assert.equal(noPrematureSyncState.updated_at, "2024-03-28T04:26:55Z")
+
+  await plugin.event({
+    event: {
+      type: "session.diff",
+      properties: {
+        sessionID: "B",
+        diff: [{ file: "docs/task-focus-guard.md" }],
+      },
+    },
+  })
+
+  const diffArrivedState = JSON.parse(readFileSync(path.join(planRoot, "base-app-mobile-coldstart-optimization", "state.json"), "utf8"))
+  const diffArrivedProgress = readFileSync(syncedProgressPath, "utf8")
+  assert.equal(diffArrivedState.updated_at, "2024-03-28T04:26:58Z")
+  assert.match(diffArrivedState.latest_checkpoint, /Handled: Out-of-order fallback sync should wait for files/)
+  assert.match(diffArrivedProgress, /### Session: 2024-03-28T04:26:58Z/)
+  assert.match(diffArrivedProgress, /`docs\/task-focus-guard\.md`/)
+
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-3" },
+    {
+      message: { id: "user-3" },
+      parts: [{ type: "text", text: "Fallback sync should use session diff when patch files are absent" }],
+    },
+  )
+  await plugin.event({
+    event: {
+      type: "message.updated",
+      properties: {
+        sessionID: "B",
+        info: {
+          id: "asst-3",
+          sessionID: "B",
+          role: "assistant",
+          parentID: "user-3",
+          time: { created: 1711600020, completed: 1711600025 },
+          path: { cwd: workspace, root: workspace },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "message.part.updated",
+      properties: {
+        sessionID: "B",
+        time: 1711600024,
+        part: {
+          id: "tool-3",
+          sessionID: "B",
+          messageID: "asst-3",
+          type: "tool",
+          callID: "call-3",
+          tool: "functions.bash",
+          state: {
+            status: "completed",
+            input: {},
+            output: "",
+            title: "Checked docs links",
+            metadata: {},
+            time: { start: 1711600021, end: 1711600024 },
+          },
+        },
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.diff",
+      properties: {
+        sessionID: "B",
+        diff: [{ file: "docs/design.md" }],
+      },
+    },
+  })
+  await plugin.event({
+    event: {
+      type: "session.updated",
+      properties: {
+        info: {
+          id: "B",
+          directory: workspace,
+        },
+      },
+    },
+  })
+
+  const diffOnlySyncedState = JSON.parse(readFileSync(path.join(planRoot, "base-app-mobile-coldstart-optimization", "state.json"), "utf8"))
+  const diffOnlySyncedProgress = readFileSync(syncedProgressPath, "utf8")
+  assert.equal(diffOnlySyncedState.updated_at, "2024-03-28T04:27:05Z")
+  assert.match(diffOnlySyncedState.latest_checkpoint, /Handled: Fallback sync should use session diff when patch files are absent/)
+  assert.match(diffOnlySyncedProgress, /### Session: 2024-03-28T04:27:05Z/)
+  assert.match(diffOnlySyncedProgress, /`docs\/design\.md`/)
+
+  toasts.length = 0
+  await plugin["tool.execute.after"]({ tool: "functions.apply_patch", sessionID: "B", args: {} }, {})
+  assert.equal(toasts.some((toast) => toast.title === "Task files stale"), false)
+  touchTaskFile(planRoot, "base-app-mobile-coldstart-optimization", "task_plan.md")
+  await plugin["tool.execute.after"](
+    {
+      tool: "multi_tool_use.parallel",
+      sessionID: "B",
+      args: {
+        tool_uses: [
+          { recipient_name: "functions.read", parameters: {} },
+          { recipient_name: "functions.apply_patch", parameters: {} },
+        ],
+      },
+    },
+    {},
+  )
+  assert.deepEqual(toasts.at(-1), {
+    title: "Task files stale",
+    message: "Sync .planning/base-app-mobile-coldstart-optimization/ before more implementation or wrap-up.",
+    variant: "warning",
+    duration: 2600,
+  })
+  toasts.length = 0
 
   await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
   await plugin["tool.execute.after"]({ tool: "read" }, {})
@@ -115,6 +516,7 @@ try {
   unlinkSync(path.join(planRoot, ".active_task"))
   setTaskStatus(planRoot, "base-app-mobile", "paused")
   setTaskStatus(planRoot, "base-app-mobile-coldstart-optimization", "paused")
+  setTaskStatus(planRoot, "base-mobile-number-locale", "paused")
 
   await plugin["tool.execute.after"]({ tool: "read" }, {})
   assert.equal(titles.get("A"), "task:base-app-mobile | Session A")

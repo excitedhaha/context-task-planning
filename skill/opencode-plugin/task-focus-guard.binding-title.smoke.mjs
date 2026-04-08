@@ -74,7 +74,7 @@ try {
     },
   }
 
-  const plugin = await ContextTaskPlanningOpenCodePlugin({ client, directory: workspace })
+  const plugin = await ContextTaskPlanningOpenCodePlugin({ client, directory: workspace, worktree: "/" })
 
   await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
   assert.equal(titles.get("A"), "Session A")
@@ -83,7 +83,7 @@ try {
   await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
   assert.equal(titles.get("A"), "task:existing-task | Session A")
 
-  console.log("[context-task-planning] smoke test passed: OpenCode titles require explicit session binding")
+  console.log("[context-task-planning] smoke test passed: OpenCode titles require explicit session binding and ignore root worktree")
 } finally {
   rmSync(workspace, { recursive: true, force: true })
 }

@@ -86,15 +86,65 @@ try {
   }
 
   const plugin = await ContextTaskPlanningOpenCodePlugin({ client, directory: workspace })
+  const compactingOutput = { context: [] }
+  await plugin["experimental.session.compacting"]({ sessionID: "A" }, compactingOutput)
+  assert.match(compactingOutput.context.join("\n"), /Task `compact-demo`/u)
+  assert.match(compactingOutput.context.join("\n"), /recently compacted/u)
+
   await plugin.event({
     event: {
-      type: "session.updated",
+      type: "session.compacted",
       properties: {
-        info: { id: "A" },
-        reason: "compact",
+        sessionID: "A",
       },
     },
   })
+
+  const transformAfterCompact = { system: [] }
+  await plugin["experimental.chat.system.transform"](
+    { sessionID: "A", model: {} },
+    transformAfterCompact,
+  )
+  assert.match(transformAfterCompact.system.join("\n"), /recently compacted/u)
+  assert.match(transformAfterCompact.system.join("\n"), /Task `compact-demo`/u)
+  assert.match(transformAfterCompact.system.join("\n"), /state\.json/u)
+  assert.match(transformAfterCompact.system.join("\n"), /progress\.md/u)
+
+  const secondTransformAfterCompact = { system: [] }
+  await plugin["experimental.chat.system.transform"](
+    { sessionID: "A", model: {} },
+    secondTransformAfterCompact,
+  )
+  assert.match(secondTransformAfterCompact.system.join("\n"), /state\.json/u)
+  assert.match(secondTransformAfterCompact.system.join("\n"), /progress\.md/u)
+
+  await plugin["tool.execute.after"](
+    {
+      tool: "multi_tool_use.parallel",
+      sessionID: "A",
+      args: {
+        tool_uses: [
+          {
+            recipient_name: "functions.read",
+            parameters: { filePath: path.join(planDir, "state.json") },
+          },
+          {
+            recipient_name: "functions.read",
+            parameters: { filePath: path.join(planDir, "progress.md") },
+          },
+        ],
+      },
+    },
+    {},
+  )
+
+  const thirdTransformAfterCompact = { system: [] }
+  await plugin["experimental.chat.system.transform"](
+    { sessionID: "A", model: {} },
+    thirdTransformAfterCompact,
+  )
+  assert.doesNotMatch(thirdTransformAfterCompact.system.join("\n"), /This session compacted recently/u)
+  assert.doesNotMatch(thirdTransformAfterCompact.system.join("\n"), /re-read `\.planning\/compact-demo\/state\.json`/u)
 
   const validate = runScript("validate-task.sh", ["--task", "compact-demo"], workspace)
   assert.match(validate, /Validation passed\./)

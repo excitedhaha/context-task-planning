@@ -403,6 +403,26 @@ def parse_args() -> argparse.Namespace:
     )
     access.add_argument("--fallback", action="store_true")
 
+    record = subparsers.add_parser("record-progress")
+    record.add_argument("--cwd", default="")
+    record.add_argument("--task", default="")
+    record.add_argument("--session-key", default="")
+    record.add_argument("--fallback", action="store_true")
+    record.add_argument("--source-id", required=True)
+    record.add_argument("--timestamp", default="")
+    record.add_argument("--status", default="complete")
+    record.add_argument("--checkpoint", default="")
+    record.add_argument("--action", action="append", default=[])
+    record.add_argument("--file", action="append", default=[])
+    record.add_argument("--note", action="append", default=[])
+    record.add_argument("--task-status", default="")
+    record.add_argument("--mode", default="")
+    record.add_argument("--phase", default="")
+    record.add_argument("--next-action", default="")
+    record.add_argument("--primary-repo", default="")
+    record.add_argument("--repo", action="append", default=[])
+    record.add_argument("--json", action="store_true")
+
     return parser.parse_args()
 
 
@@ -1576,6 +1596,291 @@ def sync_task_repo_markdown(
             after_prefix="- Primary Repo:",
         )
         progress_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def task_derived_dir(plan_dir: Path) -> Path:
+    return plan_dir / ".derived"
+
+
+def opencode_idle_sync_path(plan_dir: Path) -> Path:
+    return task_derived_dir(plan_dir) / "opencode_idle_sync.json"
+
+
+def normalize_markdown_items(values: list[str]) -> list[str]:
+    items = []
+    seen = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        items.append(text)
+    return items
+
+
+def format_progress_repo_scope(repo_ids: list[str]) -> str:
+    return ", ".join(repo_ids) if repo_ids else "(unset)"
+
+
+def quoted_markdown_path(value: str) -> str:
+    if value.startswith("`") and value.endswith("`"):
+        return value
+    return f"`{value}`"
+
+
+def ensure_progress_session_log(
+    progress_path: Path, title: str, task_slug: str
+) -> None:
+    if progress_path.exists():
+        return
+
+    created_at = utc_now()
+    progress_path.parent.mkdir(parents=True, exist_ok=True)
+    progress_path.write_text(
+        "\n".join(
+            [
+                f"# Progress Log: {title}",
+                "",
+                "## Snapshot",
+                "",
+                f"- Task Slug: `{task_slug}`",
+                "- Status: `active`",
+                "- Current Mode: `clarify`",
+                "- Current Phase: `clarify`",
+                "- Next Action: (unset)",
+                "- Primary Repo: (unset)",
+                "- Repo Scope: (unset)",
+                f"- Last Updated: {created_at}",
+                "",
+                "## Session Log",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def prepend_progress_session(
+    progress_path: Path,
+    timestamp: str,
+    status: str,
+    actions: list[str],
+    files_touched: list[str],
+    notes: list[str],
+) -> None:
+    lines = progress_path.read_text(encoding="utf-8").splitlines()
+    try:
+        insert_at = lines.index("## Session Log") + 1
+    except ValueError:
+        lines.extend(["", "## Session Log"])
+        insert_at = len(lines)
+
+    while insert_at < len(lines) and lines[insert_at] == "":
+        insert_at += 1
+
+    entry_lines = [
+        f"### Session: {timestamp}",
+        "",
+        f"- Status: {status}",
+        "- Actions:",
+    ]
+    for action in actions:
+        entry_lines.append(f"  - {action}")
+
+    entry_lines.append("- Files touched:")
+    for file_path in files_touched:
+        entry_lines.append(f"  - {quoted_markdown_path(file_path)}")
+
+    entry_lines.append("- Notes:")
+    for note in notes:
+        entry_lines.append(f"  - {note}")
+    entry_lines.append("")
+
+    lines[insert_at:insert_at] = entry_lines
+    progress_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def update_progress_snapshot(
+    progress_path: Path,
+    task_slug: str,
+    task_status: str,
+    mode: str,
+    phase: str,
+    next_action: str,
+    primary_repo: str,
+    repo_scope: list[str],
+    updated_at: str,
+) -> None:
+    lines = progress_path.read_text(encoding="utf-8").splitlines()
+    lines = upsert_markdown_line(lines, "- Task Slug:", f"- Task Slug: `{task_slug}`")
+    lines = upsert_markdown_line(
+        lines, "- Status:", f"- Status: `{task_status or 'active'}`"
+    )
+    lines = upsert_markdown_line(
+        lines, "- Current Mode:", f"- Current Mode: `{mode or 'unknown'}`"
+    )
+    lines = upsert_markdown_line(
+        lines, "- Current Phase:", f"- Current Phase: `{phase or 'unknown'}`"
+    )
+    lines = upsert_markdown_line(
+        lines, "- Next Action:", f"- Next Action: {next_action or '(unset)'}"
+    )
+    lines = upsert_markdown_line(
+        lines,
+        "- Primary Repo:",
+        f"- Primary Repo: {primary_repo or '(unset)'}",
+        after_prefix="- Next Action:",
+    )
+    lines = upsert_markdown_line(
+        lines,
+        "- Repo Scope:",
+        f"- Repo Scope: {format_progress_repo_scope(repo_scope)}",
+        after_prefix="- Primary Repo:",
+    )
+    lines = upsert_markdown_line(
+        lines, "- Last Updated:", f"- Last Updated: {updated_at}"
+    )
+    progress_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def record_progress_entry(
+    plan_root: Path,
+    workspace_root: Path,
+    task_slug: str,
+    session_key: str,
+    source_id: str,
+    timestamp: str,
+    status: str,
+    checkpoint: str,
+    actions: list[str],
+    files_touched: list[str],
+    notes: list[str],
+    task_status: str,
+    mode: str,
+    phase: str,
+    next_action: str,
+    primary_repo: str,
+    repo_scope: list[str],
+) -> dict:
+    plan_dir = plan_root / task_slug
+    if not plan_dir.is_dir():
+        raise SystemExit(f"Task not found: {plan_dir}")
+
+    role = binding_role_for_task(plan_root, session_key, task_slug)
+    if (
+        not role
+        and session_key == WORKSPACE_FALLBACK_SESSION_KEY
+        and read_active_pointer(plan_root) == task_slug
+        and not writer_binding_for_task(plan_root, task_slug)
+    ):
+        role = ROLE_WRITER
+    if role != ROLE_WRITER:
+        writer = writer_binding_for_task(plan_root, task_slug)
+        writer_display = display_session_key(str(writer.get("session_key") or ""))
+        raise SystemExit(
+            f"Task `{task_slug}` is observe-only for {display_session_key(session_key)}. "
+            f"Current writer: {writer_display}."
+        )
+
+    state_path = plan_dir / "state.json"
+    progress_path = plan_dir / "progress.md"
+    idle_sync_path = opencode_idle_sync_path(plan_dir)
+    idle_sync = safe_json(idle_sync_path)
+    seen_sources = idle_sync.get("sources", {}) if isinstance(idle_sync, dict) else {}
+    if not isinstance(seen_sources, dict):
+        seen_sources = {}
+    if source_id in seen_sources:
+        return {
+            "ok": True,
+            "task_slug": task_slug,
+            "source_id": source_id,
+            "deduped": True,
+            "updated_at": str(seen_sources.get(source_id) or ""),
+        }
+
+    state = load_task_state(plan_dir)
+    normalized_actions = normalize_markdown_items(actions)
+    normalized_files = normalize_markdown_items(files_touched)
+    normalized_notes = normalize_markdown_items(notes)
+    resolved_timestamp = timestamp or utc_now()
+    resolved_checkpoint = (
+        checkpoint.strip()
+        or state.get("latest_checkpoint")
+        or (
+            normalized_actions[0]
+            if normalized_actions
+            else "Recorded OpenCode idle sync progress."
+        )
+    )
+
+    state["latest_checkpoint"] = resolved_checkpoint
+    state["updated_at"] = resolved_timestamp
+    if task_status:
+        state["status"] = task_status
+    if mode:
+        state["mode"] = mode
+    if phase:
+        state["current_phase"] = phase
+    if next_action:
+        state["next_action"] = next_action
+    if primary_repo:
+        state["primary_repo"] = primary_repo
+    if repo_scope:
+        state["repo_scope"] = repo_scope
+    write_json_file(state_path, state)
+
+    ensure_progress_session_log(
+        progress_path,
+        str(state.get("title") or task_slug),
+        task_slug,
+    )
+    update_progress_snapshot(
+        progress_path,
+        task_slug,
+        str(state.get("status") or "active"),
+        str(state.get("mode") or "unknown"),
+        str(state.get("current_phase") or "unknown"),
+        str(state.get("next_action") or "(unset)"),
+        str(state.get("primary_repo") or ""),
+        nonempty_text_list(state.get("repo_scope")),
+        resolved_timestamp,
+    )
+    prepend_progress_session(
+        progress_path,
+        resolved_timestamp,
+        status or "complete",
+        normalized_actions or ["Recorded OpenCode idle sync progress."],
+        normalized_files
+        or [f".planning/{task_slug}/progress.md", f".planning/{task_slug}/state.json"],
+        normalized_notes
+        or ["Automated OpenCode idle sync appended this journal entry."],
+    )
+
+    sources = dict(seen_sources)
+    sources[source_id] = resolved_timestamp
+    retained = list(sorted(sources.items(), key=lambda item: item[1], reverse=True))[
+        :200
+    ]
+    write_json_file(
+        idle_sync_path,
+        {
+            "schema_version": "1.0.0",
+            "task_slug": task_slug,
+            "updated_at": resolved_timestamp,
+            "sources": {key: value for key, value in retained},
+        },
+    )
+
+    return {
+        "ok": True,
+        "task_slug": task_slug,
+        "source_id": source_id,
+        "deduped": False,
+        "updated_at": resolved_timestamp,
+        "checkpoint": resolved_checkpoint,
+        "workspace_root": str(workspace_root),
+    }
 
 
 def set_task_repo_scope(
@@ -3777,6 +4082,51 @@ def check_task_access(args: argparse.Namespace) -> None:
         )
 
 
+def handle_record_progress(args: argparse.Namespace) -> None:
+    session_key = effective_session_key(args.session_key, args.fallback)
+    if not session_key:
+        raise SystemExit(
+            "record-progress requires PLAN_SESSION_KEY or --session-key. Use --fallback for the shared workspace default."
+        )
+
+    workspace_root = resolve_workspace_root(args.cwd)
+    plan_root = workspace_root / ".planning"
+    task_slug = args.task.strip()
+    if not task_slug:
+        task = resolve_task(args.cwd, "", session_key)
+        if not task.get("found") or not task.get("slug"):
+            raise SystemExit("Could not resolve a current task for record-progress.")
+        task_slug = str(task.get("slug") or "").strip()
+
+    result = record_progress_entry(
+        plan_root,
+        workspace_root,
+        task_slug,
+        session_key,
+        args.source_id.strip(),
+        args.timestamp.strip(),
+        args.status.strip() or "complete",
+        args.checkpoint.strip(),
+        args.action,
+        args.file,
+        args.note,
+        args.task_status.strip(),
+        args.mode.strip(),
+        args.phase.strip(),
+        args.next_action.strip(),
+        args.primary_repo.strip(),
+        normalize_markdown_items(args.repo),
+    )
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return
+
+    state_text = "deduped" if result.get("deduped") else "recorded"
+    print(
+        f"[context-task-planning] Progress {state_text} for `{result['task_slug']}` from `{result['source_id']}`"
+    )
+
+
 def main() -> None:
     args = parse_args()
 
@@ -3811,6 +4161,10 @@ def main() -> None:
             args.cwd, args.source_task, args.target_task, args.session_key
         )
         print_switch_safety(result, args.json, args.compact)
+        return
+
+    if args.command == "record-progress":
+        handle_record_progress(args)
         return
 
     if args.command == "ensure-switch-safety":

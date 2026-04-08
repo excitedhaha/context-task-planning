@@ -7,16 +7,20 @@ import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
 const SKILL_ROOT = path.resolve(PLUGIN_DIR, "..")
+const TASK_GUARD_SCRIPT = path.join(SKILL_ROOT, "scripts", "task_guard.py")
 const CURRENT_TASK_SCRIPT = path.join(SKILL_ROOT, "scripts", "current-task.sh")
 const CHECK_DRIFT_SCRIPT = path.join(SKILL_ROOT, "scripts", "check-task-drift.sh")
 const SUBAGENT_PREFLIGHT_SCRIPT = path.join(SKILL_ROOT, "scripts", "subagent-preflight.sh")
 const COMPACT_SYNC_SCRIPT = path.join(SKILL_ROOT, "scripts", "compact-sync.sh")
+const COMPACT_CONTEXT_SCRIPT = path.join(SKILL_ROOT, "scripts", "compact-context.sh")
 const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
 const FRESHNESS_WORK_THRESHOLD = 2
 const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
 const COMPACT_SYNC_DEBOUNCE_MS = 1500
-const FRESHNESS_TRACKED_TOOLS = new Set(["bash", "edit", "multiedit", "write", "task"])
-const COMPACT_SIGNAL_RE = /\b(compact|compaction|compress|compression|compressed)\b/i
+const FRESHNESS_TRACKED_TOOLS = new Set(["apply_patch", "bash", "edit", "multiedit", "write", "task"])
+const PLANNING_FILES = ["state.json", "task_plan.md", "progress.md", "findings.md"]
+const FRESHNESS_SYNC_FILES = ["state.json", "progress.md"]
+const COMPACT_SIGNAL_RE = /\b(compact|compacted|compacting|compaction|compress|compression|compressed)\b/i
 const COMPACT_SIGNAL_VALUE_KEYS = new Set([
   "type",
   "reason",
@@ -30,7 +34,6 @@ const COMPACT_SIGNAL_VALUE_KEYS = new Set([
   "changeType",
   "mode",
 ])
-
 function compactSignalKey(value) {
   return COMPACT_SIGNAL_RE.test(String(value || ""))
 }
@@ -55,6 +58,41 @@ function runJsonScript(script, args, cwd) {
   } catch {
     return null
   }
+}
+
+function runJsonCommand(command, args, cwd) {
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: "utf8",
+  })
+
+  if (result.error || result.status !== 0) {
+    return null
+  }
+
+  const stdout = (result.stdout || "").trim()
+  if (!stdout) {
+    return null
+  }
+
+  try {
+    return JSON.parse(stdout)
+  } catch {
+    return null
+  }
+}
+
+function runTextScript(script, args, cwd) {
+  const result = spawnSync("sh", [script, ...args], {
+    cwd,
+    encoding: "utf8",
+  })
+
+  if (result.error || result.status !== 0) {
+    return ""
+  }
+
+  return String(result.stdout || "").trim()
 }
 
 function collectPromptText(parts) {
@@ -150,6 +188,15 @@ function compactSyncWarningToast(task, result) {
     message,
     variant: "warning",
   }
+}
+
+function compactSyncWarningText(task, result) {
+  if (result?.ok !== false) {
+    return ""
+  }
+
+  const toast = compactSyncWarningToast(task, result)
+  return `[context-task-planning] ${toast.title}: ${toast.message}`
 }
 
 function compactEventSignature(event) {
@@ -269,6 +316,186 @@ function taskToolPrefix(task, result) {
   ].filter(Boolean).join("\n")
 }
 
+function compactRecoverySystemPrompt(task, compactContext, warning = "") {
+  const slug = task?.slug || "(unknown)"
+  const parts = []
+  if (warning) {
+    parts.push(warning)
+  }
+  parts.push(
+    [
+      `[context-task-planning] This session recently compacted for task \`${slug}\`.`,
+      `Treat the compact recovery context below as the current hot context before more implementation or planning-file updates.`,
+      `If this turn depends on recent task details or will update planning, re-read \`.planning/${slug}/progress.md\` and \`.planning/${slug}/task_plan.md\` first.`,
+    ].join(" "),
+  )
+  if (compactContext) {
+    parts.push(compactContext)
+  }
+  return parts.join("\n\n")
+}
+
+function planningRecoveryPaths(task) {
+  if (!task?.plan_dir) {
+    return null
+  }
+
+  return {
+    state: path.resolve(task.plan_dir, "state.json"),
+    progress: path.resolve(task.plan_dir, "progress.md"),
+    taskPlan: path.resolve(task.plan_dir, "task_plan.md"),
+  }
+}
+
+function matchesTaskPlanningFile(filePath, task, fileName) {
+  const text = String(filePath || "").trim()
+  if (!text || !task?.slug || !fileName) {
+    return false
+  }
+
+  const normalized = text.replaceAll("\\", "/")
+  const expectedSuffix = `/.planning/${task.slug}/${fileName}`
+  if (normalized.endsWith(expectedSuffix)) {
+    return true
+  }
+
+  const paths = planningRecoveryPaths(task)
+  if (!paths) {
+    return false
+  }
+
+  const absoluteTarget =
+    fileName === "state.json"
+      ? paths.state
+      : fileName === "progress.md"
+        ? paths.progress
+        : paths.taskPlan
+  return path.resolve(text) === absoluteTarget
+}
+
+function readFileTargetsFromTool(toolName, args) {
+  const normalized = normalizedToolName(toolName)
+  if (normalized === "read") {
+    return [String(args?.filePath || "").trim()].filter(Boolean)
+  }
+
+  if (normalized === "parallel" && Array.isArray(args?.tool_uses)) {
+    return args.tool_uses.flatMap((toolUse) =>
+      readFileTargetsFromTool(toolUse?.recipient_name, toolUse?.parameters || {}),
+    )
+  }
+
+  return []
+}
+
+function writeFileTargetsFromPatchText(patchText) {
+  const text = String(patchText || "")
+  if (!text) {
+    return []
+  }
+
+  const targets = []
+  const pattern = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gmu
+  for (const match of text.matchAll(pattern)) {
+    const value = String(match[1] || "").trim()
+    if (value) {
+      targets.push(value)
+    }
+  }
+  return targets
+}
+
+function writeFileTargetsFromTool(toolName, args) {
+  const normalized = normalizedToolName(toolName)
+  if (normalized === "write" || normalized === "edit" || normalized === "multiedit") {
+    return [String(args?.filePath || "").trim()].filter(Boolean)
+  }
+
+  if (normalized === "apply_patch") {
+    return writeFileTargetsFromPatchText(args?.patchText)
+  }
+
+  if (normalized === "parallel" && Array.isArray(args?.tool_uses)) {
+    return args.tool_uses.flatMap((toolUse) =>
+      writeFileTargetsFromTool(toolUse?.recipient_name, toolUse?.parameters || {}),
+    )
+  }
+
+  return []
+}
+
+function planningTaskSlugFromPath(filePath) {
+  const normalized = String(filePath || "").trim().replaceAll("\\", "/")
+  if (!normalized) {
+    return ""
+  }
+
+  const match = normalized.match(/(?:^|\/)\.planning\/([^/]+)\/(state\.json|task_plan\.md|progress\.md|findings\.md)$/u)
+  return match ? String(match[1] || "").trim() : ""
+}
+
+function writtenPlanningTaskSlugs(input) {
+  return uniqueItems(writeFileTargetsFromTool(input?.tool, input?.args).map(planningTaskSlugFromPath).filter(Boolean))
+}
+
+function planningRecoveryReminder(task, recovery) {
+  if (!task?.slug || !recovery) {
+    return ""
+  }
+
+  const missing = []
+  if (recovery.needState) {
+    missing.push(`.planning/${task.slug}/state.json`)
+  }
+  if (recovery.needProgress) {
+    missing.push(`.planning/${task.slug}/progress.md`)
+  }
+
+  if (missing.length === 0) {
+    return ""
+  }
+
+  return [
+    `[context-task-planning] This session compacted recently for task \`${task.slug}\`.`,
+    `Before more implementation, wrap-up, or planning edits, re-read ${missing.map((item) => `\`${item}\``).join(" and ")}.`,
+    `If Hot Context or decisions matter for this turn, also re-read \`.planning/${task.slug}/task_plan.md\`.`,
+    "Do not rely only on compressed transcript memory.",
+  ].join(" ")
+}
+
+function truncateLine(value, max = 220) {
+  const text = String(value || "").replace(/\s+/g, " ").trim()
+  if (!text) {
+    return ""
+  }
+
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}...` : text
+}
+
+function uniqueItems(values) {
+  const seen = new Set()
+  const items = []
+  for (const value of values || []) {
+    const text = String(value || "").trim()
+    if (!text || seen.has(text)) {
+      continue
+    }
+    seen.add(text)
+    items.push(text)
+  }
+  return items
+}
+
+function timestampFromUnixSeconds(value) {
+  const unix = Number(value)
+  if (!Number.isFinite(unix) || unix <= 0) {
+    return ""
+  }
+
+  const milliseconds = unix >= 1e12 ? unix : unix * 1000
+  return new Date(milliseconds).toISOString().replace(/\.\d{3}Z$/, "Z")
+}
+
 function taskTextFromArgs(args) {
   if (!args || typeof args !== "object") {
     return ""
@@ -345,44 +572,46 @@ function pluginEnabled(task) {
   return typeof planRoot === "string" && planRoot.length > 0 && existsSync(planRoot)
 }
 
-function planningFiles(task) {
+function taskFiles(task, names = PLANNING_FILES) {
   if (!task?.plan_dir) {
     return []
   }
 
-  return ["state.json", "task_plan.md", "progress.md", "findings.md"]
+  return names
     .map((name) => path.join(task.plan_dir, name))
     .filter((filePath) => existsSync(filePath))
 }
 
-function latestPlanningInfo(task) {
-  const files = planningFiles(task)
+function freshnessPlanningInfo(task) {
+  const syncFiles = taskFiles(task, FRESHNESS_SYNC_FILES)
+  const files = syncFiles.length > 0 ? syncFiles : taskFiles(task)
   if (files.length === 0) {
     return null
   }
 
-  let latestPath = files[0]
-  let latestMtimeMs = statSync(files[0]).mtimeMs
+  let baselinePath = files[0]
+  let baselineMtimeMs = statSync(files[0]).mtimeMs
 
   for (const filePath of files.slice(1)) {
     const mtimeMs = statSync(filePath).mtimeMs
-    if (mtimeMs > latestMtimeMs) {
-      latestMtimeMs = mtimeMs
-      latestPath = filePath
+    if (mtimeMs < baselineMtimeMs) {
+      baselineMtimeMs = mtimeMs
+      baselinePath = filePath
     }
   }
 
   return {
-    latestPath,
-    latestFile: path.basename(latestPath),
-    latestMtimeMs,
-    ageMs: Math.max(0, Date.now() - latestMtimeMs),
+    trackedPaths: files,
+    baselinePath,
+    baselineFile: path.basename(baselinePath),
+    baselineMtimeMs,
+    ageMs: Math.max(0, Date.now() - baselineMtimeMs),
   }
 }
 
 function defaultFreshnessState(planning) {
   return {
-    lastPlanningMtimeMs: planning?.latestMtimeMs || 0,
+    lastPlanningMtimeMs: planning?.baselineMtimeMs || 0,
     workEventsSincePlanning: 0,
     lastWorkTool: "",
     lastWorkAt: 0,
@@ -391,7 +620,7 @@ function defaultFreshnessState(planning) {
 }
 
 function refreshFreshnessState(store, sessionID, task) {
-  const planning = latestPlanningInfo(task)
+  const planning = freshnessPlanningInfo(task)
   if (!sessionID) {
     return {
       state: defaultFreshnessState(planning),
@@ -401,10 +630,10 @@ function refreshFreshnessState(store, sessionID, task) {
   }
 
   const state = store.get(sessionID) || defaultFreshnessState(planning)
-  const planningUpdated = Boolean(planning && planning.latestMtimeMs > state.lastPlanningMtimeMs)
+  const planningUpdated = Boolean(planning && planning.baselineMtimeMs > state.lastPlanningMtimeMs)
 
   if (planningUpdated && planning) {
-    state.lastPlanningMtimeMs = planning.latestMtimeMs
+    state.lastPlanningMtimeMs = planning.baselineMtimeMs
     state.workEventsSincePlanning = 0
     state.lastWorkTool = ""
     state.lastWorkAt = 0
@@ -446,7 +675,7 @@ function freshnessReminder(task, state, planning) {
       : "Task files may be getting stale for the current task"
 
   return [
-    `[context-task-planning] ${urgency} \`${slug}\`: last planning update was \`${planning.latestFile}\` about ${ageMinutes}m ago, and ${count} tracked work step(s) have happened since then.`,
+    `[context-task-planning] ${urgency} \`${slug}\`: the freshness baseline is \`${planning.baselineFile}\` from about ${ageMinutes}m ago, and ${count} tracked work step(s) have happened since then.`,
     `Before more implementation or wrap-up, sync \`.planning/${slug}/\` with at least the current progress and next_action.`,
   ].join(" ")
 }
@@ -472,13 +701,39 @@ function freshnessTaskPrefix(task, state, planning) {
 
   return [
     `[context-task-planning] Task files may be stale for ${task.slug || "(unknown)"}.`,
-    `Last planning update: ${planning.latestFile}. Work steps since then: ${state.workEventsSincePlanning}.`,
+    `Freshness baseline: ${planning.baselineFile}. Work steps since then: ${state.workEventsSincePlanning}.`,
     "Before or after this subagent work, sync `.planning/<slug>/` with the current progress and next_action.",
   ].join("\n")
 }
 
+function normalizedToolName(toolName) {
+  const value = String(toolName || "").trim().toLowerCase()
+  if (!value) {
+    return ""
+  }
+
+  return value.split("/").pop().split(".").pop()
+}
+
 function trackableTool(toolName) {
-  return FRESHNESS_TRACKED_TOOLS.has(String(toolName || "").toLowerCase())
+  const normalized = normalizedToolName(toolName)
+  return normalized ? FRESHNESS_TRACKED_TOOLS.has(normalized) : false
+}
+
+function trackableParallelTool(args) {
+  if (!args || typeof args !== "object" || !Array.isArray(args.tool_uses)) {
+    return false
+  }
+
+  return args.tool_uses.some((toolUse) => trackableTool(toolUse?.recipient_name))
+}
+
+function trackableToolExecution(input) {
+  if (trackableTool(input?.tool)) {
+    return true
+  }
+
+  return normalizedToolName(input?.tool) === "parallel" && trackableParallelTool(input?.args)
 }
 
 function resolveExplicitSessionID(...values) {
@@ -512,7 +767,12 @@ function resolveExplicitSessionID(...values) {
 }
 
 export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, worktree }) => {
-  const baseCwd = worktree || directory || process.cwd()
+  const resolvedDirectory = directory ? path.resolve(directory) : ""
+  const resolvedWorktree = worktree ? path.resolve(worktree) : ""
+  const baseCwd =
+    (resolvedWorktree && resolvedWorktree !== "/" ? resolvedWorktree : "") ||
+    resolvedDirectory ||
+    process.cwd()
   const normalizedBaseCwd = path.resolve(baseCwd)
   const driftBySession = new Map()
   const promptBySession = new Map()
@@ -520,6 +780,12 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const completedTaskBySession = new Map()
   const freshnessBySession = new Map()
   const compactSyncBySession = new Map()
+  const postCompactContextBySession = new Map()
+  const planningRecoveryBySession = new Map()
+  const userPromptByMessageID = new Map()
+  const assistantStateByMessageID = new Map()
+  const latestAssistantBySession = new Map()
+  const latestDiffBySession = new Map()
   const observedSessionIDs = new Set()
   let lastExplicitSessionID = ""
 
@@ -650,10 +916,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       return
     }
 
-    if (previous !== taskSlug) {
-      await showToast("Current task", taskSlug, "info")
-    }
-
     if (drift?.classification === "likely-unrelated") {
       await showToast(
         "Task drift",
@@ -715,6 +977,334 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     return runJsonScript(COMPACT_SYNC_SCRIPT, scriptArgs, cwd)
   }
 
+  function readCompactContext(cwd = baseCwd, sessionID = "") {
+    const scriptArgs = []
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      scriptArgs.push("--session-key", sessionKey)
+    }
+    return runTextScript(COMPACT_CONTEXT_SCRIPT, scriptArgs, cwd)
+  }
+
+  function bindSessionTask(sessionID, taskSlug, role = "writer") {
+    const resolvedSessionKey = pluginSessionKey(sessionID)
+    if (!resolvedSessionKey || !taskSlug) {
+      return { ok: false, message: "missing session binding input" }
+    }
+
+    const args = [
+      TASK_GUARD_SCRIPT,
+      "bind-session-task",
+      "--cwd",
+      baseCwd,
+      "--session-key",
+      resolvedSessionKey,
+      "--task",
+      taskSlug,
+      "--role",
+      role,
+    ]
+    const result = spawnSync("python3", args, {
+      cwd: baseCwd,
+      encoding: "utf8",
+    })
+    const stderr = String(result.stderr || "").trim()
+    const stdout = String(result.stdout || "").trim()
+    return {
+      ok: !result.error && result.status === 0,
+      message: stderr || stdout,
+    }
+  }
+
+  async function maybeAutoBindPlanningTask(sessionID, currentTask, input) {
+    if (!sessionID || currentTask?.selection_source === "session_binding") {
+      return currentTask
+    }
+
+    const slugs = writtenPlanningTaskSlugs(input)
+    if (slugs.length !== 1) {
+      return currentTask
+    }
+
+    const targetSlug = slugs[0]
+    if (!targetSlug || targetSlug === currentTask?.slug) {
+      return currentTask
+    }
+
+    const writerResult = bindSessionTask(sessionID, targetSlug, "writer")
+    if (writerResult.ok) {
+      const reboundTask = readCurrentTask(baseCwd, sessionID)
+      await syncVisibleTask(sessionID, reboundTask, null)
+      await showToast(
+        "Task binding bootstrapped",
+        `Bound this session to .planning/${targetSlug}/ as writer after direct planning edits.`,
+        "info",
+      )
+      return reboundTask
+    }
+
+    const observerResult = bindSessionTask(sessionID, targetSlug, "observer")
+    if (observerResult.ok) {
+      const reboundTask = readCurrentTask(baseCwd, sessionID)
+      await syncVisibleTask(sessionID, reboundTask, null)
+      const detail = truncateLine(writerResult.message || "writer binding required additional isolation")
+      await showToast(
+        "Task binding bootstrapped as observer",
+        `Direct planning edits matched .planning/${targetSlug}/, but writer binding was blocked. ${detail}`,
+        "warning",
+      )
+      return reboundTask
+    }
+
+    return currentTask
+  }
+
+  function requirePlanningRecovery(sessionID) {
+    if (!sessionID) {
+      return
+    }
+
+    planningRecoveryBySession.set(sessionID, {
+      needState: true,
+      needProgress: true,
+    })
+  }
+
+  function maybeClearPlanningRecovery(sessionID) {
+    const recovery = planningRecoveryBySession.get(sessionID)
+    if (!recovery) {
+      return
+    }
+
+    if (!recovery.needState && !recovery.needProgress) {
+      planningRecoveryBySession.delete(sessionID)
+    }
+  }
+
+  function notePlanningRecoveryRead(sessionID, task, input) {
+    const recovery = planningRecoveryBySession.get(sessionID)
+    if (!recovery) {
+      return
+    }
+
+    const targets = readFileTargetsFromTool(input?.tool, input?.args)
+    if (targets.some((filePath) => matchesTaskPlanningFile(filePath, task, "state.json"))) {
+      recovery.needState = false
+    }
+    if (targets.some((filePath) => matchesTaskPlanningFile(filePath, task, "progress.md"))) {
+      recovery.needProgress = false
+    }
+
+    planningRecoveryBySession.set(sessionID, recovery)
+    maybeClearPlanningRecovery(sessionID)
+  }
+
+  function assistantState(messageID) {
+    if (!messageID) {
+      return null
+    }
+
+    let existing = assistantStateByMessageID.get(messageID)
+    if (!existing) {
+      existing = {
+        messageID,
+        sessionID: "",
+        parentID: "",
+        createdAt: "",
+        completedAt: "",
+        cwd: "",
+        actions: [],
+        notes: [],
+        files: [],
+        tools: [],
+      }
+      assistantStateByMessageID.set(messageID, existing)
+    }
+    return existing
+  }
+
+  function mergeAssistantMessage(info) {
+    if (!info || info.role !== "assistant" || !info.id) {
+      return null
+    }
+
+    const state = assistantState(info.id)
+    state.sessionID = String(info.sessionID || state.sessionID || "")
+    state.parentID = String(info.parentID || state.parentID || "")
+    state.createdAt = timestampFromUnixSeconds(info.time?.created) || state.createdAt
+    state.completedAt = timestampFromUnixSeconds(info.time?.completed) || state.completedAt
+    state.cwd = String(info.path?.cwd || state.cwd || "")
+    latestAssistantBySession.set(state.sessionID, state)
+    return state
+  }
+
+  function mergeAssistantPart(part) {
+    if (!part || !part.messageID) {
+      return null
+    }
+
+    const state = assistantState(part.messageID)
+    state.sessionID = String(part.sessionID || state.sessionID || "")
+
+    if (part.type === "patch" && Array.isArray(part.files)) {
+      state.files = uniqueItems([...state.files, ...part.files.map((file) => String(file || "").trim())])
+    }
+
+    if (part.type === "tool") {
+      state.tools = uniqueItems([...state.tools, String(part.tool || "").trim()])
+      if (part.state?.status === "completed") {
+        const title = truncateLine(part.state?.title || part.tool)
+        if (title) {
+          state.actions = uniqueItems([...state.actions, `Ran ${title}`])
+        }
+      }
+    }
+
+    if ((part.type === "text" || part.type === "reasoning") && typeof part.text === "string") {
+      const summary = truncateLine(part.text)
+      if (summary) {
+        state.notes = uniqueItems([...state.notes, summary])
+      }
+    }
+
+    latestAssistantBySession.set(state.sessionID, state)
+    return state
+  }
+
+  function mergeSessionDiff(sessionID, diff) {
+    if (!sessionID || !Array.isArray(diff)) {
+      return
+    }
+
+    latestDiffBySession.set(
+      sessionID,
+      uniqueItems(diff.map((entry) => String(entry?.file || "").trim())),
+    )
+  }
+
+  function recordUserPrompt(messageID, parts) {
+    if (!messageID) {
+      return
+    }
+
+    const prompt = collectPromptText(parts)
+    if (!prompt) {
+      return
+    }
+
+    userPromptByMessageID.set(messageID, prompt)
+  }
+
+  function readIdleSync(task, sessionID, payload) {
+    if (!task?.found || !sessionID || !payload?.sourceID) {
+      return null
+    }
+
+    const args = [
+      TASK_GUARD_SCRIPT,
+      "record-progress",
+      "--json",
+      "--cwd",
+      payload.cwd || baseCwd,
+      "--session-key",
+      pluginSessionKey(sessionID),
+      "--task",
+      task.slug,
+      "--source-id",
+      payload.sourceID,
+      "--timestamp",
+      payload.timestamp,
+      "--status",
+      payload.status || "complete",
+      "--checkpoint",
+      payload.checkpoint,
+      "--task-status",
+      task.status || "",
+      "--mode",
+      task.mode || "",
+      "--phase",
+      task.current_phase || "",
+      "--next-action",
+      task.next_action || "",
+      "--primary-repo",
+      task.primary_repo || "",
+    ]
+
+    for (const repo of task.repo_scope || []) {
+      args.push("--repo", String(repo))
+    }
+    for (const action of payload.actions || []) {
+      args.push("--action", action)
+    }
+    for (const filePath of payload.files || []) {
+      args.push("--file", filePath)
+    }
+    for (const note of payload.notes || []) {
+      args.push("--note", note)
+    }
+
+    return runJsonCommand("python3", args, payload.cwd || baseCwd)
+  }
+
+  function idleSyncPayload(sessionID, trigger = "") {
+    const assistant = latestAssistantBySession.get(sessionID)
+    if (!assistant?.messageID || !assistant.completedAt) {
+      return null
+    }
+
+    const files = uniqueItems([...(assistant.files || []), ...(latestDiffBySession.get(sessionID) || [])])
+    const tools = uniqueItems(assistant.tools || [])
+    if (files.length === 0 && tools.length === 0) {
+      return null
+    }
+
+    if (trigger !== "session.idle" && files.length === 0) {
+      return null
+    }
+
+    const prompt = truncateLine(userPromptByMessageID.get(assistant.parentID) || "")
+    const actions = uniqueItems([
+      prompt ? `Handled: ${prompt}` : "Handled the latest OpenCode task turn.",
+      ...(assistant.actions || []),
+    ]).slice(0, 4)
+    const notes = uniqueItems([
+      tools.length > 0 ? `Tools: ${tools.join(", ")}` : "",
+      ...(assistant.notes || []),
+    ]).slice(0, 4)
+
+    return {
+      sourceID: `opencode-idle:${assistant.messageID}`,
+      timestamp: assistant.completedAt || assistant.createdAt || new Date().toISOString(),
+      status: "complete",
+      checkpoint: actions[0] || "Recorded OpenCode idle sync progress.",
+      actions,
+      files,
+      notes,
+      cwd: assistant.cwd || baseCwd,
+    }
+  }
+
+  function maybeSyncJournalFromActivity(task, session, sessionID, trigger) {
+    if (!sessionID || !task?.found || task.binding_role === "observer") {
+      return false
+    }
+
+    const payload = idleSyncPayload(sessionID, trigger)
+    if (!payload) {
+      return false
+    }
+
+    const result = readIdleSync(task, sessionID, payload)
+    if (!result?.ok) {
+      return false
+    }
+
+    latestDiffBySession.delete(sessionID)
+    const cacheSessionID = sessionCacheKey(session, true)
+    refreshFreshnessState(freshnessBySession, cacheSessionID, readCurrentTask(baseCwd, session?.readSessionID || sessionID))
+    return true
+  }
+
   return {
     "chat.message": async (input, output) => {
       const session = sessionContext(input, output)
@@ -726,6 +1316,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
           taskBySession.delete(session.explicitSessionID)
         }
         return
+      }
+
+      recordUserPrompt(output.message?.id || input.messageID || "", output.parts)
+      if (session.readSessionID) {
+        latestDiffBySession.delete(session.readSessionID)
       }
 
       const prompt = collectPromptText(output.parts)
@@ -769,8 +1364,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         (cacheSessionID ? driftBySession.get(cacheSessionID) : null) ||
         readDrift(prompt, baseCwd, session.readSessionID)
       const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, cacheSessionID, task)
+      const compactRecovery = visibleSessionID ? postCompactContextBySession.get(visibleSessionID) || "" : ""
+      const planningRecovery = visibleSessionID ? planningRecoveryBySession.get(visibleSessionID) || null : null
 
       if (task && task.found) {
+        if (compactRecovery) {
+          output.system.push(compactRecovery)
+          postCompactContextBySession.delete(visibleSessionID)
+        }
+        const planningRecoveryText = planningRecoveryReminder(task, planningRecovery)
+        if (planningRecoveryText) {
+          output.system.push(planningRecoveryText)
+        }
         output.system.push(currentTaskSummary(task))
         const reminder = driftReminder(drift)
         if (reminder) {
@@ -786,6 +1391,26 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const noTaskHint = noActiveTaskReminder(drift)
       if (noTaskHint) {
         output.system.push(noTaskHint)
+      }
+    },
+
+    "experimental.session.compacting": async (input, output) => {
+      const sessionID = resolveExplicitSessionID(input)
+      const task = readCurrentTask(baseCwd, sessionID)
+      if (!pluginEnabled(task) || !task?.found) {
+        return
+      }
+
+      requirePlanningRecovery(sessionID)
+
+      const syncResult = readCompactSync(baseCwd, sessionID)
+      const refreshedTask = readCurrentTask(baseCwd, sessionID)
+      const warning = compactSyncWarningText(refreshedTask, syncResult)
+      const compactContext = readCompactContext(baseCwd, sessionID)
+      const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
+      if (recovery) {
+        output.context.push(recovery)
+        postCompactContextBySession.set(sessionID, recovery)
       }
     },
 
@@ -814,6 +1439,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         cacheSessionID,
         currentTask,
       )
+      const planningRecovery = cacheSessionID ? planningRecoveryBySession.get(cacheSessionID) || null : null
       const prefixes = []
 
       if (preflight) {
@@ -836,6 +1462,11 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
       if (freshnessPrefix) {
         prefixes.push(freshnessPrefix)
+      }
+
+      const planningRecoveryText = planningRecoveryReminder(currentTask, planningRecovery)
+      if (planningRecoveryText) {
+        prefixes.push(planningRecoveryText)
       }
 
       const prefix = prefixes.join("\n\n")
@@ -870,9 +1501,13 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const session = sessionContext(input, output)
       const visibleSessionID = session.explicitSessionID || session.fallbackSessionID
       const previousTaskSlug = visibleSessionID ? taskBySession.get(visibleSessionID) || "" : ""
-      const task = readCurrentTask(baseCwd, session.readSessionID)
+      let task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
+      }
+
+      if (session.readSessionID) {
+        task = await maybeAutoBindPlanningTask(session.readSessionID, task, input)
       }
 
       if (visibleSessionID) {
@@ -902,13 +1537,16 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const toolName = String(input.tool || "").toLowerCase()
       const cacheSessionID = sessionCacheKey(session, true)
+      if (cacheSessionID) {
+        notePlanningRecoveryRead(cacheSessionID, task, input)
+      }
       const { state, planning, planningUpdated } = refreshFreshnessState(
         freshnessBySession,
         cacheSessionID,
         task,
       )
 
-      if (!planning || !trackableTool(toolName) || planningUpdated || !cacheSessionID) {
+      if (!planning || !trackableToolExecution(input) || planningUpdated || !cacheSessionID) {
         return
       }
 
@@ -918,22 +1556,89 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       freshnessBySession.set(cacheSessionID, state)
 
       const toast = freshnessToastMessage(task, state, planning)
-      if (!toast || state.toastPlanningMtimeMs === planning.latestMtimeMs) {
+      if (!toast || state.toastPlanningMtimeMs === planning.baselineMtimeMs) {
         return
       }
 
-      state.toastPlanningMtimeMs = planning.latestMtimeMs
+      state.toastPlanningMtimeMs = planning.baselineMtimeMs
       freshnessBySession.set(cacheSessionID, state)
       await showToast(toast.title, toast.message, toast.variant)
     },
 
     event: async ({ event }) => {
       const compactEvent = hasCompactSignal(event)
+      if (event?.type === "message.updated") {
+        mergeAssistantMessage(event.properties?.info)
+      }
+
+      if (event?.type === "message.part.updated") {
+        mergeAssistantPart(event.properties?.part)
+      }
+
+      if (event?.type === "session.diff") {
+        mergeSessionDiff(event.properties?.sessionID, event.properties?.diff)
+      }
+
+      if (event?.type === "session.idle") {
+        const explicitSessionID = resolveExplicitSessionID(event)
+        if (!explicitSessionID) {
+          return
+        }
+
+        const session = sessionContext(event)
+        const task = readCurrentTask(baseCwd, session.readSessionID)
+        if (!pluginEnabled(task) || !task?.found || task.binding_role === "observer") {
+          return
+        }
+        maybeSyncJournalFromActivity(task, session, explicitSessionID, "session.idle")
+        return
+      }
+
+      if (event?.type === "session.compacted") {
+        const explicitSessionID = resolveExplicitSessionID(event)
+        if (!explicitSessionID) {
+          return
+        }
+
+        const session = sessionContext(event)
+        const task = readCurrentTask(baseCwd, session.readSessionID)
+        if (!pluginEnabled(task) || !task?.found) {
+          return
+        }
+
+        if (!shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
+          return
+        }
+
+        requirePlanningRecovery(explicitSessionID)
+
+        const syncResult = readCompactSync(baseCwd, session.readSessionID)
+        const refreshedTask = readCurrentTask(baseCwd, session.readSessionID)
+        const warning = compactSyncWarningText(refreshedTask, syncResult)
+        const compactContext = readCompactContext(baseCwd, session.readSessionID)
+        const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
+        if (recovery) {
+          postCompactContextBySession.set(explicitSessionID, recovery)
+        }
+
+        if (!syncResult || syncResult.ok === false) {
+          const toast = compactSyncWarningToast(refreshedTask, syncResult)
+          await showToast(toast.title, toast.message, toast.variant)
+        }
+        const cacheSessionID = sessionCacheKey(session, true)
+        refreshFreshnessState(freshnessBySession, cacheSessionID, refreshedTask)
+        await syncVisibleTask(explicitSessionID, refreshedTask, null)
+        return
+      }
+
       if (
         !compactEvent &&
         event?.type !== "session.created" &&
         event?.type !== "session.updated" &&
-        event?.type !== "tui.session.select"
+        event?.type !== "tui.session.select" &&
+        event?.type !== "session.status" &&
+        event?.type !== "message.updated" &&
+        event?.type !== "session.diff"
       ) {
         return
       }
@@ -957,6 +1662,14 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       if (shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
         const compactSync = readCompactSync(baseCwd, session.readSessionID)
         task = readCurrentTask(baseCwd, session.readSessionID)
+        if (compactEvent) {
+          const warning = compactSyncWarningText(task, compactSync)
+          const compactContext = readCompactContext(baseCwd, session.readSessionID)
+          const recovery = compactRecoverySystemPrompt(task, compactContext, warning)
+          if (recovery) {
+            postCompactContextBySession.set(explicitSessionID, recovery)
+          }
+        }
         if (!compactSync || compactSync.ok === false) {
           const toast = compactSyncWarningToast(task, compactSync)
           await showToast(toast.title, toast.message, toast.variant)
@@ -965,6 +1678,14 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const cacheSessionID = sessionCacheKey(session, true)
       refreshFreshnessState(freshnessBySession, cacheSessionID, task)
+      if (
+        event?.type === "session.updated" ||
+        event?.type === "session.status" ||
+        event?.type === "message.updated" ||
+        event?.type === "session.diff"
+      ) {
+        maybeSyncJournalFromActivity(task, session, explicitSessionID, `event:${event.type}`)
+      }
       await syncVisibleTask(session.explicitSessionID, task, null)
     },
   }

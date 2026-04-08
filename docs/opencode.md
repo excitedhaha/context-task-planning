@@ -29,7 +29,7 @@ A global install makes the skill available under:
 The OpenCode plugin is a thin UI layer over the same file-backed task state. Once enabled, it can:
 
 - prefix the session title as `task:<slug> | ...`
-- show toasts when the current task is first detected or when drift looks likely
+- show toasts for drift, stale planning, and task-binding/bootstrap events
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
 - call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
@@ -72,10 +72,10 @@ sh skill/scripts/install-macos.sh --skip-opencode-plugin
 After the plugin is enabled and OpenCode is restarted, you should see:
 
 - the session title prefixed as `task:<slug> | ...`
-- an info toast when the current task is first detected
 - a warning toast when a prompt looks like likely task drift
 - a warning toast when tracked work has happened but planning files look stale
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
+- if a fresh or fallback-resolved session directly edits one task's `.planning/<slug>/state.json|task_plan.md|progress.md|findings.md`, OpenCode now auto-bootstraps a binding for that task instead of silently staying on the old fallback task; it tries writer first and falls back to observer with a warning when repo isolation blocks writer ownership
 - the same task still resolving when OpenCode starts inside a registered repo path or recorded worktree under a parent workspace
 - in some repos, the injected task summary can also mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
 - treat that spec line as scoping help, not as extra setup; only use the manual override path if the work really needs one authoritative ref
@@ -94,10 +94,12 @@ Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these mom
 
 - `chat.message` - after a user message is assembled; cache prompt text, classify drift, and try to sync the visible task title
 - `experimental.chat.system.transform` - right before the model receives system context; inject current-task, drift, and freshness reminders
+- `experimental.session.compacting` - right before OpenCode compacts a session; run the shared compact-sync helper, then feed compact recovery context into the compaction prompt and cache one resume-time recovery injection for the next turn
 - `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
-- `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed
-- `event` - on host events such as `session.created`, `session.updated`, and `tui.session.select`; sync session titles for already-bound tasks and, when the event payload carries a compact/compression signal, run the shared safe compact-sync helper
+- `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed; freshness tracking normalizes namespaced tool names such as `functions.bash`, inspects `multi_tool_use.parallel` payloads for nested tracked work like `functions.apply_patch`, and uses `state.json` / `progress.md` as the sync-critical freshness baseline before falling back to the broader planning set
+- `tool.execute.after` also watches for direct writes to one task's main planning files; when a session is still running on fallback resolution, that planning write now bootstraps the matching session binding so later compact sync and writer reminders target the task the agent is actually editing
+- `event` - on host events such as `session.created`, `session.updated`, `session.compacted`, and `tui.session.select`; sync session titles for already-bound tasks, cache message and diff metadata from `message.updated` / `message.part.updated` / `session.diff`, run a deterministic writer-only journal sync on `session.idle`, and fall back to the same deduped journal sync on later visible events such as `session.updated`, `session.status`, `message.updated`, or `session.diff` when the host never emits `session.idle` for that completed turn
 
 Typical message flow:
 
@@ -108,14 +110,43 @@ Typical message flow:
 
 ## Why task files do not always auto-sync
 
-The plugin can make session state visible and inject reminders, but it does not deterministically rewrite `state.json`, `progress.md`, `task_plan.md`, or `findings.md` on its own.
+The plugin can make session state visible and inject reminders, and it now has one narrow automatic writeback path for writer sessions after a completed turn with real work, using `session.idle` when available and a deduped visible-event fallback when the host skips that event. It still does not act as a general planner or rewrite every task file on every turn.
 
 In practice this means:
 
 - session-title sync can be host-driven and deterministic once the session binding is correct
-- planning-file sync is still agent-driven unless you add a dedicated post-response writeback path
+- `state.json` and `progress.md` can now receive a deterministic append-only journal update after a writer session finishes a turn with real tool/patch/diff activity
+- compact-time recovery is now two-stage: OpenCode injects compact recovery context into the compaction prompt itself, then injects the same compact recovery context once on the first post-compaction turn so the model does not rely only on the compressed transcript summary
+- `task_plan.md` and `findings.md` are still agent-driven; the plugin does not try to infer or rewrite Hot Context, decisions, or findings from transcript history
 - the shared `sh skill/scripts/compact-sync.sh` helper is now wired to OpenCode on a best-effort basis when event payloads visibly mention compact/compression; writer sessions may repair warning-level drift and refresh the derived compact artifact, while observer sessions stay derived-only
 - writer-session reminders should explicitly say to sync `progress.md` and `state.json` whenever a turn materially changes progress, blockers, or `next_action`
+
+## Idle journal sync
+
+The automatic journal sync path is intentionally narrow:
+
+- it only runs for the writer session bound to the current task
+- it only runs when the cached assistant turn shows real tool, patch, or diff activity
+- it prefers `session.idle`, but if OpenCode skips that event for a finished turn it can fall back on the next visible session event that still carries the same completed assistant state
+- it records one deduped source id per assistant message under `.planning/<slug>/.derived/opencode_idle_sync.json`
+- it updates `state.json.updated_at` and `state.json.latest_checkpoint`
+- it refreshes the `## Snapshot` block in `progress.md`
+- it prepends one append-only `## Session Log` entry with actions, files touched, and compact notes derived from the latest turn
+
+This keeps the plugin advisory for planning content while still giving OpenCode a minimal, deterministic writeback layer for the most common "I changed code but forgot to sync progress" case.
+
+## Compact recovery
+
+OpenCode compaction used to be much easier to drift after than Claude because the plugin only noticed some compact-looking events and refreshed the derived artifact on a best-effort basis.
+
+The recovery path is now stricter:
+
+- `experimental.session.compacting` runs the shared compact sync before compaction and appends the derived compact context to the compaction prompt
+- the plugin now recognizes real `session.compacted` events directly instead of relying only on loose `compact` keyword matches
+- after compaction, the next `experimental.chat.system.transform` injects one resume-time recovery prompt that tells the model to treat the compact artifact as the current hot context
+- after that first resume injection, OpenCode now keeps a narrower persistent reminder on subsequent turns until the session actually reads the current task's `state.json` and `progress.md`; `task_plan.md` stays a conditional follow-up when Hot Context or decisions matter
+
+This still is not a hard tool-enforced file read, but it closes the main gap that let OpenCode resume from an over-compressed transcript without rehydrating the task context.
 
 ## Task preflight
 
@@ -143,8 +174,8 @@ The plugin still keeps title and toast behavior unchanged in this first pass.
 ## Current limits
 
 - the plugin SDK exposes hooks, session title updates, and TUI toasts, but not a dedicated custom sidebar or status bar widget API
-- the plugin is advisory, not a second planner; the model and tools still update `.planning/`
-- compact sync is heuristic because the current SDK does not expose a dedicated compaction lifecycle hook; the plugin looks for compact/compression signals on visible session events and otherwise stays silent
+- the plugin is still not a second planner; its automatic writeback stays limited to deterministic `state.json` / `progress.md` journal sync, preferring `session.idle` and falling back to later visible events only after file evidence for the completed turn arrives
+- compact sync is heuristic, but the plugin now also uses the dedicated `experimental.session.compacting` hook when OpenCode exposes it and still falls back to compact/compression signals on visible session events otherwise
 - if you do not see a dedicated sidebar widget, that is expected today
 
 ## Manual fallback
