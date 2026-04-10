@@ -57,7 +57,7 @@ For work like this, the agent should usually pick the skill automatically. Only 
 You should see one of these:
 
 - `Claude Code` - `task:<slug>` in the status line
-- `OpenCode` - `task:<slug> | ...` in the session title
+- `OpenCode` - `task:<slug> | ...` in the session title; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` and `/task-list`
 - `Codex` - `sh skill/scripts/current-task.sh` prints the active task plus the recommended next step; `--compact` stays available for prompts and status bars
 
 If that cue is missing, use:
@@ -65,6 +65,17 @@ If that cue is missing, use:
 - `docs/claude.md`
 - `docs/opencode.md`
 - `docs/codex.md`
+
+For OpenCode specifically, after you enable the OpenCode command helpers, the bundled command set covers the common task loop:
+
+- `/task-init <task title>`
+- `/task-current`
+- `/task-list`
+- `/task-validate`
+- `/task-drift <new request>`
+- `/task-done [slug]`
+
+`docs/opencode.md` has the install, smoke-test, and troubleshooting details.
 
 #### Step 4: Simulate one recovery
 

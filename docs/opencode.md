@@ -2,6 +2,13 @@
 
 This page only covers OpenCode-specific setup and behavior. Use `README.md` for the first success case and `docs/onboarding.md` for the shared workflow.
 
+OpenCode support in this project has two thin host-specific layers over the same shell-first runtime:
+
+- an OpenCode plugin for visibility, toasts, session binding, and native-`Task` preflight
+- bundled slash commands for common task workflows such as init, inspect, list, validate, and drift-check
+
+If you only want the shortest path: install the skill, run the plugin and command helpers once, restart OpenCode, then smoke-test `/task-current` and `/task-list`.
+
 ## Install
 
 Recommended install:
@@ -24,11 +31,17 @@ A global install makes the skill available under:
 ~/.config/opencode/skills/context-task-planning
 ```
 
+The OpenCode-specific extras install into separate locations:
+
+- plugin: `~/.config/opencode/plugins/`
+- slash commands: `~/.config/opencode/commands/`
+
 ## What OpenCode adds
 
 The OpenCode plugin is a thin UI layer over the same file-backed task state. Once enabled, it can:
 
 - prefix the session title as `task:<slug> | ...`
+- expose bundled slash commands for common task entry points
 - show toasts for drift, stale planning, and task-binding/bootstrap events
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
@@ -37,7 +50,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - carry repo context for parent-workspace multi-repo tasks
 - stay quiet in repositories that do not already use `.planning/`
 
-## Enable the OpenCode plugin
+## Enable the OpenCode plugin and commands
 
 If you installed from a local clone with:
 
@@ -45,33 +58,37 @@ If you installed from a local clone with:
 sh skill/scripts/install-macos.sh
 ```
 
-the OpenCode plugin is installed automatically by default.
+the OpenCode plugin and bundled slash commands are installed automatically by default, so you can usually skip straight to restarting OpenCode and running the smoke test below.
 
-If you installed through `npx skills add`, run the bundled helper once because OpenCode loads skills and plugins from different directories:
+If you installed through `npx skills add`, run the bundled helpers once because OpenCode loads skills, plugins, and commands from different directories:
 
 ```bash
 sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh
+sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh
 ```
 
 You can also run the helper from a local clone:
 
 ```bash
 sh skill/scripts/install-opencode-plugin.sh
+sh skill/scripts/install-opencode-commands.sh
 ```
 
-Then restart OpenCode.
+Then restart OpenCode so it picks up new plugins and slash commands.
 
-If you want the skill symlink but not the runtime plugin from the local installer, use:
+If you want the skill symlink but not the runtime plugin or slash commands from the local installer, use:
 
 ```bash
 sh skill/scripts/install-macos.sh --skip-opencode-plugin
+sh skill/scripts/install-macos.sh --skip-opencode-commands
 ```
 
 ## What you should notice
 
-After the plugin is enabled and OpenCode is restarted, you should see:
+After the plugin and commands are enabled and OpenCode is restarted, you should see:
 
 - the session title prefixed as `task:<slug> | ...`
+- bundled slash commands such as `/task-init` appearing in the OpenCode command menu
 - a warning toast when a prompt looks like likely task drift
 - a warning toast when tracked work has happened but planning files look stale
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
@@ -85,6 +102,46 @@ Sample illustration:
 ![OpenCode title and toast sample](assets/opencode-title-toast-sample.svg)
 
 This is a sample illustration of the expected title/toast fallback, not a live screenshot from your machine.
+
+## Bundled slash commands
+
+Current bundled commands:
+
+- `/task-init <task title>` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/init-task.sh "<task title>"` and report the created task
+- `/task-current` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/current-task.sh` and summarize the active task plus next action
+- `/task-list` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/list-tasks.sh` and summarize the available tasks in the workspace
+- `/task-validate` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/validate-task.sh` and summarize whether the current task state is valid
+- `/task-drift <new request>` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/check-task-drift.sh --prompt "<new request>" --json` and summarize whether the new ask still fits the current task
+- `/task-done [slug]` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/done-task.sh [slug]` and mark the current or named task done when verification and safety checks pass
+
+The command files are installed into:
+
+```text
+~/.config/opencode/commands/task-current.md
+~/.config/opencode/commands/task-done.md
+~/.config/opencode/commands/task-init.md
+~/.config/opencode/commands/task-list.md
+~/.config/opencode/commands/task-drift.md
+~/.config/opencode/commands/task-validate.md
+```
+
+These commands stay thin on purpose: the underlying shell scripts remain the source of truth for task resolution, initialization, dirty-worktree safety, and session binding behavior.
+
+## Quick validation and troubleshooting
+
+Fastest smoke test after install:
+
+- run `/task-current` to confirm OpenCode can resolve the current task
+- run `/task-list` to confirm the workspace task list is available
+- run `/task-validate` to confirm the validation path responds without auto-fixing warnings
+
+If the commands do not appear right away:
+
+- make sure the command files exist under `~/.config/opencode/commands/`
+- restart OpenCode after running the install helper
+- rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh` if the command symlinks are missing
+- rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` if the title/toast behavior is missing but slash commands are present
+- if the slash commands work but the task title never updates, verify that the plugin loaded and that you restarted OpenCode after installation
 
 ## Plugin lifecycle
 
