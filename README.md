@@ -38,6 +38,8 @@ npx skills add excitedhaha/context-task-planning -g
 
 Choose `context-task-planning` and the agent(s) you want when prompted.
 
+If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
+
 For preview or local contributor install paths, see `docs/sharing.md`.
 
 ### 2. Give the agent one real task
@@ -51,7 +53,7 @@ For multi-step or recovery-sensitive work, the agent should usually pick this sk
 ### 3. Check that the task became visible
 
 - `Claude Code` - look for `task:<slug>` in the status line
-- `OpenCode` - look for `task:<slug> | ...` in the session title plus task/drift toasts
+- `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
 - `Codex` - run `sh skill/scripts/current-task.sh` for the full summary and recommended next step, or `sh skill/scripts/current-task.sh --compact` for a prompt-friendly cue
 
 In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.
@@ -70,7 +72,7 @@ When the task has grown enough that replaying multiple markdown files feels nois
 
 - `docs/onboarding.md` - the full user journey, from first success to multi-session, multi-repo, worktree, delegate, and verification workflows
 - `docs/claude.md` - Claude-specific setup and cues
-- `docs/opencode.md` - OpenCode-specific plugin behavior and limits
+- `docs/opencode.md` - OpenCode-specific install steps, slash commands, plugin behavior, and troubleshooting
 - `docs/codex.md` - Codex-specific shell-first workflow
 - `docs/design.md` - the deeper architecture
 - `docs/spec-aware-task-runtime.md` - spec-aware design notes, mainly for contributors or deeper implementation questions
@@ -103,6 +105,17 @@ The shared shell entry points now map cleanly to those basics:
 - `sh skill/scripts/current-task.sh --compact` - short status for prompts, tmux, or status bars
 - `sh skill/scripts/compact-context.sh` - compact recovery view for larger tasks; see `docs/onboarding.md`
 - `sh skill/scripts/validate-task.sh --fix-warnings` - repair warning-level snapshot drift after manual edits or long-running work
+
+OpenCode users also get a small slash-command surface for the same high-frequency flows:
+
+- `/task-init <task title>` - create a tracked task
+- `/task-current` - inspect the current task and next action
+- `/task-list` - list existing tasks in the workspace
+- `/task-validate` - validate the current task without auto-fixing warnings
+- `/task-drift <new request>` - check whether a new ask still fits the current task
+- `/task-done [slug]` - mark the current or named task done after verification
+
+See `docs/opencode.md` for OpenCode-specific install details, troubleshooting, and smoke tests.
 
 ## What stays on disk
 

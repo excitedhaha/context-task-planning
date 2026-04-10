@@ -6,15 +6,19 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SKILL_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 SKILL_NAME="context-task-planning"
 INSTALL_OPENCODE_PLUGIN=1
+INSTALL_OPENCODE_COMMANDS=1
 
 for arg in "$@"; do
     case "$arg" in
         --skip-opencode-plugin)
             INSTALL_OPENCODE_PLUGIN=0
             ;;
+        --skip-opencode-commands)
+            INSTALL_OPENCODE_COMMANDS=0
+            ;;
         *)
             echo "Unknown argument: $arg" >&2
-            echo "Usage: sh skill/scripts/install-macos.sh [--skip-opencode-plugin]" >&2
+            echo "Usage: sh skill/scripts/install-macos.sh [--skip-opencode-plugin] [--skip-opencode-commands]" >&2
             exit 1
             ;;
     esac
@@ -56,7 +60,14 @@ else
     echo "Skipped OpenCode plugin install."
 fi
 
+if [ "$INSTALL_OPENCODE_COMMANDS" -eq 1 ]; then
+    sh "$SCRIPT_DIR/install-opencode-commands.sh"
+else
+    echo "Skipped OpenCode command install."
+fi
+
 echo ""
 echo "Install complete."
 echo "If OpenCode uses a custom skill source list, make sure ~/.config/opencode/skills is enabled."
 echo "Use --skip-opencode-plugin if you want the skill without the OpenCode runtime plugin."
+echo "Use --skip-opencode-commands if you want the skill without the OpenCode slash commands."
