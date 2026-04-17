@@ -50,6 +50,8 @@ if not commands or "init-task.sh" not in commands[0]:
 PY
 printf '%s\n' "$EMPTY_TEXT" | grep -F "Recommended next step: init-task" >/dev/null || fail "empty workspace text output missed init guidance"
 
+STATUSLINE_PY="$CLAUDE_HOOKS_DIR/statusline.py"
+
 RESUME_ROOT="$WORKDIR/resume"
 mkdir -p "$RESUME_ROOT"
 cd "$RESUME_ROOT"
@@ -74,6 +76,35 @@ if not commands or "resume-task.sh paused-task" not in commands[0]:
     raise SystemExit(f"expected resume command, got: {commands!r}")
 PY
 printf '%s\n' "$RESUME_TEXT" | grep -F "Resume candidates:" >/dev/null || fail "resume text output missed resume candidates"
+
+RESUME_STATUSLINE=$(printf '%s' '{"cwd":"'"$RESUME_ROOT"'"}' | "$PYTHON_BIN" "$STATUSLINE_PY")
+printf '%s\n' "$RESUME_STATUSLINE" | grep -F " task!:" >/dev/null && fail "paused-only workspace status line should not show explicit task cue"
+printf '%s\n' "$RESUME_STATUSLINE" | grep -F " obs:" >/dev/null && fail "paused-only workspace status line should not show observer cue"
+printf '%s\n' "$RESUME_STATUSLINE" | grep -F " wksp:" >/dev/null && fail "paused-only workspace status line should not show workspace cue"
+
+LATEST_ROOT="$WORKDIR/latest"
+mkdir -p "$LATEST_ROOT"
+cd "$LATEST_ROOT"
+sh "$SCRIPT_DIR/init-task.sh" --slug latest-demo --title "Latest demo" >/dev/null
+WORKSPACE_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | "$PYTHON_BIN" "$STATUSLINE_PY")
+printf '%s\n' "$WORKSPACE_STATUSLINE" | grep -F "wksp:latest-demo" >/dev/null || fail "workspace fallback status line missed wksp cue"
+rm "$LATEST_ROOT/.planning/.active_task"
+LATEST_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --json)
+"$PYTHON_BIN" - "$LATEST_JSON" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+if payload.get("slug") != "latest-demo":
+    raise SystemExit(f"unexpected latest fallback task: {payload.get('slug')!r}")
+if payload.get("selection_source") != "latest":
+    raise SystemExit(f"unexpected latest fallback source: {payload.get('selection_source')!r}")
+PY
+LATEST_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | "$PYTHON_BIN" "$STATUSLINE_PY")
+printf '%s\n' "$LATEST_STATUSLINE" | grep -F " task!:" >/dev/null && fail "latest fallback status line should not show explicit task cue"
+printf '%s\n' "$LATEST_STATUSLINE" | grep -F " obs:" >/dev/null && fail "latest fallback status line should not show observer cue"
+printf '%s\n' "$LATEST_STATUSLINE" | grep -F " wksp:" >/dev/null && fail "latest fallback status line should not show workspace cue"
+printf '%s\n' "$LATEST_STATUSLINE" | grep -F "latest-demo" >/dev/null && fail "latest fallback status line leaked task slug"
 
 MULTI_ROOT="$WORKDIR/multi"
 mkdir -p "$MULTI_ROOT"

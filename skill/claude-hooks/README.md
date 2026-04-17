@@ -5,7 +5,7 @@ This directory contains an optional Claude Code automation layer for `context-ta
 The core skill remains portable across Claude Code, Codex, and OpenCode.
 These hooks are Claude-only enhancements for users who want automatic context injection.
 
-When enabled, the most visible cue is Claude Code's native status line showing the active task as `task:<slug>`.
+When enabled, the most visible cue is Claude Code's native status line showing explicit writer bindings as `task!:<slug>`, explicit observer bindings as `obs:<slug>`, and workspace fallback selection as `wksp:<slug>`.
 
 ## What the hooks do
 

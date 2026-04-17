@@ -28,8 +28,9 @@ A global install makes the skill available under:
 
 After you enable the bundled adapter, Claude Code can surface the shared file-backed task state through:
 
-- a native status line cue, usually `task:<slug>`
-- `obs:<slug>` when the session is observe-only
+- a native status line cue such as `task!:<slug>` for explicit writer binding
+- `obs:<slug>` when the current session is explicitly bound as observe-only
+- `wksp:<slug>` when Claude is only following the shared workspace fallback pointer
 - task recovery on session start from the session binding or workspace fallback
 - safe compact-time sync before Claude compresses context: writer sessions may repair warning-level snapshot drift and refresh `.derived/context_compact.json`, while observer sessions only refresh the derived compact artifact
 - prompt-time reminders when a request looks like likely task drift
@@ -54,7 +55,7 @@ The bundled config includes both hooks and `statusLine`, so copying it is enough
 
 After restarting Claude Code, you should see:
 
-- the current task in the native status line
+- an explicit task cue in the native status line for per-session bindings, or a weaker workspace fallback cue when only `.planning/.active_task` is set
 - automatic task-context recovery when the session starts
 - on context compaction, Claude refreshes compact recovery context from the shared helper instead of replaying only the shorter session-start snapshot
 - a reminder before Claude silently mixes likely-unrelated work into the current task

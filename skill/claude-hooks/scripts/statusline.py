@@ -220,24 +220,17 @@ def resolve_task(cwd: str, session_key: str = "") -> dict | None:
 
 def task_segment(cwd: str, payload: dict) -> str | None:
     task = resolve_task(cwd, session_key_from_payload(payload))
-    if not task:
+    if not task or not task.get("found"):
         return None
 
-    if task.get("found"):
-        slug = shorten_label(task.get("slug") or "(unknown)")
-        prefix = "task"
-        style = BG_BLUE + WHITE
+    slug = shorten_label(task.get("slug") or "(unknown)")
+    source = task.get("selection_source")
+    if source == "active_pointer":
+        return color(f" wksp:{slug} ", YELLOW)
+    if source in {"session_binding", "session_pin"}:
         if task.get("binding_role") == "observer":
-            prefix = "obs"
-            style = BG_RED + WHITE
-        elif task.get("selection_source") in {"session_binding", "session_pin"}:
-            prefix = "task!"
-            style = BG_GREEN + BLACK
-        return color(f" {prefix}:{slug} ", style)
-
-    plan_root = task.get("plan_root")
-    if isinstance(plan_root, str) and Path(plan_root).is_dir():
-        return color(" task:none ", YELLOW)
+            return color(f" obs:{slug} ", BG_RED + WHITE)
+        return color(f" task!:{slug} ", BG_GREEN + BLACK)
     return None
 
 

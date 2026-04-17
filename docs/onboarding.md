@@ -56,7 +56,7 @@ For work like this, the agent should usually pick the skill automatically. Only 
 
 You should see one of these:
 
-- `Claude Code` - `task:<slug>` in the status line
+- `Claude Code` - `task!:<slug>` for explicit writer bindings, `obs:<slug>` for explicit observer bindings, or `wksp:<slug>` for the workspace fallback pointer
 - `OpenCode` - `task:<slug> | ...` in the session title; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` and `/task-list`
 - `Codex` - `sh skill/scripts/current-task.sh` prints the active task plus the recommended next step; `--compact` stays available for prompts and status bars
 
