@@ -10,7 +10,7 @@ Recommended install:
 npx skills add excitedhaha/context-task-planning -g
 ```
 
-Choose `context-task-planning` and the Claude Code agent when prompted.
+Choose `context-task-planning`, the Claude Code agent, and any bundled `task-*` entry skills you want when prompted.
 
 Local fallback while developing from a clone:
 
@@ -18,11 +18,15 @@ Local fallback while developing from a clone:
 sh skill/scripts/install-macos.sh
 ```
 
-A global install makes the skill available under:
+That local installer links the main `context-task-planning` skill plus the bundled `task-*` Claude entry skills into `~/.claude/skills/`.
+
+A global install keeps the main skill under:
 
 ```text
 ~/.claude/skills/context-task-planning
 ```
+
+Any selected bundled `task-*` entry skills are installed as sibling directories under `~/.claude/skills/`.
 
 ## What Claude adds
 
@@ -50,6 +54,19 @@ After you enable the bundled adapter, Claude Code can surface the shared file-ba
 For first-time testing, `.claude/settings.local.json` is the safest option.
 
 The bundled config includes both hooks and `statusLine`, so copying it is enough to enable the visible task cue.
+
+## Bundled task skills
+
+Claude Code now also supports bundled thin task-entry skills for the same high-frequency flows that OpenCode exposes as slash commands:
+
+- `task-init <task title>` - create a tracked task
+- `task-current` - inspect the current task and next action
+- `task-list` - list existing tasks in the workspace
+- `task-validate` - validate the current task without auto-fixing warnings
+- `task-drift <new request>` - check whether a new ask still fits the current task
+- `task-done [slug]` - mark the current or named task done after verification
+
+These are implemented as skills, not a separate Claude `commands/` directory. They stay thin on purpose and reuse the same shared shell scripts under `skill/scripts/`.
 
 ## What you should notice
 
@@ -100,7 +117,7 @@ Claude's compact hook only does the safe MVP path: it never invents progress fro
 
 ## Manual fallback
 
-Useful commands when you want direct control:
+Useful shell commands when you want direct control instead of the bundled task-entry skills:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh --compact`

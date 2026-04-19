@@ -23,6 +23,19 @@ Use this skill when the work involves one or more of the following:
 - recovery after context loss or agent switching
 - optional delegate or sub-agent work on isolated subproblems
 
+## Claude task-entry skills
+
+Claude Code can also use bundled thin task-entry skills for high-frequency flows:
+
+- `task-init`
+- `task-current`
+- `task-list`
+- `task-validate`
+- `task-drift`
+- `task-done`
+
+Those entry skills should stay thin and reuse the shared shell scripts documented below rather than introducing a parallel workflow.
+
 ## Core operating model
 
 Each task lives in its own directory:

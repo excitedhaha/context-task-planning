@@ -36,7 +36,7 @@ Recommended install:
 npx skills add excitedhaha/context-task-planning -g
 ```
 
-Choose `context-task-planning` and the agent(s) you want when prompted.
+Choose `context-task-planning` and the agent(s) you want when prompted. Claude Code users can also choose the bundled thin task-entry skills: `task-init`, `task-current`, `task-list`, `task-validate`, `task-drift`, and `task-done`.
 
 If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
 
@@ -52,7 +52,7 @@ For multi-step or recovery-sensitive work, the agent should usually pick this sk
 
 ### 3. Check that the task became visible
 
-- `Claude Code` - look for `task:<slug>` in the status line
+- `Claude Code` - look for `task:<slug>` in the status line; bundled task-entry skills such as `task-current` or `task-list` can also appear after install
 - `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
 - `Codex` - run `sh skill/scripts/current-task.sh` for the full summary and recommended next step, or `sh skill/scripts/current-task.sh --compact` for a prompt-friendly cue
 
@@ -105,6 +105,15 @@ The shared shell entry points now map cleanly to those basics:
 - `sh skill/scripts/current-task.sh --compact` - short status for prompts, tmux, or status bars
 - `sh skill/scripts/compact-context.sh` - compact recovery view for larger tasks; see `docs/onboarding.md`
 - `sh skill/scripts/validate-task.sh --fix-warnings` - repair warning-level snapshot drift after manual edits or long-running work
+
+Claude Code users now also get thin skill-style entry points for the same high-frequency flows:
+
+- `task-init <task title>` - create a tracked task
+- `task-current` - inspect the current task and next action
+- `task-list` - list existing tasks in the workspace
+- `task-validate` - validate the current task without auto-fixing warnings
+- `task-drift <new request>` - check whether a new ask still fits the current task
+- `task-done [slug]` - mark the current or named task done after verification
 
 OpenCode users also get a small slash-command surface for the same high-frequency flows:
 

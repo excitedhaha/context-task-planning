@@ -5,6 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SKILL_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 SKILL_NAME="context-task-planning"
+CLAUDE_EXTRA_SKILLS_DIR="$SKILL_DIR/../skills"
 INSTALL_OPENCODE_PLUGIN=1
 INSTALL_OPENCODE_COMMANDS=1
 
@@ -26,13 +27,14 @@ done
 
 link_skill() {
     target="$1"
+    source_path="${2:-$SKILL_DIR}"
     parent=$(dirname "$target")
 
     mkdir -p "$parent"
 
     if [ -L "$target" ]; then
         current=$(readlink "$target" || true)
-        if [ "$current" = "$SKILL_DIR" ]; then
+        if [ "$current" = "$source_path" ]; then
             echo "Already linked: $target"
             return 0
         fi
@@ -46,13 +48,22 @@ link_skill() {
         return 1
     fi
 
-    ln -s "$SKILL_DIR" "$target"
-    echo "Linked: $target -> $SKILL_DIR"
+    ln -s "$source_path" "$target"
+    echo "Linked: $target -> $source_path"
 }
 
 link_skill "$HOME/.claude/skills/$SKILL_NAME"
 link_skill "$HOME/.codex/skills/$SKILL_NAME"
 link_skill "$HOME/.config/opencode/skills/$SKILL_NAME"
+
+if [ -d "$CLAUDE_EXTRA_SKILLS_DIR" ]; then
+    for extra_skill in "$CLAUDE_EXTRA_SKILLS_DIR"/*; do
+        if [ ! -d "$extra_skill" ] || [ ! -f "$extra_skill/SKILL.md" ]; then
+            continue
+        fi
+        link_skill "$HOME/.claude/skills/$(basename "$extra_skill")" "$extra_skill"
+    done
+fi
 
 if [ "$INSTALL_OPENCODE_PLUGIN" -eq 1 ]; then
     sh "$SCRIPT_DIR/install-opencode-plugin.sh"

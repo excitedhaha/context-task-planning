@@ -34,8 +34,8 @@ npx skills add excitedhaha/context-task-planning -g
 
 Notes:
 
-1. The CLI will discover the skill under `skill/` automatically.
-2. Choose `context-task-planning` and the agent(s) your teammate uses when prompted.
+1. The CLI will discover the main skill under `skill/` and the bundled task-entry skills under `skills/` automatically.
+2. Choose `context-task-planning` and any task-entry skills your teammate wants when prompted.
 3. If they want to preview before installing, they can run `npx skills add excitedhaha/context-task-planning -l`.
 4. If they use Claude Code and want hook automation, merge `skill/claude-hooks/settings.example.json` into either `~/.claude/settings.json` or `.claude/settings.local.json`.
 5. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
