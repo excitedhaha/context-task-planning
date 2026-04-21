@@ -528,6 +528,21 @@ function visibleTaskSlug(task) {
   return task.slug
 }
 
+function explicitTaskContextEligible(task) {
+  return Boolean(task?.found && task?.slug && task.selection_source === "session_binding")
+}
+
+function workspaceFallbackReminder(task) {
+  if (!task?.found || !task?.slug || explicitTaskContextEligible(task)) {
+    return null
+  }
+
+  return [
+    `[context-task-planning] Workspace fallback resolved task \`${task.slug}\`, but this OpenCode session is not explicitly bound to it.`,
+    "Do not treat that fallback task as this session's current task unless you bind or resume it explicitly.",
+  ].join(" ")
+}
+
 function taskStateForSlug(planRoot, taskSlug) {
   if (!planRoot || !taskSlug) {
     return null
@@ -1366,24 +1381,32 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, cacheSessionID, task)
       const compactRecovery = visibleSessionID ? postCompactContextBySession.get(visibleSessionID) || "" : ""
       const planningRecovery = visibleSessionID ? planningRecoveryBySession.get(visibleSessionID) || null : null
+      const explicitTaskContext = explicitTaskContextEligible(task)
 
       if (task && task.found) {
-        if (compactRecovery) {
+        if (explicitTaskContext && compactRecovery) {
           output.system.push(compactRecovery)
           postCompactContextBySession.delete(visibleSessionID)
         }
-        const planningRecoveryText = planningRecoveryReminder(task, planningRecovery)
-        if (planningRecoveryText) {
-          output.system.push(planningRecoveryText)
-        }
-        output.system.push(currentTaskSummary(task))
-        const reminder = driftReminder(drift)
-        if (reminder) {
-          output.system.push(reminder)
-        }
-        const freshness = freshnessReminder(task, freshnessState, planning)
-        if (freshness) {
-          output.system.push(freshness)
+        if (explicitTaskContext) {
+          const planningRecoveryText = planningRecoveryReminder(task, planningRecovery)
+          if (planningRecoveryText) {
+            output.system.push(planningRecoveryText)
+          }
+          output.system.push(currentTaskSummary(task))
+          const reminder = driftReminder(drift)
+          if (reminder) {
+            output.system.push(reminder)
+          }
+          const freshness = freshnessReminder(task, freshnessState, planning)
+          if (freshness) {
+            output.system.push(freshness)
+          }
+        } else {
+          const fallbackReminder = workspaceFallbackReminder(task)
+          if (fallbackReminder) {
+            output.system.push(fallbackReminder)
+          }
         }
         return
       }
@@ -1405,6 +1428,9 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const syncResult = readCompactSync(baseCwd, sessionID)
       const refreshedTask = readCurrentTask(baseCwd, sessionID)
+      if (!explicitTaskContextEligible(refreshedTask)) {
+        return
+      }
       const warning = compactSyncWarningText(refreshedTask, syncResult)
       const compactContext = readCompactContext(baseCwd, sessionID)
       const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
@@ -1433,6 +1459,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         session.readSessionID,
       )
       const drift = cacheSessionID ? driftBySession.get(cacheSessionID) : null
+      const explicitTaskContext = explicitTaskContextEligible(currentTask)
 
       const { state: freshnessState, planning } = refreshFreshnessState(
         freshnessBySession,
@@ -1442,7 +1469,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const planningRecovery = cacheSessionID ? planningRecoveryBySession.get(cacheSessionID) || null : null
       const prefixes = []
 
-      if (preflight) {
+      if (explicitTaskContext && preflight) {
         if (
           (preflight.decision === "payload_only" ||
             preflight.decision === "payload_plus_delegate_recommended") &&
@@ -1459,14 +1486,16 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         }
       }
 
-      const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
-      if (freshnessPrefix) {
-        prefixes.push(freshnessPrefix)
-      }
+      if (explicitTaskContext) {
+        const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
+        if (freshnessPrefix) {
+          prefixes.push(freshnessPrefix)
+        }
 
-      const planningRecoveryText = planningRecoveryReminder(currentTask, planningRecovery)
-      if (planningRecoveryText) {
-        prefixes.push(planningRecoveryText)
+        const planningRecoveryText = planningRecoveryReminder(currentTask, planningRecovery)
+        if (planningRecoveryText) {
+          prefixes.push(planningRecoveryText)
+        }
       }
 
       const prefix = prefixes.join("\n\n")
@@ -1614,11 +1643,13 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
         const syncResult = readCompactSync(baseCwd, session.readSessionID)
         const refreshedTask = readCurrentTask(baseCwd, session.readSessionID)
-        const warning = compactSyncWarningText(refreshedTask, syncResult)
-        const compactContext = readCompactContext(baseCwd, session.readSessionID)
-        const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
-        if (recovery) {
-          postCompactContextBySession.set(explicitSessionID, recovery)
+        if (explicitTaskContextEligible(refreshedTask)) {
+          const warning = compactSyncWarningText(refreshedTask, syncResult)
+          const compactContext = readCompactContext(baseCwd, session.readSessionID)
+          const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
+          if (recovery) {
+            postCompactContextBySession.set(explicitSessionID, recovery)
+          }
         }
 
         if (!syncResult || syncResult.ok === false) {
@@ -1662,7 +1693,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       if (shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
         const compactSync = readCompactSync(baseCwd, session.readSessionID)
         task = readCurrentTask(baseCwd, session.readSessionID)
-        if (compactEvent) {
+        if (compactEvent && explicitTaskContextEligible(task)) {
           const warning = compactSyncWarningText(task, compactSync)
           const compactContext = readCompactContext(baseCwd, session.readSessionID)
           const recovery = compactRecoverySystemPrompt(task, compactContext, warning)

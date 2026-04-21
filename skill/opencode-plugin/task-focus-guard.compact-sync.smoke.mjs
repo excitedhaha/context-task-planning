@@ -155,6 +155,28 @@ try {
   assert.equal(titles.get("A"), "task:compact-demo | Session A")
   assert.equal(toasts.some((toast) => toast.body?.title === "Compact sync warning"), false)
 
+  titles.set("C", "Session C")
+  const fallbackCompactingOutput = { context: [] }
+  await plugin["experimental.session.compacting"]({ sessionID: "C" }, fallbackCompactingOutput)
+  assert.equal(fallbackCompactingOutput.context.length, 0)
+
+  await plugin.event({
+    event: {
+      type: "session.compacted",
+      properties: {
+        sessionID: "C",
+      },
+    },
+  })
+
+  const fallbackTransformAfterCompact = { system: [] }
+  await plugin["experimental.chat.system.transform"](
+    { sessionID: "C", model: {} },
+    fallbackTransformAfterCompact,
+  )
+  assert.doesNotMatch(fallbackTransformAfterCompact.system.join("\n"), /recently compacted/u)
+  assert.match(fallbackTransformAfterCompact.system.join("\n"), /Workspace fallback resolved task `compact-demo`/u)
+
   introduceWarningDrift(planDir, "Do not compact on false events.", "false event stale action")
   await plugin.event({
     event: {

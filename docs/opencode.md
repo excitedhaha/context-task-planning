@@ -45,6 +45,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - show toasts for drift, stale planning, and task-binding/bootstrap events
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
+- inject strong task context only for sessions with an explicit task binding; workspace fallback resolution stays advisory
 - call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
 - surface linked spec context such as auto-detected OpenSpec refs in the injected task summary and native-`Task` preflight payload when available, including a short candidate hint when the runtime refuses to guess
 - carry repo context for parent-workspace multi-repo tasks
@@ -91,6 +92,7 @@ After the plugin and commands are enabled and OpenCode is restarted, you should 
 - bundled slash commands such as `/task-init` appearing in the OpenCode command menu
 - a warning toast when a prompt looks like likely task drift
 - a warning toast when tracked work has happened but planning files look stale
+- a fresh unbound session no longer inherits strong task prompt context just because the workspace has `.active_task` or a latest task; OpenCode only injects the full task summary, compact recovery, and native-`Task` task prefix after explicit session binding
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
 - if a fresh or fallback-resolved session directly edits one task's `.planning/<slug>/state.json|task_plan.md|progress.md|findings.md`, OpenCode now auto-bootstraps a binding for that task instead of silently staying on the old fallback task; it tries writer first and falls back to observer with a warning when repo isolation blocks writer ownership
 - the same task still resolving when OpenCode starts inside a registered repo path or recorded worktree under a parent workspace
@@ -135,6 +137,14 @@ Fastest smoke test after install:
 - run `/task-list` to confirm the workspace task list is available
 - run `/task-validate` to confirm the validation path responds without auto-fixing warnings
 
+Local plugin regression suite while developing from this repo:
+
+```bash
+sh skill/scripts/smoke-test-opencode-plugin.sh
+```
+
+That wrapper runs the current OpenCode plugin smoke coverage for explicit bindings, fallback-only sessions, compact recovery, and ancestor-workspace fallback isolation.
+
 If the commands do not appear right away:
 
 - make sure the command files exist under `~/.config/opencode/commands/`
@@ -150,9 +160,9 @@ The OpenCode plugin is event-driven. It is not a file watcher, background sync d
 Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these moments:
 
 - `chat.message` - after a user message is assembled; cache prompt text, classify drift, and try to sync the visible task title
-- `experimental.chat.system.transform` - right before the model receives system context; inject current-task, drift, and freshness reminders
-- `experimental.session.compacting` - right before OpenCode compacts a session; run the shared compact-sync helper, then feed compact recovery context into the compaction prompt and cache one resume-time recovery injection for the next turn
-- `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance
+- `experimental.chat.system.transform` - right before the model receives system context; inject current-task, drift, and freshness reminders for explicitly bound sessions, while fallback-only resolution emits at most a short advisory that the session is not bound yet
+- `experimental.session.compacting` - right before OpenCode compacts a session; run the shared compact-sync helper, then feed compact recovery context into the compaction prompt and cache one resume-time recovery injection for the next turn only when the session is explicitly bound to that task
+- `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance for explicitly bound sessions
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
 - `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed; freshness tracking normalizes namespaced tool names such as `functions.bash`, inspects `multi_tool_use.parallel` payloads for nested tracked work like `functions.apply_patch`, and uses `state.json` / `progress.md` as the sync-critical freshness baseline before falling back to the broader planning set
 - `tool.execute.after` also watches for direct writes to one task's main planning files; when a session is still running on fallback resolution, that planning write now bootstraps the matching session binding so later compact sync and writer reminders target the task the agent is actually editing

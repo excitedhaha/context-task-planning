@@ -123,6 +123,18 @@ try {
   assert.equal(titles.get("C"), "Session C")
   assert.equal(toasts.some((toast) => toast.title === "Current task"), false)
 
+  const fallbackTransformOutput = { system: [] }
+  await plugin["experimental.chat.system.transform"]({ sessionID: "C" }, fallbackTransformOutput)
+  assert.doesNotMatch(fallbackTransformOutput.system.join("\n"), /Current task `base-app-mobile-coldstart-optimization`/u)
+  assert.match(fallbackTransformOutput.system.join("\n"), /Workspace fallback resolved task `base-app-mobile-coldstart-optimization`/u)
+
+  const fallbackTaskOutput = { args: { prompt: "Investigate helper script behavior" } }
+  await plugin["tool.execute.before"](
+    { tool: "Task", sessionID: "C", args: { prompt: "Investigate helper script behavior" } },
+    fallbackTaskOutput,
+  )
+  assert.equal(fallbackTaskOutput.args.prompt, "Investigate helper script behavior")
+
   toasts.length = 0
   await plugin["tool.execute.after"](
     {
