@@ -5,6 +5,8 @@ from pathlib import Path
 
 try:
     from .hook_common import (
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         compact_context_text,
         load_state,
         no_active_task_hint,
@@ -19,6 +21,8 @@ try:
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from hook_common import (  # type: ignore
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         compact_context_text,
         load_state,
         no_active_task_hint,
@@ -91,8 +95,10 @@ def main():
     session_key = session_key_from_payload(payload)
     sync_result = run_compact_sync(cwd=cwd, session_key=session_key, host="claude")
     warning = compact_sync_warning(sync_result)
+    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
+    explicit_task_context = explicit_task_context_eligible(task_meta)
 
-    if isinstance(sync_result, dict) and sync_result.get("ok", True):
+    if explicit_task_context and isinstance(sync_result, dict) and sync_result.get("ok", True):
         compact_context = compact_context_text(cwd=cwd, session_key=session_key)
     else:
         compact_context = None
@@ -102,11 +108,16 @@ def main():
         return
 
     plan_dir = resolve_plan_dir(cwd=cwd, session_key=session_key)
-    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
 
     if plan_dir:
         state = load_state(plan_dir)
         if state:
+            if not explicit_task_context:
+                advisory = fallback_task_advisory(task_meta)
+                context = join_context(warning, advisory or "")
+                if context:
+                    print(session_start_payload(context))
+                return
             print(
                 session_start_payload(
                     join_context(

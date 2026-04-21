@@ -7,6 +7,8 @@ try:
     from .hook_common import (
         allow_delegate_hint,
         delegate_hint_for_text,
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         init_task_hint,
         load_state,
         looks_complex,
@@ -25,6 +27,8 @@ except ImportError:
     from hook_common import (  # type: ignore
         allow_delegate_hint,
         delegate_hint_for_text,
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         init_task_hint,
         load_state,
         looks_complex,
@@ -51,6 +55,11 @@ def main():
     if plan_dir:
         state = load_state(plan_dir)
         if state:
+            if not explicit_task_context_eligible(task_meta):
+                advisory = fallback_task_advisory(task_meta)
+                if advisory:
+                    print(user_prompt_payload(advisory))
+                return
             context = state_summary(state, task_meta=task_meta, include_spec=True)
             drift_result = task_drift_result(prompt, cwd, session_key=session_key)
             drift_hint = task_drift_hint(drift_result)

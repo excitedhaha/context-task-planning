@@ -35,11 +35,11 @@ After you enable the bundled adapter, Claude Code can surface the shared file-ba
 - a native status line cue such as `task!:<slug>` for explicit writer binding
 - `obs:<slug>` when the current session is explicitly bound as observe-only
 - `wksp:<slug>` when Claude is only following the shared workspace fallback pointer
-- task recovery on session start from the session binding or workspace fallback
+- strong task-context recovery on session start for explicit bindings or `PLAN_TASK`, while workspace fallback stays advisory
 - safe compact-time sync before Claude compresses context: writer sessions may repair warning-level snapshot drift and refresh `.derived/context_compact.json`, while observer sessions only refresh the derived compact artifact
 - prompt-time reminders when a request looks like likely task drift
 - stronger warnings before `Task` launches on mismatched work
-- shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related work and routing or delegate escalation when the fit is wrong
+- shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related work and routing or delegate escalation when the fit is wrong for explicitly bound sessions; fallback-only sessions stay routing-only
 - linked or ambiguous spec context such as auto-detected OpenSpec refs in startup and prompt-time summaries when the current task has a clear external artifact candidate or multiple plausible ones, including a short candidate hint when the runtime refuses to guess
 - repo context such as `primary_repo` and `repo_scope` when a task spans multiple repos
 
@@ -73,8 +73,8 @@ These are implemented as skills, not a separate Claude `commands/` directory. Th
 After restarting Claude Code, you should see:
 
 - an explicit task cue in the native status line for per-session bindings, or a weaker workspace fallback cue when only `.planning/.active_task` is set
-- automatic task-context recovery when the session starts
-- on context compaction, Claude refreshes compact recovery context from the shared helper instead of replaying only the shorter session-start snapshot
+- automatic strong task-context recovery when the session starts for explicit bindings; fallback-only sessions get a short advisory instead of the full task snapshot
+- on context compaction, Claude refreshes compact recovery context from the shared helper for explicit bindings instead of replaying only the shorter session-start snapshot; fallback-only sessions do not inherit compact recovery payloads
 - a reminder before Claude silently mixes likely-unrelated work into the current task
 - the same task still resolving when Claude starts inside a registered repo path or recorded worktree under a parent workspace
 - startup and prompt-time summaries can mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
@@ -105,7 +105,7 @@ The helper returns one decision for the launch:
 - `routing_only` - Claude shows routing confirmation only and does not inject the repo/worktree payload
 - `delegate_required` - Claude tells you to create or reuse a delegate lane first
 
-If the task resolves a linked OpenSpec context, Claude now surfaces that summary in session-start and prompt-time context, and the injected `Task` preflight prefix includes the same spec context summary and primary linked ref in addition to the repo/worktree scope. When the runtime reports `status=ambiguous`, Claude now receives the candidate refs plus an explicit manual-override hint in both places. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
+If the task resolves a linked OpenSpec context for an explicitly bound session, Claude now surfaces that summary in session-start and prompt-time context, and the injected `Task` preflight prefix includes the same spec context summary and primary linked ref in addition to the repo/worktree scope. When the runtime reports `status=ambiguous`, Claude now receives the candidate refs plus an explicit manual-override hint in both places. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front. Workspace fallback alone does not trigger that strong payload.
 
 `UserPromptSubmit` stays advisory; the actual native-Task preflight happens in `PreToolUse`.
 

@@ -85,9 +85,35 @@ printf '%s\n' "$RESUME_STATUSLINE" | grep -F " wksp:" >/dev/null && fail "paused
 LATEST_ROOT="$WORKDIR/latest"
 mkdir -p "$LATEST_ROOT"
 cd "$LATEST_ROOT"
-sh "$SCRIPT_DIR/init-task.sh" --slug latest-demo --title "Latest demo" >/dev/null
-WORKSPACE_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | "$PYTHON_BIN" "$STATUSLINE_PY")
+PLAN_SESSION_KEY= sh "$SCRIPT_DIR/init-task.sh" --slug latest-demo --title "Latest demo" >/dev/null
+WORKSPACE_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | PLAN_SESSION_KEY= "$PYTHON_BIN" "$STATUSLINE_PY")
 printf '%s\n' "$WORKSPACE_STATUSLINE" | grep -F "wksp:latest-demo" >/dev/null || fail "workspace fallback status line missed wksp cue"
+WORKSPACE_SESSION_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/session_start.py")
+WORKSPACE_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"prompt\":\"Investigate the fallback task\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
+WORKSPACE_PRE_TOOL=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"tool_name\":\"Task\",\"tool_input\":{\"description\":\"Investigate the fallback task\"}}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/pre_tool_use.py")
+WORKSPACE_COMPACT_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
+"$PYTHON_BIN" - "$WORKSPACE_SESSION_START" "$WORKSPACE_PROMPT_SUBMIT" "$WORKSPACE_PRE_TOOL" "$WORKSPACE_COMPACT_START" <<'PY'
+import json
+import sys
+
+payloads = [json.loads(item) for item in sys.argv[1:]]
+for payload in payloads:
+    context = (
+        payload.get("hookSpecificOutput", {}).get("additionalContext")
+        or payload.get("additionalContext", "")
+    )
+    if "Workspace fallback resolved task `latest-demo`" not in context:
+        raise SystemExit(f"fallback hook output missing advisory: {context!r}")
+    forbidden = [
+        "Task `latest-demo` | status `active`",
+        "Next action:",
+        "Keep Task launches scoped to the current task.",
+        "Compact policy:",
+    ]
+    for item in forbidden:
+        if item in context:
+            raise SystemExit(f"fallback hook output unexpectedly included {item!r}: {context!r}")
+PY
 rm "$LATEST_ROOT/.planning/.active_task"
 LATEST_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --json)
 "$PYTHON_BIN" - "$LATEST_JSON" <<'PY'
@@ -100,7 +126,7 @@ if payload.get("slug") != "latest-demo":
 if payload.get("selection_source") != "latest":
     raise SystemExit(f"unexpected latest fallback source: {payload.get('selection_source')!r}")
 PY
-LATEST_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | "$PYTHON_BIN" "$STATUSLINE_PY")
+LATEST_STATUSLINE=$(printf '%s' '{"cwd":"'"$LATEST_ROOT"'"}' | PLAN_SESSION_KEY= "$PYTHON_BIN" "$STATUSLINE_PY")
 printf '%s\n' "$LATEST_STATUSLINE" | grep -F " task!:" >/dev/null && fail "latest fallback status line should not show explicit task cue"
 printf '%s\n' "$LATEST_STATUSLINE" | grep -F " obs:" >/dev/null && fail "latest fallback status line should not show observer cue"
 printf '%s\n' "$LATEST_STATUSLINE" | grep -F " wksp:" >/dev/null && fail "latest fallback status line should not show workspace cue"
@@ -263,6 +289,8 @@ git -C "$LINKED_ROOT" -c user.name="Smoke Test" -c user.email="smoke@example.com
 
 cd "$LINKED_ROOT"
 sh "$SCRIPT_DIR/init-task.sh" --slug bridge-task --title "Linked provider bridge" >/dev/null
+PREFLIGHT_TEXT=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task bridge-task --host codex --tool-name Task --task-text "Review the linked provider artifact" --text)
+PLAN_SESSION_KEY=claude:linked-session sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal bridge-task >/dev/null
 LINKED_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --task bridge-task --json)
 LINKED_TEXT=$(sh "$SCRIPT_DIR/current-task.sh" --task bridge-task)
 LINKED_SESSION_START=$(printf '%s' "{\"cwd\":\"$LINKED_ROOT\",\"session_id\":\"linked-session\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/session_start.py")
@@ -301,8 +329,6 @@ PY
 COMPACT_TEXT=$(sh "$SCRIPT_DIR/compact-context.sh" --task bridge-task)
 printf '%s\n' "$COMPACT_TEXT" | grep -F "Linked artifacts:" >/dev/null || fail "compact-context text output missed linked artifacts heading"
 printf '%s\n' "$COMPACT_TEXT" | grep -F "openspec/changes/auth-refresh/proposal.md" >/dev/null || fail "compact-context text output missed linked proposal ref"
-
-PREFLIGHT_TEXT=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task bridge-task --host codex --tool-name Task --task-text "Review the linked provider artifact" --text)
 printf '%s\n' "$PREFLIGHT_TEXT" | grep -F "Primary spec ref: openspec/changes/auth-refresh" >/dev/null || fail "subagent-preflight text output missed linked primary spec ref"
 
 DRIFT_JSON=$(sh "$SCRIPT_DIR/check-task-drift.sh" --task bridge-task --prompt "Continue work in openspec/changes/auth-refresh/proposal.md" --json)
@@ -329,9 +355,10 @@ sh "$SCRIPT_DIR/init-task.sh" --slug runtime --title "Runtime" >/dev/null
 AMBIG_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --task runtime --json)
 AMBIG_TEXT=$(sh "$SCRIPT_DIR/current-task.sh" --task runtime)
 AMBIG_COMPACT=$(sh "$SCRIPT_DIR/compact-context.sh" --task runtime)
-AMBIG_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$AMBIG_ROOT\",\"session_id\":\"runtime-session\",\"prompt\":\"Investigate the runtime candidates\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
 AMBIG_PREFLIGHT_JSON=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --json)
 AMBIG_PREFLIGHT_TEXT=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --text)
+PLAN_SESSION_KEY=claude:runtime-session sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal runtime >/dev/null
+AMBIG_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$AMBIG_ROOT\",\"session_id\":\"runtime-session\",\"prompt\":\"Investigate the runtime candidates\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
 "$PYTHON_BIN" - "$AMBIG_JSON" <<'PY'
 import json
 import sys

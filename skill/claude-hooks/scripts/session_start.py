@@ -5,6 +5,8 @@ from pathlib import Path
 
 try:
     from .hook_common import (
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         load_state,
         no_active_task_hint,
         read_hook_input,
@@ -17,6 +19,8 @@ try:
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from hook_common import (  # type: ignore
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         load_state,
         no_active_task_hint,
         read_hook_input,
@@ -38,6 +42,11 @@ def main():
     if plan_dir:
         state = load_state(plan_dir)
         if state:
+            if not explicit_task_context_eligible(task_meta):
+                advisory = fallback_task_advisory(task_meta)
+                if advisory:
+                    print(session_start_payload(advisory))
+                return
             print(
                 session_start_payload(
                     state_summary(state, task_meta=task_meta, include_spec=True)

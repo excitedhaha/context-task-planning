@@ -436,6 +436,45 @@ def resolve_task_meta(
         return None
 
 
+def explicit_task_context_eligible(task_meta: dict | None) -> bool:
+    if not isinstance(task_meta, dict):
+        return False
+    if not task_meta.get("found"):
+        return False
+    return str(task_meta.get("selection_source") or "") in {
+        "session_binding",
+        "session_pin",
+    }
+
+
+def fallback_task_advisory(
+    task_meta: dict | None, tool_name: str | None = None
+) -> str | None:
+    if not isinstance(task_meta, dict) or not task_meta.get("found"):
+        return None
+    if explicit_task_context_eligible(task_meta):
+        return None
+
+    slug = str(task_meta.get("slug") or "").strip() or "(unknown)"
+    source = str(task_meta.get("selection_source") or "")
+    if source == "active_pointer":
+        source_text = "workspace fallback"
+    elif source == "latest":
+        source_text = "latest-task fallback"
+    else:
+        source_text = "fallback resolution"
+
+    lines = [
+        f"[context-task-planning] {source_text.capitalize()} resolved task `{slug}`, but this Claude session is not explicitly bound to it.",
+        "Do not treat that fallback task as the current session task unless you bind or resume it explicitly.",
+    ]
+    if tool_name == "Task":
+        lines.append(
+            "If you still launch a subagent here, keep the result routing-only until task ownership is explicit."
+        )
+    return " ".join(lines)
+
+
 def task_drift_hint(result: dict | None, tool_name: str | None = None) -> str | None:
     if not result:
         return None

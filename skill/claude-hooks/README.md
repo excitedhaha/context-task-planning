@@ -10,10 +10,10 @@ When enabled, the most visible cue is Claude Code's native status line showing e
 ## What the hooks do
 
 - `statusLine` - show the current task in Claude Code's native status line
-- `SessionStart` - recover the current task snapshot from `.planning/<slug>/`
-- `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context
-- `UserPromptSubmit` - add planning guidance and task-drift reminders before Claude handles the prompt
-- `PreToolUse` - inject compact task context before key tools run, with a stronger mismatch warning before `Task`
+- `SessionStart` - recover the current task snapshot from `.planning/<slug>/` for explicit bindings, while workspace fallback stays advisory
+- `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context only for explicit bindings
+- `UserPromptSubmit` - add planning guidance and task-drift reminders before Claude handles the prompt; fallback-only sessions get advisory routing text instead of the full task snapshot
+- `PreToolUse` - inject compact task context before key tools run for explicit bindings, with a stronger mismatch warning before `Task`
 
 ## What the hooks do not do
 

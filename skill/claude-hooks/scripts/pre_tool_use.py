@@ -7,6 +7,8 @@ try:
     from .hook_common import (
         allow_delegate_hint,
         delegate_hint_for_text,
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         load_state,
         pre_tool_payload,
         read_hook_input,
@@ -24,6 +26,8 @@ except ImportError:
     from hook_common import (  # type: ignore
         allow_delegate_hint,
         delegate_hint_for_text,
+        explicit_task_context_eligible,
+        fallback_task_advisory,
         load_state,
         pre_tool_payload,
         read_hook_input,
@@ -52,6 +56,33 @@ def main():
 
     state = load_state(plan_dir)
     if not state:
+        return
+
+    explicit_task_context = explicit_task_context_eligible(task_meta)
+
+    if not explicit_task_context:
+        advisory = fallback_task_advisory(task_meta, tool_name=tool_name)
+        if tool_name == "Task":
+            task_text = task_tool_text(tool_input)
+            preflight = subagent_preflight_result(
+                task_text,
+                cwd=cwd,
+                session_key=session_key,
+                host="claude",
+                tool_name=tool_name,
+            )
+            operator_message = ""
+            if preflight:
+                operator_message = str(preflight.get("operator_message") or "").strip()
+            context = "\n".join(
+                item for item in (advisory, operator_message) if item
+            )
+            if context:
+                print(pre_tool_payload(context))
+            return
+
+        if advisory:
+            print(pre_tool_payload(advisory))
         return
 
     if tool_name == "Task":
