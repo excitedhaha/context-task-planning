@@ -336,8 +336,8 @@ manual or wrapper-driven Task launch
 
 Implementation points:
 
-- no native adapter in P0
-- add docs and wrapper examples that call the helper explicitly
+- Codex hooks can inject prompt-time reminders, but current Codex `PreToolUse` cannot safely inject `additionalContext` or rewrite native subagent prompts
+- keep native subagent preflight as a shell-first or wrapper-driven flow in P0
 - if a future native interception surface exists, it must call this same helper
 
 ## File Changes For P0
@@ -385,8 +385,9 @@ Optional follow-up files:
 
 ### Step 4 - Codex
 
-- add documented shell-first usage examples
-- add wrapper examples if the repository wants them
+- add Codex hook docs for prompt-time reminders and Stop-time planning sync
+- keep documented shell-first `subagent-preflight.sh` usage examples
+- add wrapper examples if the repository wants automatic native subagent prompt mutation later
 
 ### Step 5 - docs and polish
 

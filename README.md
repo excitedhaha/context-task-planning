@@ -54,7 +54,7 @@ For multi-step or recovery-sensitive work, the agent should usually pick this sk
 
 - `Claude Code` - look for `task:<slug>` in the status line; bundled task-entry skills such as `task-current` or `task-list` can also appear after install
 - `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
-- `Codex` - run `sh skill/scripts/current-task.sh` for the full summary and recommended next step, or `sh skill/scripts/current-task.sh --compact` for a prompt-friendly cue
+- `Codex` - if `codex features list` includes `codex_hooks`, enable optional Codex hooks for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
 
 In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.
 
@@ -73,7 +73,7 @@ When the task has grown enough that replaying multiple markdown files feels nois
 - `docs/onboarding.md` - the full user journey, from first success to multi-session, multi-repo, worktree, delegate, and verification workflows
 - `docs/claude.md` - Claude-specific setup and cues
 - `docs/opencode.md` - OpenCode-specific install steps, slash commands, plugin behavior, and troubleshooting
-- `docs/codex.md` - Codex-specific shell-first workflow
+- `docs/codex.md` - Codex-specific hooks and shell-first workflow
 - `docs/design.md` - the deeper architecture
 - `docs/spec-aware-task-runtime.md` - spec-aware design notes, mainly for contributors or deeper implementation questions
 

@@ -10,3 +10,6 @@ __pycache__/
 .claude/
 .codex/
 .opencode/
+log/
+.obsidian/
+*.base

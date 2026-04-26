@@ -339,8 +339,9 @@ Host adapters are optional layers on top of that core.
   reminders on top of the shared resolver
 - **OpenCode plugin** injects task summaries, exports `PLAN_SESSION_KEY`, and
   surfaces repo and role context without becoming a second planner
-- **Codex and shell-only workflows** fall back to the same scripts and file
-  protocol, which is why `.active_task` still exists
+- **Codex hooks** inject prompt-time task context and end-of-turn planning
+  sync reminders, while still falling back to the same scripts and file protocol
+  when hooks are not enabled
 
 Adapters must not become the source of truth. They surface and route the same
 file-backed state; they do not replace it.

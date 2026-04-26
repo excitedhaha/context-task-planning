@@ -26,17 +26,21 @@ A global install makes the skill available under:
 
 ## What Codex relies on
 
-Codex does not currently have a bundled native task UI adapter like Claude Code's status line or OpenCode's plugin.
+Codex now has lifecycle hooks, so the recommended path is:
 
-So the intended Codex path is the shared file-backed core plus shell-first visibility:
+- the same shared file-backed core under `.planning/<slug>/`
+- optional Codex hooks that inject task context on session start and every user prompt
+- a `Stop` hook that asks Codex to continue once when a complex or mutating turn is about to finish without planning read/update evidence
+- shell-first visibility with `sh skill/scripts/current-task.sh` as the fallback and debugging surface
 
-- keep the active task visible with `sh skill/scripts/current-task.sh` when you want the full summary and next step, or `sh skill/scripts/current-task.sh --compact` when you only need a short cue
-- use `sh skill/scripts/check-task-drift.sh --prompt "..." --json` when a new request may be a different task
-- use `sh skill/scripts/subagent-preflight.sh --task-text "..." --text` before manual or wrapper-driven native subagent launches when you want the same routing and repo/worktree context as Claude or OpenCode
-- rely on the same auto-detected linked spec context that the other hosts expose through `current-task` and preflight, treating linked refs or short candidate hints as scoping help rather than a new mode you have to manage
-- expect Codex to ask whether to continue the current task, switch tasks, or create a new task before updating planning state when the match looks wrong
-- use `PLAN_SESSION_KEY` when multiple Codex shells or wrappers should keep different current tasks
-- rely on the same parent-workspace repo registration and recorded worktree rules as the other hosts
+Codex still does not expose the same surfaces as Claude Code or OpenCode:
+
+- no native status line or session-title API for a persistent task cue
+- no supported `PreToolUse` context injection or tool input rewrite path
+- no automatic native subagent prompt mutation equivalent to Claude `Task` or OpenCode `tool.execute.before`
+- no dedicated compact hook; recovery happens on the next `SessionStart`, `UserPromptSubmit`, or `Stop` check
+
+Use the hooks for long-context reminders and end-of-turn planning sync. Keep the shell scripts as the source of truth and as the manual escape hatch.
 
 ## Recommended Codex setup
 
@@ -47,11 +51,42 @@ export PLAN_SESSION_KEY=manual:feature-auth
 sh skill/scripts/set-active-task.sh feature-auth
 ```
 
+The Codex hooks use `PLAN_SESSION_KEY` when it is exported before Codex starts. If it is not set, they derive a key from Codex's `session_id`; shell commands that do not receive that key still update the workspace fallback pointer rather than an explicit Codex session binding.
+
 Use observe mode when a second thread should watch the same task without becoming a second writer:
 
 ```bash
 sh skill/scripts/set-active-task.sh --observe feature-auth
 ```
+
+## Optional Codex hooks
+
+Codex hooks require a Codex CLI build that lists `codex_hooks` in `codex features list`; this workflow has been verified with `codex-cli 0.125.0`. After installing the skill, merge this file into either `~/.codex/config.toml` or a trusted project `.codex/config.toml`:
+
+```text
+skill/codex-hooks/config.example.toml
+```
+
+The example enables:
+
+- `SessionStart` - inject explicit task context on startup, resume, or clear
+- `UserPromptSubmit` - inject task context, drift reminders, delegate hints, and long-context planning guidance on every user prompt
+- `PostToolUse` - track whether this turn read planning files, used mutating tools, or updated planning files
+- `Stop` - continue once if Codex is about to finish without the required planning read or update
+
+The scripts emit Codex hook JSON with `hookSpecificOutput.additionalContext` for prompt-visible context. This avoids Codex treating bracket-prefixed plain text such as `[context-task-planning] ...` as malformed JSON-like output.
+
+Codex project-local hooks only load after the project `.codex/` layer is trusted. User-level hooks in `~/.codex/config.toml` are simpler for first-time testing.
+
+Quick verification after enabling hooks:
+
+```bash
+codex --version
+codex features list | grep codex_hooks
+codex exec "Do not modify files or run commands. Reply exactly: OK"
+```
+
+The last command should show `SessionStart Completed`, `UserPromptSubmit Completed`, and `Stop Completed`. If the prompt asks Codex to run a shell command, `PostToolUse Completed` should also appear.
 
 If you want the current task visible all the time, put this in your shell prompt, tmux status line, or a quick manual check:
 
@@ -67,7 +102,9 @@ sh skill/scripts/current-task.sh
 
 ## What you should notice
 
-- there is no bundled native Codex task UI today
+- there is still no native Codex task UI today
+- with hooks enabled, new turns should receive a planning reminder without you manually pasting one
+- after a code-changing turn, Codex may automatically continue once to update or explicitly justify not updating planning files
 - `current-task.sh` should show the resolved task, access mode, repo/worktree summary, and a recommended next step
 - `current-task.sh` can also show one linked spec ref, or a few candidate refs when the runtime refuses to guess
 - treat that spec line as scoping help; only use the manual override path when the work really needs one authoritative ref
@@ -79,7 +116,7 @@ If that quick check prints `task=<slug> ...`, the fallback visibility path is wo
 
 ## Shell-first Task preflight
 
-Codex has no native interception surface in this first pass, so use the shared helper directly when you launch native subagents manually or through a wrapper:
+Codex hooks currently do not provide a reliable native subagent prompt mutation path. Use the shared helper directly when you launch native subagents manually or through a wrapper:
 
 ```bash
 sh skill/scripts/subagent-preflight.sh \

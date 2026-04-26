@@ -36,8 +36,25 @@ except ImportError:
     resolve_guard_task = None  # type: ignore
 
 
-def installed_skill_command(script_name: str) -> str:
-    return f'sh "$HOME/.claude/skills/context-task-planning/scripts/{script_name}"'
+def host_skill_home(host: str = "claude") -> str:
+    if host == "codex":
+        return "$HOME/.codex/skills/context-task-planning"
+    if host == "opencode":
+        return "$HOME/.config/opencode/skills/context-task-planning"
+    return "$HOME/.claude/skills/context-task-planning"
+
+
+def host_display_name(host: str = "claude") -> str:
+    names = {
+        "codex": "Codex",
+        "opencode": "OpenCode",
+        "claude": "Claude",
+    }
+    return names.get(host, "agent")
+
+
+def installed_skill_command(script_name: str, host: str = "claude") -> str:
+    return f'sh "{host_skill_home(host)}/scripts/{script_name}"'
 
 
 def resolve_workspace_root(cwd: str | None = None) -> Path | None:
@@ -381,19 +398,21 @@ def default_delegate_title(kind: str) -> str:
     return titles.get(kind, "Delegate lane")
 
 
-def prepare_delegate_command(text: str, kind: str) -> str:
+def prepare_delegate_command(text: str, kind: str, host: str = "claude") -> str:
     normalized = " ".join(text.split()) or default_delegate_title(kind)
     if len(normalized) > 80:
         normalized = normalized[:77].rstrip() + "..."
-    return f"{installed_skill_command('prepare-delegate.sh')} --kind {kind} {shlex.quote(normalized)}"
+    return f"{installed_skill_command('prepare-delegate.sh', host=host)} --kind {kind} {shlex.quote(normalized)}"
 
 
-def delegate_hint_for_text(text: str, state: dict | None = None) -> str | None:
+def delegate_hint_for_text(
+    text: str, state: dict | None = None, host: str = "claude"
+) -> str | None:
     kind = delegate_kind_for_text(text)
     if not kind:
         return None
 
-    command = prepare_delegate_command(text, kind)
+    command = prepare_delegate_command(text, kind, host=host)
     base = (
         f"[context-task-planning] If this turns into a bounded `{kind}` side quest, a delegate lane may help. "
         f"Optional command: `{command}`. Keep it optional unless observe-only routing or durable lifecycle tracking makes a delegate required."
@@ -448,7 +467,7 @@ def explicit_task_context_eligible(task_meta: dict | None) -> bool:
 
 
 def fallback_task_advisory(
-    task_meta: dict | None, tool_name: str | None = None
+    task_meta: dict | None, tool_name: str | None = None, host: str = "claude"
 ) -> str | None:
     if not isinstance(task_meta, dict) or not task_meta.get("found"):
         return None
@@ -465,7 +484,7 @@ def fallback_task_advisory(
         source_text = "fallback resolution"
 
     lines = [
-        f"[context-task-planning] {source_text.capitalize()} resolved task `{slug}`, but this Claude session is not explicitly bound to it.",
+        f"[context-task-planning] {source_text.capitalize()} resolved task `{slug}`, but this {host_display_name(host)} session is not explicitly bound to it.",
         "Do not treat that fallback task as the current session task unless you bind or resume it explicitly.",
     ]
     if tool_name == "Task":
@@ -596,11 +615,11 @@ def state_summary(
     return "\n".join(lines)
 
 
-def no_active_task_hint(cwd: str | None = None) -> str | None:
+def no_active_task_hint(cwd: str | None = None, host: str = "claude") -> str | None:
     if workspace_has_planning(cwd):
         return (
             "[context-task-planning] This workspace already has `.planning/`, but no auto-selected active task. "
-            f"Run `{installed_skill_command('list-tasks.sh')}` to inspect tasks, then `resume-task.sh <slug>` or `set-active-task.sh <slug>` before major work."
+            f"Run `{installed_skill_command('list-tasks.sh', host=host)}` to inspect tasks, then `resume-task.sh <slug>` or `set-active-task.sh <slug>` before major work."
         )
     return None
 
@@ -652,10 +671,10 @@ def looks_complex(prompt: str) -> bool:
     return keyword_hit and (signal_hit or word_count >= 8)
 
 
-def init_task_hint() -> str:
+def init_task_hint(host: str = "claude") -> str:
     return (
         "[context-task-planning] This looks like multi-step work. Before implementation, initialize a task workspace with "
-        f'`{installed_skill_command("init-task.sh")} "<task title>"`, then capture goal, non-goals, acceptance criteria, constraints, and next action in `.planning/<slug>/`.'
+        f'`{installed_skill_command("init-task.sh", host=host)} "<task title>"`, then capture goal, non-goals, acceptance criteria, constraints, and next action in `.planning/<slug>/`.'
     )
 
 

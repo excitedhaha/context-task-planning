@@ -143,7 +143,7 @@ When the host does not provide native task UI or prompt hooks, use the shared sc
 - use `scripts/check-task-drift.sh --prompt "..." --json` before mixing a new complex request into the active task when the match is uncertain
 - if the result is `likely-unrelated` or `unclear`, ask whether to continue the current task, switch tasks, or create a new task before changing planning state
 
-This is especially important for Codex-style environments where the file protocol exists but host-native reminder surfaces may not.
+This is especially important for shell-only or unhooked Codex environments where the file protocol exists but host-native reminder surfaces may not.
 
 When you need more than the prompt-friendly cue, `scripts/current-task.sh` now prints a human-readable summary with the recommended next step, suggested commands, and repo/worktree context. Keep `--compact` for prompts, tmux, or status bars.
 
@@ -225,6 +225,7 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task; the standard location is `.worktrees/<task-slug>/<repo-id>/`
 - `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
+- `codex-hooks/config.example.toml` - optional Codex lifecycle hooks for prompt-time task reminders and end-of-turn planning sync
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, delegates, and derived compact artifacts; add `--fix-warnings` to resync warning-level snapshot drift from `state.json` and refresh compact artifacts when needed
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
