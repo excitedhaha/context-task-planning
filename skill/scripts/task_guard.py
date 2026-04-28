@@ -2521,16 +2521,16 @@ def guidance_for_current_task(task: dict) -> dict:
             }
         return {
             "recommended_action": "init-task",
-            "recommended_reason": "No active or resumable task is selected, so the next step is to start a new task.",
+            "recommended_reason": "No active or resumable task is selected, so the next step is to start a new task with a confirmed title.",
             "recommended_commands": [
-                'sh skill/scripts/init-task.sh "Task Title"',
+                'sh skill/scripts/init-task.sh "Confirmed Task Title"',
             ],
         }
 
     if task.get("status") == "done":
         commands = [
             f"sh skill/scripts/archive-task.sh {slug}",
-            'sh skill/scripts/init-task.sh "Next task title"',
+            'sh skill/scripts/init-task.sh "Next confirmed task title"',
         ]
         return {
             "recommended_action": "archive-or-open-new-task",

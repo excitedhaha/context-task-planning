@@ -674,7 +674,7 @@ def looks_complex(prompt: str) -> bool:
 def init_task_hint(host: str = "claude") -> str:
     return (
         "[context-task-planning] This looks like multi-step work. Before implementation, initialize a task workspace with "
-        f'`{installed_skill_command("init-task.sh", host=host)} "<task title>"`, then capture goal, non-goals, acceptance criteria, constraints, and next action in `.planning/<slug>/`.'
+        f'`{installed_skill_command("init-task.sh", host=host)} "<confirmed task title>"`. If you infer the title from the request, ask the user to confirm or edit the title and slug before creating `.planning/<slug>/`. Then capture goal, non-goals, acceptance criteria, constraints, and next action in the task files.'
     )
 
 

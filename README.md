@@ -50,6 +50,8 @@ Refactor the auth flow across backend and frontend. This will take multiple step
 
 For multi-step or recovery-sensitive work, the agent should usually pick this skill automatically. If your host does not auto-invoke it reliably, mention `context-task-planning` explicitly.
 
+If the prompt does not name the task explicitly, the agent should suggest a concise task title and slug first, then wait for your confirmation before creating `.planning/<slug>/`.
+
 ### 3. Check that the task became visible
 
 - `Claude Code` - look for `task:<slug>` in the status line; bundled task-entry skills such as `task-current` or `task-list` can also appear after install
@@ -108,7 +110,7 @@ The shared shell entry points now map cleanly to those basics:
 
 Claude Code users now also get thin skill-style entry points for the same high-frequency flows:
 
-- `task-init <task title>` - create a tracked task
+- `task-init <task title>` - create a tracked task from a confirmed title
 - `task-current` - inspect the current task and next action
 - `task-list` - list existing tasks in the workspace
 - `task-validate` - validate the current task without auto-fixing warnings
@@ -117,7 +119,7 @@ Claude Code users now also get thin skill-style entry points for the same high-f
 
 OpenCode users also get a small slash-command surface for the same high-frequency flows:
 
-- `/task-init <task title>` - create a tracked task
+- `/task-init <task title>` - create a tracked task from a confirmed title
 - `/task-current` - inspect the current task and next action
 - `/task-list` - list existing tasks in the workspace
 - `/task-validate` - validate the current task without auto-fixing warnings

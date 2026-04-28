@@ -58,10 +58,13 @@ Each task lives in its own directory:
 
 ## First steps
 
-1. Run `scripts/init-task.sh "<task title>"`
-2. Read `.planning/<slug>/state.json`
-3. Read `.planning/<slug>/task_plan.md`
-4. Fill in missing goal, non-goals, acceptance criteria, constraints, and open questions before implementation
+1. If the user did not explicitly provide a task name, infer a concise candidate task title from the request, derive the slug that `scripts/slugify.sh` would produce, and ask the user to confirm or edit that title before creating files
+2. Run `scripts/init-task.sh "<confirmed task title>"`
+3. Read `.planning/<slug>/state.json`
+4. Read `.planning/<slug>/task_plan.md`
+5. Fill in missing goal, non-goals, acceptance criteria, constraints, and open questions before implementation
+
+Do not silently create a task with an agent-inferred name. Confirmation is only unnecessary when the user has already provided the task title directly, such as `task-init Implement auth flow` or "create a task named Implement auth flow".
 
 If multiple sessions are active, give the current session a stable session key and bind one task to it:
 

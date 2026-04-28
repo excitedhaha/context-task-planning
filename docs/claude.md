@@ -59,7 +59,7 @@ The bundled config includes both hooks and `statusLine`, so copying it is enough
 
 Claude Code now also supports bundled thin task-entry skills for the same high-frequency flows that OpenCode exposes as slash commands:
 
-- `task-init <task title>` - create a tracked task
+- `task-init <task title>` - create a tracked task from a confirmed title
 - `task-current` - inspect the current task and next action
 - `task-list` - list existing tasks in the workspace
 - `task-validate` - validate the current task without auto-fixing warnings

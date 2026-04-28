@@ -6,6 +6,8 @@ Most users do not need to call the scripts directly for normal work.
 
 For multi-step or recovery-sensitive work, the agent should usually pick this skill automatically from the task description alone.
 
+When the user has not explicitly named the task, the agent should propose the inferred title and slug, then wait for confirmation before creating `.planning/<slug>/`.
+
 Useful prompts:
 
 ```text

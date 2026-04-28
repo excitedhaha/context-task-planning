@@ -109,7 +109,7 @@ This is a sample illustration of the expected title/toast fallback, not a live s
 
 Current bundled commands:
 
-- `/task-init <task title>` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/init-task.sh "<task title>"` and report the created task
+- `/task-init <task title>` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/init-task.sh "<task title>"` with a confirmed title and report the created task
 - `/task-current` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/current-task.sh` and summarize the active task plus next action
 - `/task-list` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/list-tasks.sh` and summarize the available tasks in the workspace
 - `/task-validate` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/validate-task.sh` and summarize whether the current task state is valid

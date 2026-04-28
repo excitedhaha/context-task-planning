@@ -52,6 +52,8 @@ Skip these for your first run:
 
 For work like this, the agent should usually pick the skill automatically. Only mention `context-task-planning` explicitly if your host does not auto-invoke it reliably.
 
+If you did not explicitly name the task, the agent should propose the inferred task title and slug and wait for your confirmation before it creates `.planning/<slug>/`.
+
 #### Step 3: Check that the task showed up
 
 You should see one of these:
@@ -68,7 +70,7 @@ If that cue is missing, use:
 
 For OpenCode specifically, after you enable the OpenCode command helpers, the bundled command set covers the common task loop:
 
-- `/task-init <task title>`
+- `/task-init <task title>` using a confirmed title
 - `/task-current`
 - `/task-list`
 - `/task-validate`
