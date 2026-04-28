@@ -40,6 +40,12 @@ Choose `context-task-planning` and the agent(s) you want when prompted. Claude C
 
 If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
 
+If you use Codex and want lifecycle hooks, install the hook package after the skill:
+
+```bash
+npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+```
+
 For preview or local contributor install paths, see `docs/sharing.md`.
 
 ### 2. Give the agent one real task
@@ -56,7 +62,7 @@ If the prompt does not name the task explicitly, the agent should suggest a conc
 
 - `Claude Code` - look for `task:<slug>` in the status line; bundled task-entry skills such as `task-current` or `task-list` can also appear after install
 - `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
-- `Codex` - if `codex features list` includes `codex_hooks`, enable optional Codex hooks for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
+- `Codex` - if `codex features list` includes `codex_hooks`, install the optional hook package for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
 
 In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.
 

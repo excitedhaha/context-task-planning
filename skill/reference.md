@@ -148,7 +148,7 @@ If OpenSpec detection lands in `status=ambiguous`, `current-task` and `compact-c
 
 For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.
 
-For Codex specifically, the optional hooks under `codex-hooks/` can be merged into `~/.codex/config.toml` or a trusted project `.codex/config.toml`. They use Codex `SessionStart`, `UserPromptSubmit`, `PostToolUse`, and `Stop` to re-inject task context in long threads and ask Codex to continue once when a mutating turn is about to finish without planning sync evidence. They do not provide a native status cue or mutate native subagent prompts.
+For Codex specifically, prefer the packaged hooks under `hooks/context-task-planning/` so users can install a standard `hooks.json` layer without hand-merging TOML. The manual fallback remains `codex-hooks/config.example.toml` for `~/.codex/config.toml` or a trusted project `.codex/config.toml`. Both paths use Codex `SessionStart`, `UserPromptSubmit`, `PostToolUse`, and `Stop` to re-inject task context in long threads and ask Codex to continue once when a mutating turn is about to finish without planning sync evidence. They do not provide a native status cue or mutate native subagent prompts.
 
 Claude Code also supports bundled thin task-entry skills for the same high-frequency flows. Those skills should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
 

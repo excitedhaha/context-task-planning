@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'p=\"${CODEX_HOME:-$HOME/.codex}/hooks/context-task-planning/scripts/run-hook.py\"; if [ ! -f \"$p\" ]; then d=\"$PWD\"; while [ \"$d\" != \"/\" ]; do q=\"$d/.codex/hooks/context-task-planning/scripts/run-hook.py\"; [ -f \"$q\" ] && { p=\"$q\"; break; }; d=$(dirname \"$d\"); done; fi; exec python3 \"$p\" session_start'",
+            "timeout": 8,
+            "statusMessage": "Loading task context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'p=\"${CODEX_HOME:-$HOME/.codex}/hooks/context-task-planning/scripts/run-hook.py\"; if [ ! -f \"$p\" ]; then d=\"$PWD\"; while [ \"$d\" != \"/\" ]; do q=\"$d/.codex/hooks/context-task-planning/scripts/run-hook.py\"; [ -f \"$q\" ] && { p=\"$q\"; break; }; d=$(dirname \"$d\"); done; fi; exec python3 \"$p\" user_prompt_submit'",
+            "timeout": 5,
+            "statusMessage": "Checking planning context"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'p=\"${CODEX_HOME:-$HOME/.codex}/hooks/context-task-planning/scripts/run-hook.py\"; if [ ! -f \"$p\" ]; then d=\"$PWD\"; while [ \"$d\" != \"/\" ]; do q=\"$d/.codex/hooks/context-task-planning/scripts/run-hook.py\"; [ -f \"$q\" ] && { p=\"$q\"; break; }; d=$(dirname \"$d\"); done; fi; exec python3 \"$p\" post_tool_use'",
+            "timeout": 5,
+            "statusMessage": "Tracking planning evidence"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'p=\"${CODEX_HOME:-$HOME/.codex}/hooks/context-task-planning/scripts/run-hook.py\"; if [ ! -f \"$p\" ]; then d=\"$PWD\"; while [ \"$d\" != \"/\" ]; do q=\"$d/.codex/hooks/context-task-planning/scripts/run-hook.py\"; [ -f \"$q\" ] && { p=\"$q\"; break; }; d=$(dirname \"$d\"); done; fi; exec python3 \"$p\" stop'",
+            "timeout": 8,
+            "statusMessage": "Checking planning sync"
+          }
+        ]
+      }
+    ]
+  }
+}

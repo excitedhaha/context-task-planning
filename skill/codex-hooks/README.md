@@ -22,12 +22,20 @@ The core skill remains shell-first and file-backed. These hooks only adapt Codex
 
 1. Make sure `codex --version` is a build that exposes `codex_hooks` in `codex features list`; `codex-cli 0.125.0` is verified.
 2. Make sure the skill is installed at `~/.codex/skills/context-task-planning`.
-3. Merge `config.example.toml` into either:
+3. Prefer the packaged hook install:
+
+```bash
+npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+```
+
+Use `--project` from a repository for a trusted project-local install.
+
+Manual fallback: merge `config.example.toml` into either:
 
 - `~/.codex/config.toml`
 - `.codex/config.toml`
 
-For first-time testing, user-level `~/.codex/config.toml` is usually simpler. Project-local `.codex/config.toml` only loads after Codex trusts the project.
+For first-time testing, user-level hooks are usually simpler. Project-local `.codex/` hooks only load after Codex trusts the project.
 
 Codex hooks are behind the `codex_hooks` feature flag, so keep this line when merging the example:
 

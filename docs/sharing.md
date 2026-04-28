@@ -38,7 +38,14 @@ Notes:
 2. Choose `context-task-planning` and any task-entry skills your teammate wants when prompted.
 3. If they want to preview before installing, they can run `npx skills add excitedhaha/context-task-planning -l`.
 4. If they use Claude Code and want hook automation, merge `skill/claude-hooks/settings.example.json` into either `~/.claude/settings.json` or `.claude/settings.local.json`.
-5. If they use Codex and want hook automation, merge `skill/codex-hooks/config.example.toml` into `~/.codex/config.toml` or a trusted project `.codex/config.toml`.
+5. If they use Codex and want hook automation, prefer the packaged hook install:
+
+   ```bash
+   npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+   ```
+
+   Use `--project` from a repository for a trusted project-local install. Team bootstrap scripts can append `--yes` after reviewing the hook package. If GitHub rejects the marketplace request with a rate-limit or `403`, set `GITHUB_TOKEN` and retry. If the hook-package installer is unavailable, merge `skill/codex-hooks/config.example.toml` manually into `~/.codex/config.toml` or a trusted project `.codex/config.toml`.
+
 6. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
 
 ## Local fallback for contributors
@@ -81,6 +88,8 @@ Before pushing to GitHub:
 ```bash
 for f in skill/scripts/*.sh; do sh -n "$f"; done
 python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py
+python3 -m py_compile hooks/context-task-planning/scripts/*.py
+sh skill/scripts/smoke-test-codex-hook-package.sh
 npx skills add . -l
 sh skill/scripts/validate-task.sh || true
 ```
@@ -89,7 +98,7 @@ sh skill/scripts/validate-task.sh || true
 3. Confirm local absolute paths only appear in private planning state, not in shareable docs.
 4. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
 5. Confirm install commands point at `excitedhaha/context-task-planning`.
-6. Confirm hook docs still match `skill/claude-hooks/settings.example.json` and `skill/codex-hooks/config.example.toml`.
+6. Confirm hook docs still match `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, and `hooks/context-task-planning/hooks.json`.
 
 ## Notes on `.planning/`
 
