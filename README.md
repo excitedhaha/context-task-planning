@@ -1,6 +1,6 @@
 # Context Task Planning
 
-Keep complex coding tasks recoverable, visible, and isolated across Claude Code, OpenCode, and Codex.
+Keep complex coding tasks recoverable, visible, and isolated across Claude Code, OpenCode, Codex, and TraeCLI/Coco.
 
 `context-task-planning` gives a coding agent a task-scoped workspace on disk so it can:
 
@@ -49,6 +49,14 @@ Choose `context-task-planning` and the agent(s) you want when prompted. Claude C
 
 If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
 
+TraeCLI/Coco recommended install:
+
+```bash
+coco plugin install --type=github excitedhaha/context-task-planning --name context-task-planning
+```
+
+Restart TraeCLI/Coco after installation. The plugin exposes the main skill, bundled `/context-task-planning:task-*` slash commands, and lifecycle hooks declared in `coco.yaml`.
+
 If you use Codex and want lifecycle hooks, install the hook package after the skill:
 
 ```bash
@@ -72,6 +80,7 @@ If the prompt does not name the task explicitly, the agent should suggest a conc
 - `Claude Code` - plugin hooks should inject task context and reminders automatically; plugin task-entry skills appear namespaced, such as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 - `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
 - `Codex` - if `codex features list` includes `codex_hooks`, install the optional hook package for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
+- `TraeCLI/Coco` - plugin hooks inject task context and planning-sync reminders; bundled slash commands appear namespaced, such as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 
 In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.
 
@@ -91,6 +100,7 @@ When the task has grown enough that replaying multiple markdown files feels nois
 - `docs/claude.md` - Claude-specific setup and cues
 - `docs/opencode.md` - OpenCode-specific install steps, slash commands, plugin behavior, and troubleshooting
 - `docs/codex.md` - Codex-specific hooks and shell-first workflow
+- `docs/trae.md` - TraeCLI/Coco plugin install, slash commands, hooks, and troubleshooting
 - `docs/design.md` - the deeper architecture
 - `docs/spec-aware-task-runtime.md` - spec-aware design notes, mainly for contributors or deeper implementation questions
 
@@ -142,6 +152,17 @@ OpenCode users also get a small slash-command surface for the same high-frequenc
 - `/task-done [slug]` - mark the current or named task done after verification
 
 See `docs/opencode.md` for OpenCode-specific install details, troubleshooting, and smoke tests.
+
+TraeCLI/Coco users get equivalent plugin-bundled slash commands under the plugin namespace:
+
+- `/context-task-planning:task-init <task title>` - create a tracked task from a confirmed title
+- `/context-task-planning:task-current` - inspect the current task and next action
+- `/context-task-planning:task-list` - list existing tasks in the workspace
+- `/context-task-planning:task-validate` - validate the current task without auto-fixing warnings
+- `/context-task-planning:task-drift <new request>` - check whether a new ask still fits the current task
+- `/context-task-planning:task-done [slug]` - mark the current or named task done after verification
+
+See `docs/trae.md` for TraeCLI/Coco-specific install details, hooks, and smoke tests.
 
 ## What stays on disk
 

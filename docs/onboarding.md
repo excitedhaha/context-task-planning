@@ -33,6 +33,14 @@ claude plugin install context-task-planning@context-task-planning
 
 Then run `/reload-plugins` or restart Claude Code.
 
+For TraeCLI/Coco, install the plugin:
+
+```bash
+coco plugin install --type=github excitedhaha/context-task-planning --name context-task-planning
+```
+
+Then restart TraeCLI/Coco.
+
 For OpenCode, Codex, or standalone skill installs:
 
 ```bash
@@ -72,14 +80,16 @@ You should see one of these:
 - `Claude Code` - plugin hooks inject task context and reminders; if you also enable the optional status-line fallback, it can show `task!:<slug>` for writer bindings, `obs:<slug>` for observer bindings, or `wksp:<slug>` for the workspace fallback pointer
 - `OpenCode` - `task:<slug> | ...` in the session title; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` and `/task-list`
 - `Codex` - optional hooks inject task reminders on new turns and can ask Codex to sync planning before finishing; `sh skill/scripts/current-task.sh` remains the manual visibility check
+- `TraeCLI/Coco` - plugin hooks inject task reminders and planning-sync guardrails; bundled slash commands appear as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 
 If that cue is missing, use:
 
 - `docs/claude.md`
 - `docs/opencode.md`
 - `docs/codex.md`
+- `docs/trae.md`
 
-For OpenCode specifically, after you enable the OpenCode command helpers, the bundled command set covers the common task loop:
+For OpenCode or TraeCLI/Coco, the bundled command set covers the common task loop:
 
 - `/task-init <task title>` using a confirmed title
 - `/task-current`
@@ -88,7 +98,7 @@ For OpenCode specifically, after you enable the OpenCode command helpers, the bu
 - `/task-drift <new request>`
 - `/task-done [slug]`
 
-`docs/opencode.md` has the install, smoke-test, and troubleshooting details.
+`docs/opencode.md` and `docs/trae.md` have host-specific install, smoke-test, and troubleshooting details.
 
 #### Step 4: Simulate one recovery
 
@@ -185,6 +195,7 @@ Host-specific setup lives in:
 - `docs/claude.md`
 - `docs/opencode.md`
 - `docs/codex.md`
+- `docs/trae.md`
 
 You can ignore until later:
 
@@ -441,6 +452,7 @@ If you want the full command contract instead of the progressive usage guide, us
 - `docs/claude.md` - Claude-specific setup and visible cues
 - `docs/opencode.md` - OpenCode-specific plugin behavior and limitations
 - `docs/codex.md` - Codex-specific shell-first workflow
+- `docs/trae.md` - TraeCLI/Coco-specific plugin behavior, commands, and hooks
 - `docs/design.md` - why session bindings, repo scopes, and worktrees exist
 - `skill/reference.md` - command reference once you want explicit control
 

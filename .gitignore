@@ -6,10 +6,12 @@ __pycache__/
 .planning/
 .worktrees/
 
-# Local Claude/Codex/OpenCode project settings should not be shared unless intentional.
+# Local Claude/Codex/OpenCode/Trae project settings should not be shared unless intentional.
 .claude/
 .codex/
 .opencode/
+.coco/
+.trae/
 log/
 .obsidian/
 *.base

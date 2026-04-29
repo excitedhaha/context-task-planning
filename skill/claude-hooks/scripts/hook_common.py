@@ -45,6 +45,11 @@ def host_skill_home(host: str = "claude") -> str:
         return "$HOME/.codex/skills/context-task-planning"
     if host == "opencode":
         return "$HOME/.config/opencode/skills/context-task-planning"
+    if host == "trae":
+        plugin_root = os.environ.get("COCO_PLUGIN_ROOT", "").strip()
+        if plugin_root:
+            return str(Path(plugin_root) / "skill")
+        return "$HOME/.coco/skills/context-task-planning"
     return "$HOME/.claude/skills/context-task-planning"
 
 
@@ -53,6 +58,7 @@ def host_display_name(host: str = "claude") -> str:
         "codex": "Codex",
         "opencode": "OpenCode",
         "claude": "Claude",
+        "trae": "TraeCLI/Coco",
     }
     return names.get(host, "agent")
 

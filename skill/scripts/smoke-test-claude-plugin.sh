@@ -47,7 +47,16 @@ with open(hook_path, encoding="utf-8") as fh:
 
 if plugin.get("name") != "context-task-planning":
     raise SystemExit(f"unexpected plugin name: {plugin.get('name')!r}")
-if plugin.get("skills") != ["./skill", "./skills"]:
+expected_skills = [
+    "./skill",
+    "./skills/task-current",
+    "./skills/task-done",
+    "./skills/task-drift",
+    "./skills/task-init",
+    "./skills/task-list",
+    "./skills/task-validate",
+]
+if plugin.get("skills") != expected_skills:
     raise SystemExit(f"unexpected plugin skills paths: {plugin.get('skills')!r}")
 if plugin.get("hooks") != "./skill/claude-hooks/hooks.json":
     raise SystemExit(f"unexpected plugin hooks path: {plugin.get('hooks')!r}")

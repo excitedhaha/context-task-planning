@@ -1,6 +1,6 @@
 {
   "name": "context-task-planning",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Task-scoped context engineering for recoverable, visible, and isolated long-running coding work.",
   "author": {
     "name": "excitedhaha"
@@ -15,7 +15,12 @@
   ],
   "skills": [
     "./skill",
-    "./skills"
+    "./skills/task-current",
+    "./skills/task-done",
+    "./skills/task-drift",
+    "./skills/task-init",
+    "./skills/task-list",
+    "./skills/task-validate"
   ],
   "hooks": "./skill/claude-hooks/hooks.json"
 }

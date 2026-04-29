@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -23,9 +23,9 @@ Use this skill when the work involves one or more of the following:
 - recovery after context loss or agent switching
 - optional delegate or sub-agent work on isolated subproblems
 
-## Claude task-entry skills
+## Thin host entry points
 
-Claude Code can also use bundled thin task-entry skills for high-frequency flows:
+Claude Code and TraeCLI/Coco can also use bundled thin task-entry skills or slash commands for high-frequency flows:
 
 - `task-init`
 - `task-current`
@@ -34,7 +34,7 @@ Claude Code can also use bundled thin task-entry skills for high-frequency flows
 - `task-drift`
 - `task-done`
 
-Those entry skills should stay thin and reuse the shared shell scripts documented below rather than introducing a parallel workflow.
+Those entry points should stay thin and reuse the shared shell scripts documented below rather than introducing a parallel workflow.
 
 ## Core operating model
 
@@ -146,7 +146,7 @@ When the host does not provide native task UI or prompt hooks, use the shared sc
 - use `scripts/check-task-drift.sh --prompt "..." --json` before mixing a new complex request into the active task when the match is uncertain
 - if the result is `likely-unrelated` or `unclear`, ask whether to continue the current task, switch tasks, or create a new task before changing planning state
 
-This is especially important for shell-only or unhooked Codex environments where the file protocol exists but host-native reminder surfaces may not.
+This is especially important for shell-only, unhooked Codex, or unhooked TraeCLI/Coco environments where the file protocol exists but host-native reminder surfaces may not.
 
 When you need more than the prompt-friendly cue, `scripts/current-task.sh` now prints a human-readable summary with the recommended next step, suggested commands, and repo/worktree context. Keep `--compact` for prompts, tmux, or status bars.
 
@@ -213,7 +213,7 @@ When resuming a task, recover in this order:
 3. latest relevant entries in `progress.md`
 4. unresolved delegates
 
-This keeps recovery portable across Claude Code, Codex, and OpenCode.
+This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Coco.
 
 ## Scripts
 

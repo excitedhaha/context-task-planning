@@ -21,7 +21,7 @@ Shared pieces:
 - `skill/scripts/check-task-drift.sh`
 - `skill/scripts/task_guard.py`
 
-The wrappers stay shell-friendly. The Python core owns the selection logic and drift heuristics so Claude Code, OpenCode, and Codex can reuse one contract.
+The wrappers stay shell-friendly. The Python core owns the selection logic and drift heuristics so Claude Code, OpenCode, Codex, and TraeCLI/Coco can reuse one contract.
 
 For the deeper architecture behind session bindings, repo scope, and worktree-aware routing, see `docs/design.md`.
 
@@ -120,6 +120,7 @@ Recommended JSON fields:
 | Claude Code | `current-task.sh` in shell or tmux now; optional `statusLine` fallback can also render the active task natively | plugin or manual `UserPromptSubmit` hooks can call the shared checker | plugin or manual `PreToolUse` hooks can reuse the same result or re-check tool text | shared core + Claude plugin hooks + optional `claude-hooks/scripts/statusline.py` | high |
 | OpenCode | `current-task.sh` in shell or tmux now; plugin can also inject current task summary, prefix the session title only for explicit session bindings, show a toast, and run best-effort compact sync when visible session events mention compact/compression | plugin can call the shared checker on chat messages | plugin can warn before `Task`, bind shell commands to the OpenCode session with `PLAN_SESSION_KEY`, and reuse the shared compact-sync helper on compact-like events | shared core + `skill/opencode-plugin/task-focus-guard.js` (quiet outside repos that already use `.planning/`) | medium |
 | Codex | `current-task.sh` in shell or tmux now; optional hooks can inject task context but cannot render a native status cue | `UserPromptSubmit` can inject the shared task and drift context on every turn | `PostToolUse` records planning evidence and `Stop` can continue once to request planning sync; `PreToolUse` is not used for context injection | shared core + `skill/codex-hooks` + shell fallback | medium |
+| TraeCLI/Coco | `current-task.sh` in shell or tmux now; plugin commands expose `/context-task-planning:task-current` and hooks inject task context but do not render a native status cue | plugin `user_prompt_submit` hook injects shared task and drift context | plugin `pre_tool_use` adds task/tool reminders, `post_tool_use` records planning evidence, and `stop` can continue once to request planning sync | shared core + `coco.yaml` + `skill/trae-hooks` + shell fallback | medium |
 
 The guard consumes session, role, repo, and checkout context from the shared resolver, but the full concurrency and workspace model lives in `docs/design.md` rather than in this guard-specific note.
 

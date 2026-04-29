@@ -1,0 +1,40 @@
+---
+name: context-task-planning
+description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-backed state, recovery after context loss, or optional sub-agent delegation.
+allowed-tools: Read Bash Glob Grep
+---
+
+# Context Task Planning
+
+Use persistent planning files as a task-scoped context system.
+
+This is the TraeCLI/Coco-visible entry point for the same shared runtime that also supports Claude Code, OpenCode, Codex, and shell-first fallback usage. The full source of truth lives under the plugin root's `skill/` directory.
+
+## When to use
+
+Use this skill when work is multi-step, interruption-prone, or large enough that the live chat history is not a safe source of truth.
+
+## Core workflow
+
+Each task lives under `.planning/<slug>/` with:
+
+- `state.json` for operational truth
+- `task_plan.md` for framing and hot context
+- `progress.md` for checkpoints and verification
+- `findings.md` for durable discoveries
+
+Before implementation, make sure the task has a goal, non-goals, acceptance criteria, constraints, and a next action. If you infer a task title from the request, ask the user to confirm or edit the title before creating `.planning/<slug>/`.
+
+## TraeCLI/Coco plugin paths
+
+When installed as a TraeCLI/Coco plugin, prefer these paths:
+
+```bash
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/init-task.sh" "<confirmed task title>"
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/current-task.sh"
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/current-task.sh" --compact
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/check-task-drift.sh" --prompt "<new request>" --json
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/validate-task.sh"
+```
+
+For detailed protocol rules, read `${COCO_PLUGIN_ROOT}/skill/SKILL.md` and `${COCO_PLUGIN_ROOT}/skill/reference.md` if those paths are available. Keep host adapters thin and reuse `skill/scripts/` instead of inventing a parallel workflow.

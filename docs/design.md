@@ -342,6 +342,9 @@ Host adapters are optional layers on top of that core.
 - **Codex hooks** inject prompt-time task context and end-of-turn planning
   sync reminders, while still falling back to the same scripts and file protocol
   when hooks are not enabled
+- **TraeCLI/Coco plugin hooks** expose the same skill and slash-command workflow
+  through `coco.yaml`, inject prompt/tool context, and reuse the same end-of-turn
+  planning-sync guardrails without becoming a separate planner
 
 Adapters must not become the source of truth. They surface and route the same
 file-backed state; they do not replace it.

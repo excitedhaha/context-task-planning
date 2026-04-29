@@ -2,7 +2,7 @@
 
 This directory contains an optional Claude Code automation layer for `context-task-planning`.
 
-The core skill remains portable across Claude Code, Codex, and OpenCode.
+The core skill remains portable across Claude Code, OpenCode, Codex, and TraeCLI/Coco.
 These hooks are Claude-only enhancements for users who want automatic context injection.
 
 When plugin hooks are enabled, Claude Code receives task context on lifecycle events. The native status line remains an optional standalone fallback because Claude Code plugins do not currently distribute the main `statusLine` setting.

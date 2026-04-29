@@ -2,7 +2,7 @@
 
 ## Goal
 
-Strengthen multi-repo subagent behavior by giving Claude Code, OpenCode, and Codex one shared preflight contract for routing, repo/worktree context injection, and delegate escalation.
+Strengthen multi-repo subagent behavior by giving Claude Code, OpenCode, Codex, and TraeCLI/Coco one shared preflight contract for routing, repo/worktree context injection, and delegate escalation.
 
 The intended result is:
 
@@ -52,7 +52,7 @@ Recommended shell contract:
 sh skill/scripts/subagent-preflight.sh \
   --cwd <path> \
   --session-key <key> \
-  --host claude|opencode|codex \
+  --host claude|opencode|codex|trae \
   --task-text "<description prompt command subagent_type combined>" \
   --tool-name Task \
   --json
@@ -62,7 +62,7 @@ P0 flags:
 
 - `--cwd` - current working directory for workspace and task resolution
 - `--session-key` - optional session binding key; defaults to normal resolution rules
-- `--host` - `claude`, `opencode`, `codex`, or `generic`; used only for formatting hints, not for source-of-truth routing
+- `--host` - `claude`, `opencode`, `codex`, `trae`, or `generic`; used only for formatting hints, not for source-of-truth routing
 - `--task` - optional explicit task slug override
 - `--task-text` - normalized text that represents the outbound subagent request
 - `--tool-name` - defaults to `Task`; allows future reuse in other tool-time checks
@@ -354,9 +354,11 @@ Modified files:
 - `skill/claude-hooks/scripts/pre_tool_use.py`
 - `skill/claude-hooks/scripts/user_prompt_submit.py`
 - `skill/opencode-plugin/task-focus-guard.js`
+- `skill/trae-hooks/scripts/pre_tool_use.py`
 - `docs/claude.md`
 - `docs/opencode.md`
 - `docs/codex.md`
+- `docs/trae.md`
 - `skill/reference.md`
 
 Optional follow-up files:

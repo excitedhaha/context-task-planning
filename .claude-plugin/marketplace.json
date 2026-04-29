@@ -4,13 +4,13 @@
     "name": "excitedhaha"
   },
   "metadata": {
-    "description": "Recoverable task-scoped planning tools for Claude Code."
+    "description": "Recoverable task-scoped planning tools for AI coding agents."
   },
   "plugins": [
     {
       "name": "context-task-planning",
       "source": "./",
-      "description": "Task-scoped context engineering with skills and Claude Code lifecycle hooks.",
+      "description": "Task-scoped context engineering with portable skills plus Claude Code and TraeCLI/Coco plugin adapters.",
       "author": {
         "name": "excitedhaha"
       },

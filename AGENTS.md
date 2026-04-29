@@ -4,23 +4,24 @@
 - `context-task-planning` is a shell-first, file-backed skill for long-running AI coding tasks.
 - Shared truth lives in `skill/scripts/` and local task state under `.planning/<slug>/`.
 - Keep routing, drift, repo, and worktree logic in the shared core, mainly `skill/scripts/task_guard.py` and `skill/scripts/*.sh`.
-- Host integrations in `skill/claude-hooks/` and `skill/opencode-plugin/` are thin adapters, not alternate sources of truth.
+- Host integrations in `skill/claude-hooks/`, `skill/opencode-plugin/`, `skill/codex-hooks/`, and `skill/trae-hooks/` are thin adapters, not alternate sources of truth.
 
 ## Key Files
 - `README.md`: positioning and quickstart
 - `VERSION`, `CHANGELOG.md`: release source of truth and release notes
 - `.claude-plugin/plugin.json`: Claude Code plugin manifest
+- `coco.yaml`: TraeCLI/Coco plugin hook manifest
 - `.github/workflows/release.yml`: automatic tag and GitHub Release workflow
 - `docs/onboarding.md`: user workflow
 - `docs/design.md`: architecture and invariants
 - `skill/reference.md`: command contract
-- `docs/claude.md`, `docs/opencode.md`, `docs/codex.md`: host-specific notes
+- `docs/claude.md`, `docs/opencode.md`, `docs/codex.md`, `docs/trae.md`: host-specific notes
 
 ## Working Rules
 - Prefer minimal changes and preserve the shell-first workflow.
 - If behavior changes, update the matching docs in the same change.
 - Do not duplicate shared logic in host-specific adapters.
-- Do not commit local state under `.planning/`, `.worktrees/`, `.claude/`, `.codex/`, or `.opencode/` unless explicitly asked.
+- Do not commit local state under `.planning/`, `.worktrees/`, `.claude/`, `.codex/`, `.opencode/`, `.coco/`, or `.trae/` unless explicitly asked.
 
 ## Release Discipline
 - Treat user-visible, install/distribution, workflow, hook, script, or doc behavior changes as release-bearing changes.
@@ -32,4 +33,5 @@
 - Doc-only changes: reread the touched markdown and keep it concise.
 - Script changes: `for f in skill/scripts/*.sh; do sh -n "$f"; done`
 - Claude hook changes: `python3 -m py_compile skill/claude-hooks/scripts/*.py`
+- Trae hook changes: `python3 -m py_compile skill/trae-hooks/scripts/*.py`
 - Workflow changes: run the relevant smoke test plus `sh skill/scripts/validate-task.sh`

@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-29
+
+### Added
+- Added TraeCLI/Coco plugin support with `coco.yaml`, bundled slash commands, a Trae-visible main skill entry, and lifecycle hooks under `skill/trae-hooks/`.
+- Added `smoke-test-trae-plugin.sh` to validate Trae/Coco plugin paths, command files, hook scripts, and plugin-root command guidance.
+- Added TraeCLI/Coco setup and troubleshooting documentation.
+
+### Changed
+- Extended the supported-host positioning from Claude Code, OpenCode, and Codex to include TraeCLI/Coco while keeping `skill/scripts/` as the shared runtime.
+- Claude plugin skill paths now list the bundled task-entry skills explicitly so the Trae-visible main skill entry does not create a duplicate Claude skill.
+
 ## [0.3.0] - 2026-04-29
 
 ### Added

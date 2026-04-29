@@ -31,13 +31,16 @@ jobs:
         run: for f in skill/scripts/*.sh; do sh -n "$f"; done
 
       - name: Compile hook Python scripts
-        run: python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py hooks/context-task-planning/scripts/*.py
+        run: python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py skill/trae-hooks/scripts/*.py hooks/context-task-planning/scripts/*.py
 
       - name: Smoke test Claude plugin package
         run: sh skill/scripts/smoke-test-claude-plugin.sh
 
       - name: Smoke test Codex hook package
         run: sh skill/scripts/smoke-test-codex-hook-package.sh
+
+      - name: Smoke test Trae/Coco plugin package
+        run: sh skill/scripts/smoke-test-trae-plugin.sh
 
       - name: Extract release metadata
         id: version

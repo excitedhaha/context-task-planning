@@ -1,0 +1,38 @@
+hooks:
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/session_start.py"'
+    timeout: 8s
+    matchers:
+      - event: session_start
+
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/user_prompt_submit.py"'
+    timeout: 5s
+    matchers:
+      - event: user_prompt_submit
+
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/pre_tool_use.py"'
+    timeout: 5s
+    matchers:
+      - event: pre_tool_use
+        tool: 'Bash|Edit|Write|MultiEdit|Read|Glob|Grep|LS|Task|ApplyPatch'
+
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/post_tool_use.py"'
+    timeout: 5s
+    matchers:
+      - event: post_tool_use
+        tool: 'Bash|Edit|Write|MultiEdit|ApplyPatch'
+
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/stop.py"'
+    timeout: 8s
+    matchers:
+      - event: stop
+
+  - type: command
+    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/pre_compact.py"'
+    timeout: 12s
+    matchers:
+      - event: pre_compact

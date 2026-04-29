@@ -14,13 +14,17 @@ This repository is meant to be shared as a context engineering skill while keepi
 - `README.md`
 - `docs/`
 - `.claude-plugin/`
+- `coco.yaml`
+- `commands/`
+- `hooks/`
 - `skill/`
+- `skills/`
 - `LICENSE`
 
 ## What should stay local
 
 - `.planning/`
-- local `.claude/`, `.codex/`, or `.opencode/` project settings
+- local `.claude/`, `.codex/`, `.opencode/`, `.coco/`, or `.trae/` project settings
 - generated Python cache files
 
 Those paths are ignored by `.gitignore` on purpose.
@@ -40,6 +44,12 @@ For OpenCode, Codex, or standalone skill installs:
 npx skills add excitedhaha/context-task-planning -g
 ```
 
+For TraeCLI/Coco, install the plugin:
+
+```bash
+coco plugin install --type=github excitedhaha/context-task-planning --name context-task-planning
+```
+
 Notes:
 
 1. The Claude plugin exposes the main skill under `skill/`, the bundled task-entry skills under `skills/`, and the plugin hooks under `skill/claude-hooks/hooks.json`.
@@ -54,7 +64,8 @@ Notes:
 
    Use `--project` from a repository for a trusted project-local install. Team bootstrap scripts can append `--yes` after reviewing the hook package. If GitHub rejects the marketplace request with a rate-limit or `403`, set `GITHUB_TOKEN` and retry. If the hook-package installer is unavailable, merge `skill/codex-hooks/config.example.toml` manually into `~/.codex/config.toml` or a trusted project `.codex/config.toml`.
 
-6. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
+6. If they use TraeCLI/Coco, restart the CLI after plugin installation and verify the command surface with `coco plugin validate context-task-planning` or `/plugin list`.
+7. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
 
 ## Local fallback for contributors
 
@@ -104,9 +115,12 @@ for f in skill/scripts/*.sh; do sh -n "$f"; done
 sh skill/scripts/check-version.sh
 sh skill/scripts/extract-release-notes.sh "$(cat VERSION)" >/dev/null
 python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py
+python3 -m py_compile skill/trae-hooks/scripts/*.py
 python3 -m py_compile hooks/context-task-planning/scripts/*.py
 sh skill/scripts/smoke-test-claude-plugin.sh
 sh skill/scripts/smoke-test-codex-hook-package.sh
+sh skill/scripts/smoke-test-trae-plugin.sh
+coco plugin validate --path .
 npx skills add . -l
 sh skill/scripts/validate-task.sh || true
 ```
@@ -116,7 +130,7 @@ sh skill/scripts/validate-task.sh || true
 4. Confirm local absolute paths only appear in private planning state, not in shareable docs.
 5. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
 6. Confirm install commands point at `excitedhaha/context-task-planning`.
-7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, and `hooks/context-task-planning/hooks.json`.
+7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, `hooks/context-task-planning/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
 8. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` handles `v$(cat VERSION)` after the change lands on `main`.
 
 ## Notes on `.planning/`

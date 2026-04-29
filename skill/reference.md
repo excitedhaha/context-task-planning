@@ -152,9 +152,13 @@ For Claude Code specifically, prefer the plugin declared by `.claude-plugin/plug
 
 For Codex specifically, prefer the packaged hooks under `hooks/context-task-planning/` so users can install a standard `hooks.json` layer without hand-merging TOML. The manual fallback remains `codex-hooks/config.example.toml` for `~/.codex/config.toml` or a trusted project `.codex/config.toml`. Both paths use Codex `SessionStart`, `UserPromptSubmit`, `PostToolUse`, and `Stop` to re-inject task context in long threads and ask Codex to continue once when a mutating turn is about to finish without planning sync evidence. They do not provide a native status cue or mutate native subagent prompts.
 
+For TraeCLI/Coco specifically, prefer the plugin root with `coco.yaml`, `commands/`, `skills/`, and `skill/trae-hooks/`. It exposes plugin-bundled slash commands, a Trae-visible main skill entry, prompt/tool hooks, and a `Stop` planning-sync guard while still delegating all durable state and routing decisions to `skill/scripts/`.
+
 Claude Code also supports bundled thin task-entry skills for the same high-frequency flows. Those skills should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
 
 OpenCode also supports bundled slash commands installed through `install-opencode-commands.sh`. Those commands should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
+
+TraeCLI/Coco slash commands live under root `commands/` and should follow the same thin-wrapper rule.
 
 P0 classifications are:
 
