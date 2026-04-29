@@ -99,7 +99,6 @@ Return this when:
 - there is no active task
 - the prompt is empty
 - drift is `likely-unrelated`
-- drift is `unclear`
 - there is no meaningful repo/worktree payload to inject
 
 Effect:
@@ -112,7 +111,7 @@ Effect:
 Return this when all of these are true:
 
 - active task exists
-- drift is `related`
+- drift is `related`, or drift is `unclear` but meaningful repo/worktree context exists so the launched LLM can make the route judgment from conversation context
 - the host request is a native `Task` launch
 - repo/worktree context exists and is meaningful
 - delegate is not required or especially helpful
@@ -121,6 +120,7 @@ Effect:
 
 - inject canonical repo/worktree payload
 - no delegate escalation language beyond normal guardrails
+- for `unclear`, include non-conclusive route-judgment wording instead of blocking the launch
 
 #### `payload_plus_delegate_recommended`
 

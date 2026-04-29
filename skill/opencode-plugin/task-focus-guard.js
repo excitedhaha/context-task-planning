@@ -223,53 +223,6 @@ function shouldRunCompactSync(store, sessionID, event) {
   return true
 }
 
-function currentTaskSummary(task) {
-  const lines = [
-    `[context-task-planning] Current task \`${task.slug}\` | status \`${task.status || "unknown"}\` | mode \`${task.mode || "unknown"}\` | phase \`${task.current_phase || "unknown"}\``,
-    `Next action: ${task.next_action || "(none recorded)"}`,
-    "Keep unrelated work out of this task; if the user's request does not belong here, confirm whether to continue, switch tasks, or initialize a new task before updating planning state.",
-  ]
-  const spec = task?.spec_context || {}
-  if (spec.provider && spec.provider !== "none") {
-    lines.push(
-      `Spec context: mode=${spec.mode || "embedded"} | provider=${spec.provider} | status=${spec.status || "none"}`,
-    )
-    if (spec.primary_ref) {
-      lines.push(`Primary spec ref: ${spec.primary_ref}`)
-    }
-    const candidateRefs = Array.isArray(task?.spec_candidate_refs) ? task.spec_candidate_refs : []
-    if (candidateRefs.length > 0) {
-      lines.push(`Spec candidates: ${candidateRefs.slice(0, 3).join("; ")}`)
-    }
-    if (typeof task?.spec_resolution_hint === "string" && task.spec_resolution_hint.trim()) {
-      lines.push(`Resolve explicitly: ${task.spec_resolution_hint.trim()}`)
-    }
-  }
-
-  if (task.binding_role) {
-    lines.push(
-      `Access: ${task.binding_role} | writer=${task.writer_display || "(none)"} | observers=${task.observer_count || 0}`,
-    )
-    if (task.binding_role === "observer") {
-      lines.push(
-        "Observe-only session: do not edit task_plan.md, progress.md, or state.json here. Delegate lane updates under delegates/<delegate-id>/ are still allowed.",
-      )
-    } else {
-      lines.push(
-        "If this turn materially changes task progress, blockers, or next_action, sync progress.md and state.json before you finish; if Hot Context changes, sync task_plan.md too.",
-      )
-    }
-  }
-
-  if (Array.isArray(task.repo_scope) && task.repo_scope.length > 0) {
-    lines.push(
-      `Repos: primary=${task.primary_repo || "(none)"} | scope=${task.repo_scope.join(", ")}`,
-    )
-  }
-
-  return lines.join("\n")
-}
-
 function noActiveTaskReminder(result) {
   if (!result || result.classification !== "no-active-task" || !result.complex_prompt) {
     return null
@@ -283,17 +236,16 @@ function driftReminder(result) {
   const slug = task.slug || "(unknown)"
 
   if (result.classification === "likely-unrelated") {
+    const matched = Array.isArray(result.matched_terms) && result.matched_terms.length > 0
+      ? result.matched_terms.join(", ")
+      : "none"
+    const cues = Array.isArray(result.switch_cues) && result.switch_cues.length > 0
+      ? result.switch_cues.join(", ")
+      : "none"
     return [
-      `[context-task-planning] The newest user request looks likely unrelated to the current task \`${slug}\`.`,
-      "Before acting, explicitly confirm whether to continue the current task, switch tasks, or create a new task.",
-      `Do not silently mix unrelated work into \`.planning/${slug}/\`.`,
-    ].join(" ")
-  }
-
-  if (result.classification === "unclear" && result.complex_prompt) {
-    return [
-      `[context-task-planning] The newest user request may be drifting away from the current task \`${slug}\`.`,
-      "If it is not part of the same task, confirm whether to continue here, switch tasks, or create a new task before editing planning state.",
+      `[context-task-planning] Route evidence for the assistant: the lightweight heuristic is \`likely-unrelated\` for current task \`${slug}\`.`,
+      `Switch cues: ${cues}. Shared terms: ${matched}.`,
+      "Use the conversation and current task goal to decide same-task, different-task, or unclear. If different-task or genuinely unclear, ask the user before updating planning state or launching subagents; if same-task, continue without surfacing this evidence.",
     ].join(" ")
   }
 
@@ -302,14 +254,14 @@ function driftReminder(result) {
 
 function taskToolPrefix(task, result) {
   if (!result) return null
-  if (result.classification !== "likely-unrelated" && result.classification !== "unclear") {
+  if (result.classification !== "likely-unrelated") {
     return null
   }
 
   return [
     `[context-task-planning] Active task: ${task.slug || "(unknown)"}`,
-    `Drift classification: ${result.classification}`,
-    "Before treating this as a subagent side quest, confirm whether the request belongs to the current task, should switch tasks, or should start a new task.",
+    `Route evidence: heuristic classification is ${result.classification}`,
+    "Use the surrounding conversation and task goal to decide whether the subagent belongs to the current task; if not, ask the user or return a routing mismatch instead of continuing.",
     task.binding_role === "observer"
       ? "This session is observe-only for the main planning files; keep any subagent output inside delegate lanes instead."
       : "",
@@ -539,8 +491,20 @@ function workspaceFallbackReminder(task) {
 
   return [
     `[context-task-planning] Workspace fallback resolved task \`${task.slug}\`, but this OpenCode session is not explicitly bound to it.`,
+    "This is a session-binding advisory, not a drift warning.",
     "Do not treat that fallback task as this session's current task unless you bind or resume it explicitly.",
   ].join(" ")
+}
+
+function shouldShowFallbackReminder(seen, sessionID) {
+  if (!sessionID) {
+    return true
+  }
+  if (seen.has(sessionID)) {
+    return false
+  }
+  seen.add(sessionID)
+  return true
 }
 
 function taskStateForSlug(planRoot, taskSlug) {
@@ -793,6 +757,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const promptBySession = new Map()
   const taskBySession = new Map()
   const completedTaskBySession = new Map()
+  const fallbackAdvisoryBySession = new Set()
   const freshnessBySession = new Map()
   const compactSyncBySession = new Map()
   const postCompactContextBySession = new Map()
@@ -929,14 +894,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
     if (!taskSlug) {
       return
-    }
-
-    if (drift?.classification === "likely-unrelated") {
-      await showToast(
-        "Task drift",
-        `Current task is ${task.slug}; confirm before switching work.`,
-        "warning",
-      )
     }
   }
 
@@ -1393,7 +1350,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
           if (planningRecoveryText) {
             output.system.push(planningRecoveryText)
           }
-          output.system.push(currentTaskSummary(task))
           const reminder = driftReminder(drift)
           if (reminder) {
             output.system.push(reminder)
@@ -1403,7 +1359,9 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
             output.system.push(freshness)
           }
         } else {
-          const fallbackReminder = workspaceFallbackReminder(task)
+          const fallbackReminder = shouldShowFallbackReminder(fallbackAdvisoryBySession, visibleSessionID)
+            ? workspaceFallbackReminder(task)
+            : null
           if (fallbackReminder) {
             output.system.push(fallbackReminder)
           }

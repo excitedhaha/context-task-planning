@@ -81,8 +81,6 @@ def main():
                 print(pre_tool_payload(context))
             return
 
-        if advisory:
-            print(pre_tool_payload(advisory))
         return
 
     if tool_name == "Task":
@@ -124,9 +122,7 @@ def main():
         print(pre_tool_payload(context))
         return
 
-    context = state_summary(state, task_meta=task_meta, tool_name=tool_name)
-
-    print(pre_tool_payload(context))
+    return
 
 
 if __name__ == "__main__":

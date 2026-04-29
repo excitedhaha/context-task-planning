@@ -92,7 +92,8 @@ WORKSPACE_SESSION_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":
 WORKSPACE_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"prompt\":\"Investigate the fallback task\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
 WORKSPACE_PRE_TOOL=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"tool_name\":\"Task\",\"tool_input\":{\"description\":\"Investigate the fallback task\"}}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/pre_tool_use.py")
 WORKSPACE_COMPACT_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
-"$PYTHON_BIN" - "$WORKSPACE_SESSION_START" "$WORKSPACE_PROMPT_SUBMIT" "$WORKSPACE_PRE_TOOL" "$WORKSPACE_COMPACT_START" <<'PY'
+[ -z "$WORKSPACE_PROMPT_SUBMIT" ] || fail "fallback user prompt submit should stay quiet after session-start advisory"
+"$PYTHON_BIN" - "$WORKSPACE_SESSION_START" "$WORKSPACE_PRE_TOOL" "$WORKSPACE_COMPACT_START" <<'PY'
 import json
 import sys
 
@@ -341,6 +342,36 @@ if payload.get("classification") != "related":
     raise SystemExit(f"unexpected drift classification for linked spec ref: {payload.get('classification')!r}")
 PY
 
+UNCLEAR_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$LINKED_ROOT\",\"session_id\":\"linked-session\",\"prompt\":\"调研任务漂移检查怎么做，需要梳理原因\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
+[ -z "$UNCLEAR_PROMPT_SUBMIT" ] || fail "unclear same-task prompt should not emit a visible drift reminder"
+LIKELY_UNRELATED_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$LINKED_ROOT\",\"session_id\":\"linked-session\",\"prompt\":\"另外新任务：修复 billing webhook\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
+"$PYTHON_BIN" - "$LIKELY_UNRELATED_PROMPT_SUBMIT" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+context = payload.get("additionalContext", "")
+if "Route evidence for the assistant" not in context:
+    raise SystemExit(f"likely-unrelated prompt did not emit route evidence: {context!r}")
+if "may be drifting away" in context or "looks likely unrelated" in context:
+    raise SystemExit(f"route evidence used old drift conclusion wording: {context!r}")
+PY
+
+UNCLEAR_PREFLIGHT_JSON=$(PLAN_SESSION_KEY= sh "$SCRIPT_DIR/subagent-preflight.sh" --task bridge-task --host codex --tool-name Task --task-text "中文范围提问" --json)
+"$PYTHON_BIN" - "$UNCLEAR_PREFLIGHT_JSON" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+routing = payload.get("routing") or {}
+if routing.get("classification") != "unclear":
+    raise SystemExit(f"expected unclear heuristic routing, got: {routing!r}")
+if payload.get("decision") not in {"payload_only", "payload_plus_delegate_recommended"}:
+    raise SystemExit(f"unclear native Task preflight should still inject route-judgment payload: {payload.get('decision')!r}")
+if "Heuristic task fit is unclear" not in str(payload.get("prompt_prefix") or ""):
+    raise SystemExit(f"unclear preflight prefix missed route-judgment wording: {payload.get('prompt_prefix')!r}")
+PY
+
 AMBIG_ROOT="$WORKDIR/ambiguous"
 mkdir -p "$AMBIG_ROOT/openspec/changes/session-runtime" "$AMBIG_ROOT/openspec/changes/runtime-session"
 git -C "$AMBIG_ROOT" init >/dev/null 2>&1
@@ -358,7 +389,7 @@ AMBIG_COMPACT=$(sh "$SCRIPT_DIR/compact-context.sh" --task runtime)
 AMBIG_PREFLIGHT_JSON=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --json)
 AMBIG_PREFLIGHT_TEXT=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --text)
 PLAN_SESSION_KEY=claude:runtime-session sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal runtime >/dev/null
-AMBIG_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$AMBIG_ROOT\",\"session_id\":\"runtime-session\",\"prompt\":\"Investigate the runtime candidates\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
+AMBIG_SESSION_START=$(printf '%s' "{\"cwd\":\"$AMBIG_ROOT\",\"session_id\":\"runtime-session\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/session_start.py")
 "$PYTHON_BIN" - "$AMBIG_JSON" <<'PY'
 import json
 import sys
@@ -381,12 +412,12 @@ hint = payload.get("spec_resolution_hint") or ""
 if "set-task-spec-context.sh --task runtime --ref <chosen-spec-ref>" not in hint:
     raise SystemExit(f"unexpected spec_resolution_hint before override: {hint!r}")
 PY
-"$PYTHON_BIN" - "$AMBIG_PROMPT_SUBMIT" <<'PY'
+"$PYTHON_BIN" - "$AMBIG_SESSION_START" <<'PY'
 import json
 import sys
 
 payload = json.loads(sys.argv[1])
-context = payload.get("additionalContext", "")
+context = payload.get("hookSpecificOutput", {}).get("additionalContext", "")
 required = [
     "Spec context: mode=linked | provider=openspec | status=ambiguous",
     "Spec candidates:",
@@ -396,7 +427,7 @@ required = [
 ]
 for item in required:
     if item not in context:
-        raise SystemExit(f"user_prompt_submit output missing {item!r}: {context!r}")
+        raise SystemExit(f"session_start output missing {item!r}: {context!r}")
 PY
 "$PYTHON_BIN" - "$AMBIG_PREFLIGHT_JSON" <<'PY'
 import json

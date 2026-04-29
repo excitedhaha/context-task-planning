@@ -135,6 +135,31 @@ try {
   )
   assert.equal(fallbackTaskOutput.args.prompt, "Investigate helper script behavior")
 
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-quiet" },
+    {
+      message: { id: "user-quiet" },
+      parts: [{ type: "text", text: "Keep optimizing coldstart startup behavior" }],
+    },
+  )
+  const quietTransformOutput = { system: [] }
+  await plugin["experimental.chat.system.transform"]({ sessionID: "B" }, quietTransformOutput)
+  assert.equal(quietTransformOutput.system.join("\n"), "")
+
+  toasts.length = 0
+  await plugin["chat.message"](
+    { sessionID: "B", messageID: "user-route" },
+    {
+      message: { id: "user-route" },
+      parts: [{ type: "text", text: "另外新任务：修复 billing webhook" }],
+    },
+  )
+  const routeTransformOutput = { system: [] }
+  await plugin["experimental.chat.system.transform"]({ sessionID: "B" }, routeTransformOutput)
+  assert.match(routeTransformOutput.system.join("\n"), /Route evidence for the assistant/u)
+  assert.doesNotMatch(routeTransformOutput.system.join("\n"), /may be drifting away|looks likely unrelated/u)
+  assert.equal(toasts.some((toast) => toast.title === "Task drift"), false)
+
   toasts.length = 0
   await plugin["tool.execute.after"](
     {

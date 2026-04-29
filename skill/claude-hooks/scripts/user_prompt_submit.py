@@ -56,20 +56,11 @@ def main():
         state = load_state(plan_dir)
         if state:
             if not explicit_task_context_eligible(task_meta):
-                advisory = fallback_task_advisory(task_meta)
-                if advisory:
-                    print(user_prompt_payload(advisory))
                 return
-            context = state_summary(state, task_meta=task_meta, include_spec=True)
             drift_result = task_drift_result(prompt, cwd, session_key=session_key)
             drift_hint = task_drift_hint(drift_result)
             if drift_hint:
-                context += "\n" + drift_hint
-            if allow_delegate_hint(drift_result):
-                delegate_hint = delegate_hint_for_text(prompt, state)
-                if delegate_hint:
-                    context += "\n" + delegate_hint
-            print(user_prompt_payload(context))
+                print(user_prompt_payload(drift_hint))
             return
 
     hint = no_active_task_hint(cwd)

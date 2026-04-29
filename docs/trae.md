@@ -36,9 +36,9 @@ coco plugin validate --path .
 
 After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed task state through:
 
-- automatic task-context reminders on `session_start` and `user_prompt_submit`
-- prompt-time drift hints before unrelated work is silently mixed into the current task
-- tool-time reminders through `pre_tool_use`, including native `Task` preflight guidance when available
+- automatic task-context recovery on `session_start`
+- prompt-time route evidence only for high-signal `likely-unrelated` prompts
+- native `Task` preflight guidance through `pre_tool_use` when available
 - `post_tool_use` planning evidence tracking for mutating tools
 - a `stop` guard that can ask the agent to continue once when a mutating turn is about to finish without planning sync evidence
 - best-effort `pre_compact` compact sync before long context is compressed
@@ -64,8 +64,8 @@ These commands stay thin on purpose. They call the bundled scripts through `${CO
 Current hooks in `coco.yaml` map to shared runtime behavior:
 
 - `session_start` - inject explicit task context or a weaker fallback advisory
-- `user_prompt_submit` - inject task context, drift reminders, delegate hints, and long-context planning guidance
-- `pre_tool_use` - inject task/tool reminders and run shared native-`Task` preflight for `Task` launches
+- `user_prompt_submit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
+- `pre_tool_use` - run shared native-`Task` preflight for `Task` launches
 - `post_tool_use` - record whether this turn read planning files, used mutating tools, or updated planning files
 - `stop` - continue once if TraeCLI/Coco is about to finish without required planning read or update evidence
 - `pre_compact` - run the shared compact-sync helper and surface compact recovery context when the session is explicitly bound
@@ -79,7 +79,7 @@ After restarting TraeCLI/Coco:
 - `/skills` should include `context-task-planning` and the bundled task-entry skills
 - `/context-task-planning:task-current` should resolve the current task or explain why no task is active
 - a complex first prompt in a repo without `.planning/` should receive an initialization hint instead of silently starting ad hoc work
-- a prompt that likely drifts from an explicitly bound task should receive a routing reminder
+- a high-signal scope-switch prompt should give the main LLM route evidence so it can ask before mixing unrelated work
 - after a code-changing turn, TraeCLI/Coco may ask once to update `.planning/<slug>/progress.md` and `.planning/<slug>/state.json` before finalizing
 
 ## Quick Validation And Troubleshooting

@@ -12,8 +12,8 @@ When plugin hooks are enabled, Claude Code receives task context on lifecycle ev
 - optional `statusLine` fallback - show the current task in Claude Code's native status line when configured through settings
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/` for explicit bindings, while workspace fallback stays advisory
 - `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context only for explicit bindings
-- `UserPromptSubmit` - add planning guidance and task-drift reminders before Claude handles the prompt; fallback-only sessions get advisory routing text instead of the full task snapshot
-- `PreToolUse` - inject compact task context before key tools run for explicit bindings, with a stronger mismatch warning before `Task`
+- `UserPromptSubmit` - stay quiet for normal turns and inject route evidence only for high-signal `likely-unrelated` prompts
+- `PreToolUse` - run native-`Task` preflight for explicit bindings, with stronger routing guidance when the request is truly mismatched
 
 ## What the hooks do not do
 

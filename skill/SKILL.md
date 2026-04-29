@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.4.0"
+  version: "0.4.1"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -143,8 +143,8 @@ When a task is complete, keep the task directory as history. Switch or remove th
 When the host does not provide native task UI or prompt hooks, use the shared scripts as the fallback policy:
 
 - use `scripts/current-task.sh --compact` when you need to verify which task is currently active
-- use `scripts/check-task-drift.sh --prompt "..." --json` before mixing a new complex request into the active task when the match is uncertain
-- if the result is `likely-unrelated` or `unclear`, ask whether to continue the current task, switch tasks, or create a new task before changing planning state
+- use `scripts/check-task-drift.sh --prompt "..." --json` as heuristic route evidence before mixing a new complex request into the active task when the match is uncertain
+- if the result is `likely-unrelated`, ask whether to continue the current task, switch tasks, or create a new task before changing planning state; treat `unclear` as non-conclusive evidence and decide from the conversation plus task goal
 
 This is especially important for shell-only, unhooked Codex, or unhooked TraeCLI/Coco environments where the file protocol exists but host-native reminder surfaces may not.
 
@@ -220,7 +220,7 @@ This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Co
 - `scripts/init-task.sh` - create or resume `.planning/<slug>/`, warning before switching away from dirty git work
 - `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, session binding, `.active_task`, or latest plan
 - `scripts/current-task.sh` - show the resolved task; default output is an action-oriented summary, `--compact` stays short for prompts and status bars, and `--json` adds recommendation metadata for host adapters
-- `scripts/check-task-drift.sh` - classify whether a new prompt still fits the active task
+- `scripts/check-task-drift.sh` - produce heuristic route evidence for whether a new prompt still fits the active task
 - `scripts/check-switch-safety.sh` - inspect whether a git worktree should be stashed or committed before switching tasks
 - `scripts/list-repos.sh --discover` - show registered repos plus direct-child git repos that could be registered under the current workspace
 - `scripts/register-repo.sh --id <repo-id> <path>` - explicitly register a repo under a parent workspace
@@ -233,7 +233,7 @@ This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Co
 - `claude-hooks/hooks.json` - Claude Code plugin hook configuration for lifecycle context injection
 - `claude-hooks/settings.example.json` - manual standalone Claude hook and status-line fallback
 - `scripts/smoke-test-codex-hook-package.sh` - validate the installable Codex hook package without touching real Codex config
-- `codex-hooks/config.example.toml` - manual fallback Codex lifecycle hooks for prompt-time task reminders and end-of-turn planning sync
+- `codex-hooks/config.example.toml` - manual fallback Codex lifecycle hooks for session-start task context, high-signal route evidence, and end-of-turn planning sync
 - `../hooks/context-task-planning/` - installable Codex hook package that writes `hooks.json` and delegates to the skill hooks
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
 - `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, delegates, and derived compact artifacts; add `--fix-warnings` to resync warning-level snapshot drift from `state.json` and refresh compact artifacts when needed

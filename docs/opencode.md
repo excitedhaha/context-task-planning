@@ -4,7 +4,7 @@ This page only covers OpenCode-specific setup and behavior. Use `README.md` for 
 
 OpenCode support in this project has two thin host-specific layers over the same shell-first runtime:
 
-- an OpenCode plugin for visibility, toasts, session binding, and native-`Task` preflight
+- an OpenCode plugin for visibility, operational toasts, session binding, route evidence, and native-`Task` preflight
 - bundled slash commands for common task workflows such as init, inspect, list, validate, and drift-check
 
 If you only want the shortest path: install the skill, run the plugin and command helpers once, restart OpenCode, then smoke-test `/task-current` and `/task-list`.
@@ -42,12 +42,12 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 
 - prefix the session title as `task:<slug> | ...`
 - expose bundled slash commands for common task entry points
-- show toasts for drift, stale planning, and task-binding/bootstrap events
+- show toasts for stale planning and task-binding/bootstrap events
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
-- inject strong task context only for sessions with an explicit task binding; workspace fallback resolution stays advisory
+- inject strong task context only at recovery or native-`Task` preflight points for sessions with an explicit task binding; workspace fallback resolution stays advisory
 - call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
-- surface linked spec context such as auto-detected OpenSpec refs in the injected task summary and native-`Task` preflight payload when available, including a short candidate hint when the runtime refuses to guess
+- surface linked spec context such as auto-detected OpenSpec refs in recovery and native-`Task` preflight payloads when available, including a short candidate hint when the runtime refuses to guess
 - carry repo context for parent-workspace multi-repo tasks
 - stay quiet in repositories that do not already use `.planning/`
 
@@ -90,13 +90,13 @@ After the plugin and commands are enabled and OpenCode is restarted, you should 
 
 - the session title prefixed as `task:<slug> | ...`
 - bundled slash commands such as `/task-init` appearing in the OpenCode command menu
-- a warning toast when a prompt looks like likely task drift
+- route evidence injected into the main LLM when a prompt has strong switch signals, without a drift toast
 - a warning toast when tracked work has happened but planning files look stale
-- a fresh unbound session no longer inherits strong task prompt context just because the workspace has `.active_task` or a latest task; OpenCode only injects the full task summary, compact recovery, and native-`Task` task prefix after explicit session binding
+- a fresh unbound session no longer inherits strong task prompt context just because the workspace has `.active_task` or a latest task; OpenCode only injects full recovery context and native-`Task` task prefixes after explicit session binding
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
 - if a fresh or fallback-resolved session directly edits one task's `.planning/<slug>/state.json|task_plan.md|progress.md|findings.md`, OpenCode now auto-bootstraps a binding for that task instead of silently staying on the old fallback task; it tries writer first and falls back to observer with a warning when repo isolation blocks writer ownership
 - the same task still resolving when OpenCode starts inside a registered repo path or recorded worktree under a parent workspace
-- in some repos, the injected task summary can also mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
+- in some repos, recovery or native-`Task` context can also mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
 - treat that spec line as scoping help, not as extra setup; only use the manual override path if the work really needs one authoritative ref
 
 Sample illustration:
@@ -159,8 +159,8 @@ The OpenCode plugin is event-driven. It is not a file watcher, background sync d
 
 Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these moments:
 
-- `chat.message` - after a user message is assembled; cache prompt text, classify drift, and try to sync the visible task title
-- `experimental.chat.system.transform` - right before the model receives system context; inject current-task, drift, and freshness reminders for explicitly bound sessions, while fallback-only resolution emits at most a short advisory that the session is not bound yet
+- `chat.message` - after a user message is assembled; cache prompt text, collect route evidence, and try to sync the visible task title
+- `experimental.chat.system.transform` - right before the model receives system context; inject compact/planning recovery, high-signal route evidence, and freshness reminders for explicitly bound sessions, while fallback-only resolution emits at most one short advisory that the session is not bound yet
 - `experimental.session.compacting` - right before OpenCode compacts a session; run the shared compact-sync helper, then feed compact recovery context into the compaction prompt and cache one resume-time recovery injection for the next turn only when the session is explicitly bound to that task
 - `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance for explicitly bound sessions
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
@@ -186,7 +186,7 @@ In practice this means:
 - compact-time recovery is now two-stage: OpenCode injects compact recovery context into the compaction prompt itself, then injects the same compact recovery context once on the first post-compaction turn so the model does not rely only on the compressed transcript summary
 - `task_plan.md` and `findings.md` are still agent-driven; the plugin does not try to infer or rewrite Hot Context, decisions, or findings from transcript history
 - the shared `sh skill/scripts/compact-sync.sh` helper is now wired to OpenCode on a best-effort basis when event payloads visibly mention compact/compression; writer sessions may repair warning-level drift and refresh the derived compact artifact, while observer sessions stay derived-only
-- writer-session reminders should explicitly say to sync `progress.md` and `state.json` whenever a turn materially changes progress, blockers, or `next_action`
+- writer-session recovery or freshness reminders should explicitly say to sync `progress.md` and `state.json` whenever a turn materially changes progress, blockers, or `next_action`
 
 ## Idle journal sync
 
@@ -236,7 +236,7 @@ OpenCode keeps freshness reminders separate from the preflight decision:
 
 When `current-task` resolves a linked OpenSpec context, that same preflight prefix now includes the spec context summary plus the primary linked ref so the native `Task` launch stays scoped to the right external artifact. If the runtime stops at `status=ambiguous`, the prefix now carries the candidate refs plus an explicit manual-override hint instead of pretending one candidate is authoritative. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
 
-The plugin still keeps title and toast behavior unchanged in this first pass.
+The plugin keeps route evidence inside model context and reserves toasts for operational issues such as stale planning or binding/bootstrap events.
 
 ## Current limits
 

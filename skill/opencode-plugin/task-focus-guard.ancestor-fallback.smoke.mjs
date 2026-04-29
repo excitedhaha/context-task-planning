@@ -127,8 +127,7 @@ try {
 
   const boundTransformOutput = { system: [] }
   await plugin["experimental.chat.system.transform"]({ sessionID: "A" }, boundTransformOutput)
-  assert.match(boundTransformOutput.system.join("\n"), /Current task `existing-task`/u)
-  assert.match(boundTransformOutput.system.join("\n"), /Next action: Do not leak fallback context into unrelated sessions\./u)
+  assert.equal(boundTransformOutput.system.join("\n"), "")
 
   assert.equal(toasts.length, 0)
   console.log("[context-task-planning] smoke test passed: OpenCode ancestor workspace fallback stays advisory until explicit binding")

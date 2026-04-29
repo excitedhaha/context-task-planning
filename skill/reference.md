@@ -116,7 +116,7 @@ The JSON output keeps the existing task fields and appends recommendation metada
 
 `set-active-task.sh` accepts `--observe` for read-only bindings and `--steal` when a new session intentionally takes over the writer lease.
 
-Use `check-task-drift.sh` when you want a lightweight answer to: does this new request still fit the active task, or should the agent confirm before mixing it in?
+Use `check-task-drift.sh` when you want lightweight route evidence for whether a new request still fits the active task. The result is heuristic input for the main LLM, not a final semantic drift decision.
 
 Use `check-switch-safety.sh --target-task <slug> --json` when you are about to switch tasks in a git repository and want to know whether the current worktree should be stashed or committed first.
 
@@ -140,7 +140,7 @@ intentionally need a nonstandard checkout location.
 - already isolated in a task worktree
 - blocked until you run `prepare-task-worktree.sh`
 
-On hosts without runtime adapters, treat `likely-unrelated` and `unclear` as a prompt to confirm routing before you edit `.planning/`.
+On hosts without runtime adapters, treat `likely-unrelated` as a prompt to confirm routing before you edit `.planning/`. Treat `unclear` as non-conclusive evidence and decide from the conversation plus task goal.
 
 Linked provider refs from `spec_context` also feed `check-task-drift.sh` and `subagent-preflight.sh`, so prompts that mention the chosen OpenSpec change or spec artifact continue to route as part of the current task.
 

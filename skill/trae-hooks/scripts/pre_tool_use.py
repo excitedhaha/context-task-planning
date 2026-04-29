@@ -55,7 +55,6 @@ def main() -> None:
             print_context("\n".join(item for item in (advisory, operator_message) if item))
             return
 
-        print_context(advisory)
         return
 
     if tool_name == "Task":
@@ -92,7 +91,7 @@ def main() -> None:
         print_context(context)
         return
 
-    print_context(state_summary(state, task_meta=task_meta, tool_name=str(tool_name or "")))
+    return
 
 
 if __name__ == "__main__":

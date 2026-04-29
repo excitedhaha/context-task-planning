@@ -3446,17 +3446,27 @@ def prompt_prefix_for_preflight(
     task: dict, routing: dict, repos: list[dict], delegate: dict
 ) -> str:
     role = preflight_binding_role(task) or "unbound"
+    classification = str(routing.get("classification") or "")
     primary_repo = str(task.get("primary_repo") or "") or (
         repos[0]["id"] if repos else ""
     )
     repo_scope = repo_scope_for_payload(task, repos)
     lines = [
         f"[context-task-planning] Current task: {task.get('slug') or '(none)'} | role: {role} | routing: {routing.get('classification') or '-'}",
-        "Treat this subagent request as part of the current task only. Do not silently broaden scope.",
         f"Primary repo: {primary_repo or '(none)'}",
         f"Repo scope: {', '.join(repo_scope) if repo_scope else '(none)'}",
         "Repo/worktree bindings:",
     ]
+    if classification == "unclear":
+        lines.insert(
+            1,
+            "Heuristic task fit is unclear. Use the surrounding conversation and current task goal to decide whether this subagent request belongs here; if not, report a routing mismatch instead of continuing.",
+        )
+    else:
+        lines.insert(
+            1,
+            "Treat this subagent request as part of the current task only. Do not silently broaden scope.",
+        )
     for repo in repos:
         lines.append(
             f"- {repo['id']}: {repo['binding_mode']} at {repo['checkout_path']}"
@@ -3529,16 +3539,10 @@ def subagent_preflight_result(
         decision_reason = "no active task"
         operator_message = "[context-task-planning] No active task is resolved, so there is no current task payload to inject before launching a subagent."
     elif classification == "likely-unrelated":
-        decision_reason = "task fit looks likely unrelated"
+        decision_reason = "route heuristic is likely-unrelated"
         operator_message = (
-            f"[context-task-planning] This Task request looks likely unrelated to the current task `{task.get('slug') or '(none)'}`. "
-            "Confirm whether to continue the current task, switch tasks, or initialize a new task before launching a subagent."
-        )
-    elif classification == "unclear":
-        decision_reason = "task fit is unclear"
-        operator_message = (
-            f"[context-task-planning] Task fit is unclear for `{task.get('slug') or '(none)'}`. "
-            "Confirm whether this still belongs to the current task before launching a subagent."
+            f"[context-task-planning] Route evidence for this Task request: the lightweight heuristic is `likely-unrelated` for current task `{task.get('slug') or '(none)'}`. "
+            "Use the surrounding conversation and task goal to decide whether to continue the current task, switch tasks, or initialize a new task before launching a subagent."
         )
     elif not repos:
         decision_reason = "no meaningful repo/worktree context exists"
@@ -3555,12 +3559,20 @@ def subagent_preflight_result(
         decision = "payload_plus_delegate_recommended"
         decision_reason = (
             delegate.get("reason")
-            or "task-related request with meaningful repo context and a bounded side-work pattern"
+            or (
+                "heuristic-unclear request with meaningful repo context and a bounded side-work pattern"
+                if classification == "unclear"
+                else "task-related request with meaningful repo context and a bounded side-work pattern"
+            )
         )
         prompt_prefix = prompt_prefix_for_preflight(task, routing, repos, delegate)
     else:
         decision = "payload_only"
-        decision_reason = "task-related request with meaningful repo/worktree context"
+        decision_reason = (
+            "heuristic-unclear request with meaningful repo/worktree context for LLM route judgment"
+            if classification == "unclear"
+            else "task-related request with meaningful repo/worktree context"
+        )
         prompt_prefix = prompt_prefix_for_preflight(task, routing, repos, delegate)
 
     return {

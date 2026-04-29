@@ -78,8 +78,8 @@ If the prompt does not name the task explicitly, the agent should suggest a conc
 ### 3. Check that the task became visible
 
 - `Claude Code` - plugin hooks should inject task context and reminders automatically; plugin task-entry skills appear namespaced, such as `/context-task-planning:task-current` and `/context-task-planning:task-list`
-- `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
-- `Codex` - if `codex features list` includes `codex_hooks`, install the optional hook package for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
+- `OpenCode` - look for `task:<slug> | ...` in the session title, route evidence on high-signal scope switches, and operational toasts for stale planning or binding events; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
+- `Codex` - if `codex features list` includes `codex_hooks`, install the optional hook package for session-start task context, high-signal route evidence, and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
 - `TraeCLI/Coco` - plugin hooks inject task context and planning-sync reminders; bundled slash commands appear namespaced, such as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 
 In some repos, that summary may also mention a linked spec ref or a short candidate hint. Treat that as scoping help, not as extra setup you need to do before normal work.

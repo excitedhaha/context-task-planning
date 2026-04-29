@@ -335,16 +335,16 @@ The canonical truth still lives in `skill/scripts/` plus the files under
 
 Host adapters are optional layers on top of that core.
 
-- **Claude Code plugin hooks** surface the current task, role, repo context, and drift
-  reminders on top of the shared resolver; manual settings hooks remain a fallback
-- **OpenCode plugin** injects task summaries, exports `PLAN_SESSION_KEY`, and
-  surfaces repo and role context without becoming a second planner
-- **Codex hooks** inject prompt-time task context and end-of-turn planning
-  sync reminders, while still falling back to the same scripts and file protocol
-  when hooks are not enabled
+- **Claude Code plugin hooks** surface task, role, repo context, and high-signal
+  route evidence on top of the shared resolver; manual settings hooks remain a fallback
+- **OpenCode plugin** injects recovery and native-`Task` context, exports
+  `PLAN_SESSION_KEY`, and surfaces repo and role context without becoming a second planner
+- **Codex hooks** inject session-start task context, high-signal route evidence,
+  and end-of-turn planning sync reminders, while still falling back to the same scripts
+  and file protocol when hooks are not enabled
 - **TraeCLI/Coco plugin hooks** expose the same skill and slash-command workflow
-  through `coco.yaml`, inject prompt/tool context, and reuse the same end-of-turn
-  planning-sync guardrails without becoming a separate planner
+  through `coco.yaml`, inject session-start and native-`Task` context, and reuse the
+  same end-of-turn planning-sync guardrails without becoming a separate planner
 
 Adapters must not become the source of truth. They surface and route the same
 file-backed state; they do not replace it.

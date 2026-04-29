@@ -1,12 +1,12 @@
 ---
 name: task-drift
-description: Check whether a new request still fits the current context-task-planning task and summarize the routing recommendation. Use this whenever the user asks whether a new ask belongs in the same task, wants a drift check, is about to switch scope, or explicitly invokes /task-drift.
+description: Return heuristic route evidence for whether a new request still fits the current context-task-planning task and summarize the routing recommendation. Use this whenever the user asks whether a new ask belongs in the same task, wants a drift check, is about to switch scope, or explicitly invokes /task-drift.
 allowed-tools: Bash
 ---
 
 # Task Drift
 
-Check whether a new request still fits the current `context-task-planning` task.
+Return heuristic route evidence for whether a new request still fits the current `context-task-planning` task.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Check whether a new request still fits the current `context-task-planning` task.
 - Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/check-task-drift.sh`.
 - If neither installed path exists but the current workspace contains `skill/scripts/check-task-drift.sh`, use the repo-local path instead.
 - Run the command from the current workspace.
-- After the command succeeds, summarize whether the request still fits the current task and mention any routing recommendation.
+- After the command succeeds, summarize the route evidence and mention any routing recommendation; do not present `unclear` as a final drift conclusion.
 
 ## Run
 

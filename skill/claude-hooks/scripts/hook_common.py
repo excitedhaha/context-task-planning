@@ -495,6 +495,7 @@ def fallback_task_advisory(
 
     lines = [
         f"[context-task-planning] {source_text.capitalize()} resolved task `{slug}`, but this {host_display_name(host)} session is not explicitly bound to it.",
+        "This is a session-binding advisory, not a drift warning.",
         "Do not treat that fallback task as the current session task unless you bind or resume it explicitly.",
     ]
     if tool_name == "Task":
@@ -515,25 +516,16 @@ def task_drift_hint(result: dict | None, tool_name: str | None = None) -> str | 
 
     slug = task.get("slug") or "(unknown)"
     if classification == "likely-unrelated":
+        matched = ", ".join(str(item) for item in result.get("matched_terms") or []) or "none"
+        cues = ", ".join(str(item) for item in result.get("switch_cues") or []) or "none"
         lines = [
-            f"[context-task-planning] This input looks likely unrelated to the current task `{slug}`.",
-            "Before proceeding, confirm whether to continue the current task, switch tasks, or initialize a new task.",
-            f"Do not silently mix unrelated work into `.planning/{slug}/`.",
+            f"[context-task-planning] Route evidence for the assistant: the lightweight heuristic is `likely-unrelated` for current task `{slug}`.",
+            f"Switch cues: {cues}. Shared terms: {matched}.",
+            "Use the conversation and current task goal to decide same-task, different-task, or unclear. If different-task or genuinely unclear, ask the user before updating planning state or launching subagents; if same-task, continue without surfacing this evidence.",
         ]
         if tool_name == "Task":
             lines.append(
-                "Avoid launching a subagent for it under the current task until that routing is clear."
-            )
-        return " ".join(lines)
-
-    if classification == "unclear" and result.get("complex_prompt"):
-        lines = [
-            f"[context-task-planning] This input may be drifting away from the current task `{slug}`.",
-            "If it is not part of the current task, confirm whether to continue here, switch tasks, or create a new task before updating planning state.",
-        ]
-        if tool_name == "Task":
-            lines.append(
-                "If you still launch a subagent, keep it scoped to the confirmed task instead of treating the mismatch as an implicit side quest."
+                "For a native Task launch, keep the subagent scoped to the confirmed task; if the fit is wrong, return a routing mismatch instead of continuing."
             )
         return " ".join(lines)
 

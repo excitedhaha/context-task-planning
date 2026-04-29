@@ -7,7 +7,7 @@ The core skill remains shell-first and file-backed. These hooks only adapt Codex
 ## What The Hooks Do
 
 - `SessionStart` - inject the current task snapshot for explicit Codex session bindings; fallback-only task resolution stays advisory
-- `UserPromptSubmit` - re-inject task context and drift reminders on every user turn, with a long-context reminder to read and update planning files
+- `UserPromptSubmit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
 - `PostToolUse` - record lightweight per-turn evidence that Codex read planning files, changed tools, or updated planning files
 - `Stop` - if a complex or mutating turn is about to finish without the needed planning read/update evidence, ask Codex to continue once and sync planning first
 

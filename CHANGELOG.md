@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-04-29
+
+### Changed
+- Reduced task-drift false positives by treating `unclear` as non-conclusive route evidence and leaving normal user turns quiet.
+- Changed host hooks to inject route evidence only for high-signal `likely-unrelated` prompts, while preserving session-start recovery and native-`Task` preflight context.
+- Removed OpenCode drift toasts so the main LLM can decide whether to ask the user from conversation context.
+
 ## [0.4.0] - 2026-04-29
 
 ### Added

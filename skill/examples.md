@@ -78,7 +78,7 @@ sh scripts/current-task.sh --compact
 sh scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 ```
 
-If the result is `likely-unrelated` or `unclear`, confirm whether to continue the current task, switch tasks, or create a new task before editing `.planning/`.
+If the result is `likely-unrelated`, confirm whether to continue the current task, switch tasks, or create a new task before editing `.planning/`. Treat `unclear` as non-conclusive route evidence and decide from the conversation plus task goal.
 
 The default `current-task.sh` output is the operator-facing summary: it shows the resolved task, access mode, repo/worktree state, and the next recommended command.
 
