@@ -13,6 +13,7 @@ This repository is meant to be shared as a context engineering skill while keepi
 
 - `README.md`
 - `docs/`
+- `.claude-plugin/`
 - `skill/`
 - `LICENSE`
 
@@ -26,7 +27,14 @@ Those paths are ignored by `.gitignore` on purpose.
 
 ## Recommended install for a teammate
 
-The shortest path is:
+For Claude Code, prefer the plugin path because it packages the skills and lifecycle hooks together:
+
+```bash
+claude plugin marketplace add excitedhaha/context-task-planning
+claude plugin install context-task-planning@context-task-planning
+```
+
+For OpenCode, Codex, or standalone skill installs:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
@@ -34,10 +42,10 @@ npx skills add excitedhaha/context-task-planning -g
 
 Notes:
 
-1. The CLI will discover the main skill under `skill/` and the bundled task-entry skills under `skills/` automatically.
-2. Choose `context-task-planning` and any task-entry skills your teammate wants when prompted.
+1. The Claude plugin exposes the main skill under `skill/`, the bundled task-entry skills under `skills/`, and the plugin hooks under `skill/claude-hooks/hooks.json`.
+2. With `npx skills add`, choose `context-task-planning` and any task-entry skills your teammate wants when prompted.
 3. If they want to preview before installing, they can run `npx skills add excitedhaha/context-task-planning -l`.
-4. If they use Claude Code and want hook automation, merge `skill/claude-hooks/settings.example.json` into either `~/.claude/settings.json` or `.claude/settings.local.json`.
+4. If they use Claude Code without the plugin and want hook automation, merge `skill/claude-hooks/settings.example.json` into either `~/.claude/settings.json` or `.claude/settings.local.json`. Do not enable both plugin hooks and manual hook entries at the same time.
 5. If they use Codex and want hook automation, prefer the packaged hook install:
 
    ```bash
@@ -55,6 +63,12 @@ If someone wants to inspect or develop the repository locally first:
 ```bash
 git clone https://github.com/excitedhaha/context-task-planning.git
 cd context-task-planning
+claude --plugin-dir .
+```
+
+For symlink-based standalone testing instead:
+
+```bash
 sh skill/scripts/install-macos.sh
 ```
 
@@ -87,18 +101,23 @@ Before pushing to GitHub:
 
 ```bash
 for f in skill/scripts/*.sh; do sh -n "$f"; done
+sh skill/scripts/check-version.sh
+sh skill/scripts/extract-release-notes.sh "$(cat VERSION)" >/dev/null
 python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py
 python3 -m py_compile hooks/context-task-planning/scripts/*.py
+sh skill/scripts/smoke-test-claude-plugin.sh
 sh skill/scripts/smoke-test-codex-hook-package.sh
 npx skills add . -l
 sh skill/scripts/validate-task.sh || true
 ```
 
 2. Confirm `.planning/` is not staged.
-3. Confirm local absolute paths only appear in private planning state, not in shareable docs.
-4. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
-5. Confirm install commands point at `excitedhaha/context-task-planning`.
-6. Confirm hook docs still match `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, and `hooks/context-task-planning/hooks.json`.
+3. Confirm `VERSION`, `skill/SKILL.md` `metadata.version`, `.claude-plugin/plugin.json` `version`, and `CHANGELOG.md` describe the same release.
+4. Confirm local absolute paths only appear in private planning state, not in shareable docs.
+5. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
+6. Confirm install commands point at `excitedhaha/context-task-planning`.
+7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, and `hooks/context-task-planning/hooks.json`.
+8. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` handles `v$(cat VERSION)` after the change lands on `main`.
 
 ## Notes on `.planning/`
 

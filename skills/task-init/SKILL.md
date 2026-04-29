@@ -15,8 +15,9 @@ Initialize a new `context-task-planning` task for this workspace using a confirm
 - If no task title was provided but the surrounding user request implies a task, infer a concise candidate title, derive the slug that the core `slugify.sh` script would produce, and ask the user to confirm or edit the title before running `init-task.sh`.
 - If no task title was provided and there is not enough surrounding request context to infer one, stop and ask the user for a task title.
 - Do not create a task from an agent-inferred title until the user confirms it.
-- Prefer the installed core skill script at `~/.claude/skills/context-task-planning/scripts/init-task.sh`.
-- If that path does not exist but the current workspace contains `skill/scripts/init-task.sh`, use the repo-local path instead.
+- If this entry skill is loaded from a Claude Code plugin, prefer the bundled core script at `${CLAUDE_SKILL_DIR}/../../skill/scripts/init-task.sh`.
+- Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/init-task.sh`.
+- If neither installed path exists but the current workspace contains `skill/scripts/init-task.sh`, use the repo-local path instead.
 - Run the command from the current workspace.
 - If the dirty-worktree guard asks for a decision, stop and ask the user instead of choosing `--stash` or `--allow-dirty` yourself.
 - After the command succeeds, summarize the created task slug and the next action.
@@ -24,5 +25,8 @@ Initialize a new `context-task-planning` task for this workspace using a confirm
 ## Run
 
 ```bash
-sh ~/.claude/skills/context-task-planning/scripts/init-task.sh "<confirmed task title>"
+core="${CLAUDE_SKILL_DIR}/../../skill/scripts/init-task.sh"
+[ -f "$core" ] || core="$HOME/.claude/skills/context-task-planning/scripts/init-task.sh"
+[ -f "$core" ] || core="skill/scripts/init-task.sh"
+sh "$core" "<confirmed task title>"
 ```

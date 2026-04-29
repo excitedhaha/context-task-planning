@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -228,6 +228,10 @@ This keeps recovery portable across Claude Code, Codex, and OpenCode.
 - `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task; the standard location is `.worktrees/<task-slug>/<repo-id>/`
 - `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
 - `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
+- `scripts/check-version.sh` - validate `VERSION`, skill metadata, Claude plugin metadata, and changelog release section are in sync
+- `scripts/extract-release-notes.sh [version]` - print the matching `CHANGELOG.md` section for GitHub Release notes
+- `claude-hooks/hooks.json` - Claude Code plugin hook configuration for lifecycle context injection
+- `claude-hooks/settings.example.json` - manual standalone Claude hook and status-line fallback
 - `scripts/smoke-test-codex-hook-package.sh` - validate the installable Codex hook package without touching real Codex config
 - `codex-hooks/config.example.toml` - manual fallback Codex lifecycle hooks for prompt-time task reminders and end-of-turn planning sync
 - `../hooks/context-task-planning/` - installable Codex hook package that writes `hooks.json` and delegates to the skill hooks

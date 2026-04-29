@@ -28,15 +28,24 @@ Skip it for tiny one-shot edits that do not need recovery.
 
 ## Quickstart
 
-### 1. Install the skill
+### 1. Install for your host
 
-Recommended install:
+Claude Code recommended install:
+
+```bash
+claude plugin marketplace add excitedhaha/context-task-planning
+claude plugin install context-task-planning@context-task-planning
+```
+
+Then run `/reload-plugins` or restart Claude Code. The plugin bundles the main skill, the `task-*` entry skills, and Claude lifecycle hooks.
+
+Skill-only install for OpenCode, Codex, or Claude Code users who prefer standalone skills:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
 ```
 
-Choose `context-task-planning` and the agent(s) you want when prompted. Claude Code users can also choose the bundled thin task-entry skills: `task-init`, `task-current`, `task-list`, `task-validate`, `task-drift`, and `task-done`.
+Choose `context-task-planning` and the agent(s) you want when prompted. Claude Code standalone-skill users can also choose the bundled thin task-entry skills: `task-init`, `task-current`, `task-list`, `task-validate`, `task-drift`, and `task-done`.
 
 If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
 
@@ -60,7 +69,7 @@ If the prompt does not name the task explicitly, the agent should suggest a conc
 
 ### 3. Check that the task became visible
 
-- `Claude Code` - look for `task:<slug>` in the status line; bundled task-entry skills such as `task-current` or `task-list` can also appear after install
+- `Claude Code` - plugin hooks should inject task context and reminders automatically; plugin task-entry skills appear namespaced, such as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 - `OpenCode` - look for `task:<slug> | ...` in the session title and task/drift toasts; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` or `/task-list` should appear too
 - `Codex` - if `codex features list` includes `codex_hooks`, install the optional hook package for prompt-time task reminders and end-of-turn planning sync, or run `sh skill/scripts/current-task.sh` for the full summary and recommended next step
 
@@ -114,7 +123,7 @@ The shared shell entry points now map cleanly to those basics:
 - `sh skill/scripts/compact-context.sh` - compact recovery view for larger tasks; see `docs/onboarding.md`
 - `sh skill/scripts/validate-task.sh --fix-warnings` - repair warning-level snapshot drift after manual edits or long-running work
 
-Claude Code users now also get thin skill-style entry points for the same high-frequency flows:
+Claude Code users also get thin skill-style entry points for the same high-frequency flows. In plugin installs they are namespaced as `/context-task-planning:<name>`; in standalone skill installs they appear as `/task-*`:
 
 - `task-init <task title>` - create a tracked task from a confirmed title
 - `task-current` - inspect the current task and next action

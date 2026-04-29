@@ -13,13 +13,17 @@ Check whether a new request still fits the current `context-task-planning` task.
 - Expect the main `context-task-planning` skill to be installed alongside this entry skill.
 - Treat the invocation argument text as the candidate new request.
 - If no request text was provided, stop and ask the user to provide the request they want to compare against the current task.
-- Prefer the installed core skill script at `~/.claude/skills/context-task-planning/scripts/check-task-drift.sh`.
-- If that path does not exist but the current workspace contains `skill/scripts/check-task-drift.sh`, use the repo-local path instead.
+- If this entry skill is loaded from a Claude Code plugin, prefer the bundled core script at `${CLAUDE_SKILL_DIR}/../../skill/scripts/check-task-drift.sh`.
+- Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/check-task-drift.sh`.
+- If neither installed path exists but the current workspace contains `skill/scripts/check-task-drift.sh`, use the repo-local path instead.
 - Run the command from the current workspace.
 - After the command succeeds, summarize whether the request still fits the current task and mention any routing recommendation.
 
 ## Run
 
 ```bash
-sh ~/.claude/skills/context-task-planning/scripts/check-task-drift.sh --prompt "<new request>" --json
+core="${CLAUDE_SKILL_DIR}/../../skill/scripts/check-task-drift.sh"
+[ -f "$core" ] || core="$HOME/.claude/skills/context-task-planning/scripts/check-task-drift.sh"
+[ -f "$core" ] || core="skill/scripts/check-task-drift.sh"
+sh "$core" --prompt "<new request>" --json
 ```

@@ -335,8 +335,8 @@ The canonical truth still lives in `skill/scripts/` plus the files under
 
 Host adapters are optional layers on top of that core.
 
-- **Claude Code hooks** surface the current task, role, repo context, and drift
-  reminders on top of the shared resolver
+- **Claude Code plugin hooks** surface the current task, role, repo context, and drift
+  reminders on top of the shared resolver; manual settings hooks remain a fallback
 - **OpenCode plugin** injects task summaries, exports `PLAN_SESSION_KEY`, and
   surfaces repo and role context without becoming a second planner
 - **Codex hooks** inject prompt-time task context and end-of-turn planning

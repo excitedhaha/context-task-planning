@@ -1,0 +1,27 @@
+{
+  "name": "context-task-planning",
+  "owner": {
+    "name": "excitedhaha"
+  },
+  "metadata": {
+    "description": "Recoverable task-scoped planning tools for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "context-task-planning",
+      "source": "./",
+      "description": "Task-scoped context engineering with skills and Claude Code lifecycle hooks.",
+      "author": {
+        "name": "excitedhaha"
+      },
+      "repository": "https://github.com/excitedhaha/context-task-planning",
+      "license": "MIT",
+      "keywords": [
+        "planning",
+        "context-engineering",
+        "tasks",
+        "hooks"
+      ]
+    }
+  ]
+}

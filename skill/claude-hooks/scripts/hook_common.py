@@ -37,6 +37,10 @@ except ImportError:
 
 
 def host_skill_home(host: str = "claude") -> str:
+    if host == "claude":
+        plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "").strip()
+        if plugin_root:
+            return str(Path(plugin_root) / "skill")
     if host == "codex":
         return "$HOME/.codex/skills/context-task-planning"
     if host == "opencode":

@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Validate version metadata
+        run: sh skill/scripts/check-version.sh
+
+      - name: Check shell scripts
+        run: for f in skill/scripts/*.sh; do sh -n "$f"; done
+
+      - name: Compile hook Python scripts
+        run: python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py hooks/context-task-planning/scripts/*.py
+
+      - name: Smoke test Claude plugin package
+        run: sh skill/scripts/smoke-test-claude-plugin.sh
+
+      - name: Smoke test Codex hook package
+        run: sh skill/scripts/smoke-test-codex-hook-package.sh
+
+      - name: Extract release metadata
+        id: version
+        run: |
+          version="$(cat VERSION | tr -d '[:space:]')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          sh skill/scripts/extract-release-notes.sh "$version" > release-notes.md
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Check existing tag
+        id: tag
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            tagged_sha="$(git rev-list -n 1 "$tag")"
+            if [ "$tagged_sha" != "$GITHUB_SHA" ]; then
+              echo "Tag $tag already exists at $tagged_sha, not current commit $GITHUB_SHA" >&2
+              exit 1
+            fi
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.tag.outputs.exists == 'false'
+        run: |
+          git tag "${{ steps.version.outputs.tag }}" "$GITHUB_SHA"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Check existing release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            --target "$GITHUB_SHA"

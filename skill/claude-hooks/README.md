@@ -5,11 +5,11 @@ This directory contains an optional Claude Code automation layer for `context-ta
 The core skill remains portable across Claude Code, Codex, and OpenCode.
 These hooks are Claude-only enhancements for users who want automatic context injection.
 
-When enabled, the most visible cue is Claude Code's native status line showing explicit writer bindings as `task!:<slug>`, explicit observer bindings as `obs:<slug>`, and workspace fallback selection as `wksp:<slug>`.
+When plugin hooks are enabled, Claude Code receives task context on lifecycle events. The native status line remains an optional standalone fallback because Claude Code plugins do not currently distribute the main `statusLine` setting.
 
 ## What the hooks do
 
-- `statusLine` - show the current task in Claude Code's native status line
+- optional `statusLine` fallback - show the current task in Claude Code's native status line when configured through settings
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/` for explicit bindings, while workspace fallback stays advisory
 - `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context only for explicit bindings
 - `UserPromptSubmit` - add planning guidance and task-drift reminders before Claude handles the prompt; fallback-only sessions get advisory routing text instead of the full task snapshot
@@ -23,6 +23,17 @@ When enabled, the most visible cue is Claude Code's native status line showing e
 
 ## Install
 
+Recommended plugin install:
+
+```bash
+claude plugin marketplace add excitedhaha/context-task-planning
+claude plugin install context-task-planning@context-task-planning
+```
+
+The plugin loads `hooks.json` directly and uses `${CLAUDE_PLUGIN_ROOT}` to locate the bundled scripts.
+
+Manual standalone fallback:
+
 1. Make sure the skill is installed at `~/.claude/skills/context-task-planning`
 2. Merge `settings.example.json` into either:
    - `~/.claude/settings.json`
@@ -31,4 +42,4 @@ When enabled, the most visible cue is Claude Code's native status line showing e
 
 For first-time testing, project-local `.claude/settings.local.json` is the safest option.
 
-The bundled example config enables both the hooks and the Claude status line. Restart Claude Code after merging it so the status-line command reloads.
+The standalone example config enables both the hooks and the Claude status line. Restart Claude Code after merging it so the status-line command reloads. Do not enable both plugin hooks and these manual hook entries at the same time.

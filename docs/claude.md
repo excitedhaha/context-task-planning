@@ -7,18 +7,33 @@ This page only covers Claude-specific setup and behavior. Use `README.md` for th
 Recommended install:
 
 ```bash
+claude plugin marketplace add excitedhaha/context-task-planning
+claude plugin install context-task-planning@context-task-planning
+```
+
+Then run `/reload-plugins` or restart Claude Code. The plugin bundles the main `context-task-planning` skill, the `task-*` entry skills, and the Claude lifecycle hooks.
+
+Local fallback while developing from a clone:
+
+```bash
+claude --plugin-dir .
+```
+
+Standalone skill fallback:
+
+```bash
 npx skills add excitedhaha/context-task-planning -g
 ```
 
 Choose `context-task-planning`, the Claude Code agent, and any bundled `task-*` entry skills you want when prompted.
 
-Local fallback while developing from a clone:
+Local symlink fallback while developing from a clone:
 
 ```bash
 sh skill/scripts/install-macos.sh
 ```
 
-That local installer links the main `context-task-planning` skill plus the bundled `task-*` Claude entry skills into `~/.claude/skills/`.
+That local installer links the main `context-task-planning` skill plus the bundled `task-*` Claude entry skills into `~/.claude/skills/`. It does not install the Claude plugin.
 
 A global install keeps the main skill under:
 
@@ -30,11 +45,9 @@ Any selected bundled `task-*` entry skills are installed as sibling directories 
 
 ## What Claude adds
 
-After you enable the bundled adapter, Claude Code can surface the shared file-backed task state through:
+After you enable the plugin or standalone adapter, Claude Code can surface the shared file-backed task state through:
 
-- a native status line cue such as `task!:<slug>` for explicit writer binding
-- `obs:<slug>` when the current session is explicitly bound as observe-only
-- `wksp:<slug>` when Claude is only following the shared workspace fallback pointer
+- optional native status line cues such as `task!:<slug>`, `obs:<slug>`, or `wksp:<slug>` when you enable the status-line fallback
 - strong task-context recovery on session start for explicit bindings or `PLAN_TASK`, while workspace fallback stays advisory
 - safe compact-time sync before Claude compresses context: writer sessions may repair warning-level snapshot drift and refresh `.derived/context_compact.json`, while observer sessions only refresh the derived compact artifact
 - prompt-time reminders when a request looks like likely task drift
@@ -45,6 +58,10 @@ After you enable the bundled adapter, Claude Code can surface the shared file-ba
 
 ## Enable the Claude adapter
 
+Recommended: install the Claude Code plugin. Its `skill/claude-hooks/hooks.json` is loaded as plugin hooks and does not require hand-merging hook settings.
+
+Manual standalone fallback:
+
 1. Install the skill with `npx skills add` or the local script.
 2. Merge `skill/claude-hooks/settings.example.json` into one of:
 
@@ -53,11 +70,11 @@ After you enable the bundled adapter, Claude Code can surface the shared file-ba
 
 For first-time testing, `.claude/settings.local.json` is the safest option.
 
-The bundled config includes both hooks and `statusLine`, so copying it is enough to enable the visible task cue.
+The standalone fallback config includes both hooks and `statusLine`, so copying it is enough to enable the visible task cue. Do not enable both plugin hooks and the manual hook entries at the same time, or Claude will receive duplicate reminders.
 
 ## Bundled task skills
 
-Claude Code now also supports bundled thin task-entry skills for the same high-frequency flows that OpenCode exposes as slash commands:
+Claude Code now also supports bundled thin task-entry skills for the same high-frequency flows that OpenCode exposes as slash commands. Plugin installs expose these under the plugin namespace, for example `/context-task-planning:task-current`; standalone skill installs expose `/task-current` directly:
 
 - `task-init <task title>` - create a tracked task from a confirmed title
 - `task-current` - inspect the current task and next action
@@ -72,13 +89,14 @@ These are implemented as skills, not a separate Claude `commands/` directory. Th
 
 After restarting Claude Code, you should see:
 
-- an explicit task cue in the native status line for per-session bindings, or a weaker workspace fallback cue when only `.planning/.active_task` is set
 - automatic strong task-context recovery when the session starts for explicit bindings; fallback-only sessions get a short advisory instead of the full task snapshot
 - on context compaction, Claude refreshes compact recovery context from the shared helper for explicit bindings instead of replaying only the shorter session-start snapshot; fallback-only sessions do not inherit compact recovery payloads
 - a reminder before Claude silently mixes likely-unrelated work into the current task
 - the same task still resolving when Claude starts inside a registered repo path or recorded worktree under a parent workspace
 - startup and prompt-time summaries can mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
 - treat that spec line as scoping help, not as extra setup; only use the manual override path if the work really needs one authoritative ref
+
+If you also enabled the optional status-line fallback, you should see an explicit task cue in the native status line for per-session bindings, or a weaker workspace fallback cue when only `.planning/.active_task` is set.
 
 Sample illustration:
 

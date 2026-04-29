@@ -22,7 +22,18 @@ Reach one clear aha moment: you can leave a long coding task, come back later, a
 
 ### Fast path
 
-#### Step 1: Install the skill
+#### Step 1: Install for your host
+
+For Claude Code, prefer the plugin:
+
+```bash
+claude plugin marketplace add excitedhaha/context-task-planning
+claude plugin install context-task-planning@context-task-planning
+```
+
+Then run `/reload-plugins` or restart Claude Code.
+
+For OpenCode, Codex, or standalone skill installs:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
@@ -58,7 +69,7 @@ If you did not explicitly name the task, the agent should propose the inferred t
 
 You should see one of these:
 
-- `Claude Code` - `task!:<slug>` for explicit writer bindings, `obs:<slug>` for explicit observer bindings, or `wksp:<slug>` for the workspace fallback pointer
+- `Claude Code` - plugin hooks inject task context and reminders; if you also enable the optional status-line fallback, it can show `task!:<slug>` for writer bindings, `obs:<slug>` for observer bindings, or `wksp:<slug>` for the workspace fallback pointer
 - `OpenCode` - `task:<slug> | ...` in the session title; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` and `/task-list`
 - `Codex` - optional hooks inject task reminders on new turns and can ask Codex to sync planning before finishing; `sh skill/scripts/current-task.sh` remains the manual visibility check
 

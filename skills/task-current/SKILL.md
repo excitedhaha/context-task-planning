@@ -11,8 +11,9 @@ Show the currently resolved `context-task-planning` task for this workspace.
 ## Requirements
 
 - Expect the main `context-task-planning` skill to be installed alongside this entry skill.
-- Prefer the installed core skill script at `~/.claude/skills/context-task-planning/scripts/current-task.sh`.
-- If that path does not exist but the current workspace contains `skill/scripts/current-task.sh`, use the repo-local path instead.
+- If this entry skill is loaded from a Claude Code plugin, prefer the bundled core script at `${CLAUDE_SKILL_DIR}/../../skill/scripts/current-task.sh`.
+- Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/current-task.sh`.
+- If neither installed path exists but the current workspace contains `skill/scripts/current-task.sh`, use the repo-local path instead.
 - Run the command from the current workspace.
 - Do not modify task state.
 - After the command succeeds, summarize the current task, status, mode, and next recommended action.
@@ -20,5 +21,8 @@ Show the currently resolved `context-task-planning` task for this workspace.
 ## Run
 
 ```bash
-sh ~/.claude/skills/context-task-planning/scripts/current-task.sh
+core="${CLAUDE_SKILL_DIR}/../../skill/scripts/current-task.sh"
+[ -f "$core" ] || core="$HOME/.claude/skills/context-task-planning/scripts/current-task.sh"
+[ -f "$core" ] || core="skill/scripts/current-task.sh"
+sh "$core"
 ```

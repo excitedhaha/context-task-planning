@@ -1,0 +1,21 @@
+{
+  "name": "context-task-planning",
+  "version": "0.3.0",
+  "description": "Task-scoped context engineering for recoverable, visible, and isolated long-running coding work.",
+  "author": {
+    "name": "excitedhaha"
+  },
+  "repository": "https://github.com/excitedhaha/context-task-planning",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "context-engineering",
+    "tasks",
+    "hooks"
+  ],
+  "skills": [
+    "./skill",
+    "./skills"
+  ],
+  "hooks": "./skill/claude-hooks/hooks.json"
+}
