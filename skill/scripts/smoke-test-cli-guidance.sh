@@ -280,6 +280,39 @@ PY
 BRIEF_WARN_OUTPUT=$(sh "$SCRIPT_DIR/validate-task.sh" --task brief-demo)
 printf '%s\n' "$BRIEF_WARN_OUTPUT" | grep -F "state.json entered execute/verify without acceptance_criteria" >/dev/null || fail "validate-task missed acceptance warning"
 
+SLUG_ROOT="$WORKDIR/slug-override"
+mkdir -p "$SLUG_ROOT"
+cd "$SLUG_ROOT"
+sh "$SCRIPT_DIR/init-task.sh" --title "Readable title" --slug "Custom Slug Value!!!" >/dev/null
+"$PYTHON_BIN" - "$SLUG_ROOT/.planning/custom-slug-value" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+plan_dir = Path(sys.argv[1])
+if not plan_dir.is_dir():
+    raise SystemExit(f"expected normalized slug directory, got missing path: {plan_dir}")
+
+state = json.loads((plan_dir / "state.json").read_text(encoding="utf-8"))
+if state.get("title") != "Readable title":
+    raise SystemExit(f"unexpected title after slug override: {state.get('title')!r}")
+if state.get("slug") != "custom-slug-value":
+    raise SystemExit(f"unexpected slug after slug override: {state.get('slug')!r}")
+if state.get("planning_path") != ".planning/custom-slug-value":
+    raise SystemExit(f"unexpected planning_path after slug override: {state.get('planning_path')!r}")
+
+task_plan = (plan_dir / "task_plan.md").read_text(encoding="utf-8")
+progress = (plan_dir / "progress.md").read_text(encoding="utf-8")
+if "# Task Plan: Readable title" not in task_plan:
+    raise SystemExit("task_plan title did not preserve the user-facing title")
+if "- Task Slug: `custom-slug-value`" not in task_plan:
+    raise SystemExit("task_plan hot context did not reflect the normalized custom slug")
+if "# Progress Log: Readable title" not in progress:
+    raise SystemExit("progress title did not preserve the user-facing title")
+if "- Task Slug: `custom-slug-value`" not in progress:
+    raise SystemExit("progress snapshot did not reflect the normalized custom slug")
+PY
+
 LINKED_ROOT="$WORKDIR/linked"
 mkdir -p "$LINKED_ROOT/openspec/changes/auth-refresh"
 git -C "$LINKED_ROOT" init >/dev/null 2>&1

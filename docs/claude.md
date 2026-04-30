@@ -76,7 +76,7 @@ The standalone fallback config includes both hooks and `statusLine`, so copying 
 
 Claude Code now also supports bundled thin task-entry skills for the same high-frequency flows that OpenCode exposes as slash commands. Plugin installs expose these under the plugin namespace, for example `/context-task-planning:task-current`; standalone skill installs expose `/task-current` directly:
 
-- `task-init <task title>` - create a tracked task from a confirmed title
+- `task-init <task title>` - create a tracked task from a confirmed title and a final task slug, previewing both when the task is inferred
 - `task-current` - inspect the current task and next action
 - `task-list` - list existing tasks in the workspace
 - `task-validate` - validate the current task without auto-fixing warnings

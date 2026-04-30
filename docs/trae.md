@@ -50,7 +50,7 @@ The plugin does not provide a native status line or session-title cue today. Use
 
 TraeCLI/Coco exposes plugin commands under the plugin namespace:
 
-- `/context-task-planning:task-init <task title>` - create a tracked task from a confirmed title
+- `/context-task-planning:task-init <task title>` - create a tracked task from a confirmed title and final slug, previewing both when the task is inferred
 - `/context-task-planning:task-current` - inspect the current task and next action
 - `/context-task-planning:task-list` - list existing tasks in the workspace
 - `/context-task-planning:task-validate` - validate the current task without auto-fixing warnings
@@ -79,6 +79,7 @@ After restarting TraeCLI/Coco:
 - `/skills` should include `context-task-planning` and the bundled task-entry skills
 - `/context-task-planning:task-current` should resolve the current task or explain why no task is active
 - a complex first prompt in a repo without `.planning/` should receive an initialization hint instead of silently starting ad hoc work
+- when task creation is inferred from context, the command flow should show both the proposed title and proposed slug before the task is created
 - a high-signal scope-switch prompt should give the main LLM route evidence so it can ask before mixing unrelated work
 - after a code-changing turn, TraeCLI/Coco may ask once to update `.planning/<slug>/progress.md` and `.planning/<slug>/state.json` before finalizing
 

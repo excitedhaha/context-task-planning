@@ -69,6 +69,15 @@ for command in [
     text = path.read_text(encoding="utf-8")
     if "${COCO_PLUGIN_ROOT}/skill/scripts/" not in text:
         raise SystemExit(f"command is not plugin-root relative: {path}")
+    if command == "task-init.md":
+        required = [
+            "confirm or edit both the title and the slug",
+            "--title \"<final task title>\" --slug \"<final task slug>\"",
+            "If the user edits the title but does not explicitly override the slug, recompute the slug from the final title",
+        ]
+        for item in required:
+            if item not in text:
+                raise SystemExit(f"task-init contract missing expected guidance {item!r}: {path}")
 
 if "name: context-task-planning" not in trae_skill:
     raise SystemExit("Trae-visible main skill has the wrong name")

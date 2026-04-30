@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-04-30
+
+### Changed
+- Updated `task-init` contracts across TraeCLI/Coco, OpenCode, and bundled task-entry skills so inferred task creation now previews both the candidate title and candidate slug before confirmation.
+- Standardized `task-init` guidance to pass explicit `--title` and `--slug` values into `init-task.sh`, while keeping slug recomputation and normalization rules aligned with `slugify.sh`.
+- Refreshed README and host-specific onboarding/docs so task creation consistently documents title/slug confirmation instead of title-only confirmation.
+
+### Added
+- Added smoke-test coverage to catch regressions in `task-init` contract text and to verify custom slug overrides preserve the user-facing title while normalizing the planning directory slug.
+
 ## [0.4.1] - 2026-04-29
 
 ### Changed

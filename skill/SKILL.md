@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.4.1"
+  version: "0.4.2"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -58,8 +58,8 @@ Each task lives in its own directory:
 
 ## First steps
 
-1. If the user did not explicitly provide a task name, infer a concise candidate task title from the request, derive the slug that `scripts/slugify.sh` would produce, and ask the user to confirm or edit that title before creating files
-2. Run `scripts/init-task.sh "<confirmed task title>"`
+1. If the user did not explicitly provide a task name, infer a concise candidate task title from the request, derive the slug that `scripts/slugify.sh` would produce, show both to the user, and ask them to confirm or edit the final title and slug before creating files
+2. Run `scripts/init-task.sh --title "<final task title>" --slug "<final task slug>"`
 3. Read `.planning/<slug>/state.json`
 4. Read `.planning/<slug>/task_plan.md`
 5. Fill in missing goal, non-goals, acceptance criteria, constraints, and open questions before implementation

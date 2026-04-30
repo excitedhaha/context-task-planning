@@ -23,14 +23,14 @@ Each task lives under `.planning/<slug>/` with:
 - `progress.md` for checkpoints and verification
 - `findings.md` for durable discoveries
 
-Before implementation, make sure the task has a goal, non-goals, acceptance criteria, constraints, and a next action. If you infer a task title from the request, ask the user to confirm or edit the title before creating `.planning/<slug>/`.
+Before implementation, make sure the task has a goal, non-goals, acceptance criteria, constraints, and a next action. If you infer a task title from the request, show both the candidate title and candidate slug, then ask the user to confirm or edit the final title and slug before creating `.planning/<slug>/`.
 
 ## TraeCLI/Coco plugin paths
 
 When installed as a TraeCLI/Coco plugin, prefer these paths:
 
 ```bash
-sh "${COCO_PLUGIN_ROOT}/skill/scripts/init-task.sh" "<confirmed task title>"
+sh "${COCO_PLUGIN_ROOT}/skill/scripts/init-task.sh" --title "<final task title>" --slug "<final task slug>"
 sh "${COCO_PLUGIN_ROOT}/skill/scripts/current-task.sh"
 sh "${COCO_PLUGIN_ROOT}/skill/scripts/current-task.sh" --compact
 sh "${COCO_PLUGIN_ROOT}/skill/scripts/check-task-drift.sh" --prompt "<new request>" --json

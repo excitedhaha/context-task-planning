@@ -91,7 +91,7 @@ If that cue is missing, use:
 
 For OpenCode or TraeCLI/Coco, the bundled command set covers the common task loop:
 
-- `/task-init <task title>` using a confirmed title
+- `/task-init <task title>` using a confirmed title and the final slug, previewing both first when the task is inferred
 - `/task-current`
 - `/task-list`
 - `/task-validate`

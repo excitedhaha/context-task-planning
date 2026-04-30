@@ -135,7 +135,7 @@ The shared shell entry points now map cleanly to those basics:
 
 Claude Code users also get thin skill-style entry points for the same high-frequency flows. In plugin installs they are namespaced as `/context-task-planning:<name>`; in standalone skill installs they appear as `/task-*`:
 
-- `task-init <task title>` - create a tracked task from a confirmed title
+- `task-init <task title>` - create a tracked task from a confirmed title and a final task slug, previewing both when the task is inferred
 - `task-current` - inspect the current task and next action
 - `task-list` - list existing tasks in the workspace
 - `task-validate` - validate the current task without auto-fixing warnings
@@ -144,7 +144,7 @@ Claude Code users also get thin skill-style entry points for the same high-frequ
 
 OpenCode users also get a small slash-command surface for the same high-frequency flows:
 
-- `/task-init <task title>` - create a tracked task from a confirmed title
+- `/task-init <task title>` - create a tracked task from a confirmed title and a final task slug, previewing both when the task is inferred
 - `/task-current` - inspect the current task and next action
 - `/task-list` - list existing tasks in the workspace
 - `/task-validate` - validate the current task without auto-fixing warnings
@@ -155,7 +155,7 @@ See `docs/opencode.md` for OpenCode-specific install details, troubleshooting, a
 
 TraeCLI/Coco users get equivalent plugin-bundled slash commands under the plugin namespace:
 
-- `/context-task-planning:task-init <task title>` - create a tracked task from a confirmed title
+- `/context-task-planning:task-init <task title>` - create a tracked task from a confirmed title and a final task slug, previewing both when the task is inferred
 - `/context-task-planning:task-current` - inspect the current task and next action
 - `/context-task-planning:task-list` - list existing tasks in the workspace
 - `/context-task-planning:task-validate` - validate the current task without auto-fixing warnings
