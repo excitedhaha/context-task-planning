@@ -49,8 +49,6 @@ tree:
     progress.md
     findings.md
     state.json
-    .derived/
-      context_compact.json
     delegates/
       <delegate-id>/
         brief.md
@@ -85,9 +83,6 @@ Inside each task, the document roles remain stable:
 - `findings.md` keeps distilled conclusions worth re-reading later
 - `state.json` is the authoritative operational snapshot for lifecycle,
   verification, repo scope, and routing metadata
-- `.derived/context_compact.json` is a non-authoritative compact recovery view
-  with source references and freshness metadata; it can always be regenerated
-  from the source task files
 
 ## Task Resolution And Workspace Boundaries
 
@@ -303,11 +298,6 @@ Recovery is a two-step process:
 1. resolve the workspace and current task
 2. rebuild the task snapshot from task files
 
-For small surfaces, `current-task.sh --compact` stays state-driven and
-prompt-sized. For larger recovery reads, `compact-context.sh` can prefer the
-derived compact artifact and fall back to rebuilding the current compact view
-from `state.json`, markdown files, and delegate state.
-
 After the task is selected, recovery order is:
 
 1. `state.json`
@@ -322,7 +312,7 @@ Several guardrails reuse the same core routing model.
 - **Switch-safety guard** checks dirty git worktrees before task switching so
   code changes are not silently carried across tasks
 - **Validation** checks consistency across task files, delegate state, session
-  bindings, runtime metadata, and warning-level derived compact-artifact drift
+  bindings, and runtime metadata
 
 These guards are intentionally lightweight. They do not attempt to become a hard
 transaction manager. Their job is to prevent the most common silent failures in

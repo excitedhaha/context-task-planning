@@ -110,8 +110,6 @@ I lost context on this task. Recover the active task from local planning files a
 
 If the agent can continue from `.planning/<slug>/` without you re-teaching the whole task, the workflow is working.
 
-If the task later grows into a noisier recovery case, use `sh skill/scripts/compact-context.sh` before replaying the full markdown files. `current-task.sh --compact` stays a prompt-sized cue; `compact-context.sh` is the richer derived recovery surface.
-
 #### You do not need to choose a mode
 
 For first-time use, keep this simple:
@@ -399,7 +397,7 @@ sh skill/scripts/validate-task.sh
 sh skill/scripts/validate-task.sh --fix-warnings
 ```
 
-`validate-task.sh --fix-warnings` can now do two small repairs: resync warning-level markdown snapshot drift from `state.json`, and refresh a stale derived compact artifact.
+`validate-task.sh --fix-warnings` can resync warning-level markdown snapshot drift from `state.json`.
 
 Do not use delegates for:
 
@@ -416,7 +414,6 @@ Start with the smallest useful commands:
 ```bash
 sh skill/scripts/current-task.sh
 sh skill/scripts/current-task.sh --compact
-sh skill/scripts/compact-context.sh
 sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json
 sh skill/scripts/validate-task.sh
 sh skill/scripts/validate-task.sh --fix-warnings
@@ -424,8 +421,8 @@ sh skill/scripts/validate-task.sh --fix-warnings
 
 If the summary shows spec candidates, keep the fallback small too:
 
-- most of the time, keep working or use `sh skill/scripts/compact-context.sh` for a clearer recovery view
-- only record a manual spec ref when the work really needs one authoritative reference
+- most of the time, keep working
+- only record a manual spec ref when the work needs one authoritative reference
 - exploratory work can usually continue without resolving candidates first
 
 ```bash

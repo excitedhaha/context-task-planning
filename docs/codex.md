@@ -52,7 +52,7 @@ Codex still does not expose the same surfaces as Claude Code or OpenCode:
 - no native status line or session-title API for a persistent task cue
 - no supported `PreToolUse` context injection or tool input rewrite path
 - no automatic native subagent prompt mutation equivalent to Claude `Task` or OpenCode `tool.execute.before`
-- no dedicated compact hook; recovery happens on the next `SessionStart`, `UserPromptSubmit`, or `Stop` check
+- no dedicated session compaction hook; recovery happens on the next `SessionStart`, `UserPromptSubmit`, or `Stop` check
 
 Use the hooks for long-context reminders and end-of-turn planning sync. Keep the shell scripts as the source of truth and as the manual escape hatch.
 
@@ -188,7 +188,6 @@ Useful commands when you want direct control:
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh`
 - `sh skill/scripts/current-task.sh --compact`
-- `sh skill/scripts/compact-context.sh`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host codex --tool-name Task --task-text "Investigate auth entry points" --json`
 - `sh skill/scripts/validate-task.sh`
@@ -196,6 +195,6 @@ Useful commands when you want direct control:
 - `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>`
 - `sh skill/scripts/prepare-delegate.sh --kind discovery "Map auth entry points"`
 
-Keep `current-task.sh --compact` for prompt-sized status. Use `compact-context.sh` when you want the richer derived recovery view for a larger task. `validate-task.sh --fix-warnings` also refreshes stale derived compact artifacts when needed. Use `set-task-spec-context.sh` only when implementation needs one authoritative spec ref; if the summary only shows a few candidates during exploration, you can usually keep going without resolving them yet.
+Keep `current-task.sh --compact` for prompt-sized status. Use `set-task-spec-context.sh` only when implementation needs one authoritative spec ref; if the summary only shows a few candidates during exploration, you can usually keep going without resolving them yet.
 
 For the shared progression from first success to multi-session and multi-repo usage, go back to `docs/onboarding.md`. For the deeper architecture behind session bindings, repo scope, and worktree attachment, use `docs/design.md`.

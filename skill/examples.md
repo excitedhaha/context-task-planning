@@ -61,15 +61,6 @@ Then fill in:
 3. Read the most recent session section in `progress.md`
 4. Continue from `next_action`
 
-When the task has grown enough that replaying the markdown files feels noisy, use the derived compact view first:
-
-```bash
-sh scripts/compact-context.sh
-sh scripts/compact-context.sh --json
-```
-
-The command prefers a fresh `.planning/<slug>/.derived/context_compact.json` when available and otherwise rebuilds an ephemeral compact snapshot from the current task files.
-
 ## Example 2b: Check for task drift before switching scope
 
 ```bash
@@ -231,4 +222,4 @@ sh scripts/validate-task.sh
 sh scripts/validate-task.sh --fix-warnings
 ```
 
-Use `validate-task.sh` before wrapping up a long task or after a manual edit to planning files. It now also warns when a derived compact artifact is stale, or missing for a task that prefers compact reads. Use `--fix-warnings` when the only drift is warning-level markdown snapshot staleness that should be resynced from `state.json` or a derived compact artifact that should be refreshed.
+Use `validate-task.sh` before wrapping up a long task or after a manual edit to planning files. Use `--fix-warnings` when the only drift is warning-level markdown snapshot staleness that should be resynced from `state.json`.

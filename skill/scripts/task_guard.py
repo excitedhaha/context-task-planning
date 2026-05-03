@@ -11,267 +11,74 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "around",
-    "as",
-    "at",
-    "be",
-    "before",
-    "by",
-    "current",
-    "for",
-    "from",
-    "help",
-    "into",
-    "keep",
-    "make",
-    "mode",
-    "next",
-    "not",
-    "phase",
-    "plan",
-    "planning",
-    "project",
-    "resume",
-    "skill",
-    "state",
-    "status",
-    "step",
-    "steps",
-    "task",
-    "tasks",
-    "that",
-    "the",
-    "then",
-    "this",
-    "use",
-    "using",
-    "with",
-    "work",
-    "workflow",
-    "上下文",
-    "一个",
-    "一些",
-    "不是",
-    "任务",
-    "当前",
-    "工作",
-    "然后",
-    "继续",
-    "问题",
-}
-
-FOLLOWUP_PHRASES = [
-    "continue",
-    "keep going",
-    "go on",
-    "same task",
-    "follow up",
-    "use the same task",
-    "继续",
-    "接着",
-    "继续做",
-    "按上面的改",
-    "刚才那个",
-    "同一个任务",
-]
-
-SWITCH_CUES = [
-    "another task",
-    "different task",
-    "new task",
-    "separately",
-    "instead",
-    "unrelated",
-    "另外",
-    "另一个",
-    "顺便",
-    "单独",
-    "新任务",
-    "换个",
-]
-
-COMPLEX_KEYWORDS = [
-    "implement",
-    "build",
-    "create",
-    "add",
-    "refactor",
-    "debug",
-    "investigate",
-    "migrate",
-    "design",
-    "plan",
-    "optimize",
-    "fix",
-    "audit",
-    "wire",
-    "document",
-    "实现",
-    "设计",
-    "重构",
-    "排查",
-    "调研",
-    "迁移",
-    "优化",
-    "新增",
-    "修复",
-    "补充",
-]
-
-COMPLEX_SIGNALS = [
-    "\n",
-    "1.",
-    "2.",
-    "- ",
-    "需要",
-    "并且",
-    "同时",
-    "方案",
-    "步骤",
-]
-
-DELEGATE_KIND_PATTERNS = [
-    (
-        "review",
-        ["review", "diff review", "code review", "pr review", "审查", "评审"],
-    ),
-    (
-        "verify",
-        [
-            "verify",
-            "validation",
-            "regression",
-            "failing test",
-            "test failure",
-            "triage",
-            "验证",
-            "回归",
-            "测试失败",
-            "失败排查",
-        ],
-    ),
-    (
-        "spike",
-        [
-            "spike",
-            "prototype",
-            "poc",
-            "feasibility",
-            "compare options",
-            "方案对比",
-            "可行性",
-        ],
-    ),
-    (
-        "discovery",
-        [
-            "investigate",
-            "analyze",
-            "map",
-            "scan",
-            "explore",
-            "entry point",
-            "dependency",
-            "research",
-            "调研",
-            "分析",
-            "找入口",
-            "排查",
-        ],
-    ),
-]
-
-DELEGATE_RECOMMEND_SESSION_CUES = [
-    "resume later",
-    "pick up later",
-    "later session",
-    "follow up later",
-    "后续继续",
-    "之后继续",
-    "跨会话",
-]
-
-DELEGATE_RECOMMEND_ARTIFACT_CUES = [
-    "write up",
-    "report",
-    "summary",
-    "matrix",
-    "research notes",
-    "record findings",
-    "整理结论",
-    "输出报告",
-    "记录结果",
-]
-
-DELEGATE_RECOMMEND_MULTI_CUES = [
-    "multiple repos",
-    "across repos",
-    "each repo",
-    "for every repo",
-    "parallel",
-    "多个仓库",
-    "多个子问题",
-    "逐个仓库",
-]
-
-DELEGATE_REQUIRED_LIFECYCLE_CUES = [
-    "durable lifecycle",
-    "lifecycle state",
-    "track lifecycle",
-    "resume and promote",
-    "blocked then resume",
-    "持久生命周期",
-    "跟踪生命周期",
-    "恢复并提升",
-]
-
-DELEGATE_REQUIRED_CLOSEOUT_CUES = [
-    "before done",
-    "before archive",
-    "block done",
-    "block archive",
-    "gate closeout",
-    "完成前",
-    "归档前",
-    "阻塞 done",
-]
-
-DELEGATE_REQUIRED_CONTEXT_CUES = [
-    "survive context loss",
-    "after context loss",
-    "promote later",
-    "review later before promote",
-    "上下文丢失后",
-    "之后再提升",
-    "稍后再评审",
-]
-
-SPECIAL_TOKEN_RE = re.compile(
-    r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+"
-    r"|[A-Za-z0-9_.-]+\.(?:sh|py|md|json|yaml|yml|toml|txt)"
-    r"|\.[A-Za-z0-9_.-]+"
-    r"|[A-Za-z0-9_.-]*-[A-Za-z0-9_.-]+"
+from constants import (
+    CHINESE_RE,
+    COMPLEX_KEYWORDS,
+    COMPLEX_SIGNALS,
+    DELEGATE_KIND_PATTERNS,
+    DELEGATE_RECOMMEND_ARTIFACT_CUES,
+    DELEGATE_RECOMMEND_MULTI_CUES,
+    DELEGATE_RECOMMEND_SESSION_CUES,
+    DELEGATE_REQUIRED_CLOSEOUT_CUES,
+    DELEGATE_REQUIRED_CONTEXT_CUES,
+    DELEGATE_REQUIRED_LIFECYCLE_CUES,
+    FOLLOWUP_PHRASES,
+    REPO_REGISTRY_FILE,
+    ROLE_OBSERVER,
+    ROLE_WRITER,
+    RUNTIME_DIR_NAME,
+    SESSION_DIR_NAME,
+    SESSION_KEY_ENV,
+    SPECIAL_TOKEN_RE,
+    SPEC_CONTEXT_MODES,
+    SPEC_CONTEXT_PROVIDERS,
+    SPEC_CONTEXT_STATUSES,
+    STOPWORDS,
+    SWITCH_CUES,
+    TASK_REPO_BINDING_DIR,
+    WORKSPACE_FALLBACK_SESSION_KEY,
+    WORKTREE_ROOT_NAME,
+    WORD_RE,
 )
-WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{2,}")
-CHINESE_RE = re.compile(r"[\u4e00-\u9fff]{2,}")
-SESSION_KEY_ENV = "PLAN_SESSION_KEY"
-SESSION_DIR_NAME = ".sessions"
-RUNTIME_DIR_NAME = ".runtime"
-REPO_REGISTRY_FILE = "repos.json"
-TASK_REPO_BINDING_DIR = "task_repo_bindings"
-WORKTREE_ROOT_NAME = ".worktrees"
-ROLE_WRITER = "writer"
-ROLE_OBSERVER = "observer"
-WORKSPACE_FALLBACK_SESSION_KEY = "workspace:default"
-SPEC_CONTEXT_MODES = {"none", "embedded", "linked"}
-SPEC_CONTEXT_PROVIDERS = {"none", "openspec", "spec-kit", "generic"}
-SPEC_CONTEXT_STATUSES = {"none", "detected", "linked", "ambiguous"}
+from file_utils import atomic_write_json
+from file_lock import file_lock, lock_path_for
+from session_binding import (
+    binding_role_for_task,
+    clear_session_binding,
+    clear_task_session_bindings,
+    demote_writer_binding,
+    display_session_key,
+    effective_session_key,
+    iter_session_bindings,
+    normalize_role,
+    read_session_binding,
+    resolve_session_key,
+    safe_json,
+    session_binding_path,
+    task_bindings,
+    utc_now,
+    write_session_binding,
+    writer_binding_for_task,
+)
+from repo_registry import (
+    discover_workspace_repos,
+    git_root_for,
+    load_task_state,
+    normalize_repo_id,
+    read_repo_registry,
+    read_task_repo_binding_overrides,
+    register_workspace_repo,
+    registered_repo_absolute_path,
+    relative_to_workspace,
+    repo_by_id,
+    repo_registry_path,
+    resolve_path_in_workspace,
+    runtime_dir,
+    task_repo_binding_path,
+    write_json_file,
+    write_repo_registry,
+    write_task_repo_binding_overrides,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -523,410 +330,6 @@ def resolve_workspace_root(cwd: str) -> Path:
         candidate = candidate.parent
 
     return git_root or start_dir
-
-
-def utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
-
-
-def resolve_session_key(explicit: str = "") -> str:
-    for candidate in (explicit.strip(), os.environ.get(SESSION_KEY_ENV, "").strip()):
-        if candidate:
-            return candidate
-    return ""
-
-
-def effective_session_key(explicit: str = "", fallback: bool = False) -> str:
-    session_key = resolve_session_key(explicit)
-    if session_key:
-        return session_key
-    if fallback:
-        return WORKSPACE_FALLBACK_SESSION_KEY
-    return ""
-
-
-def normalize_role(value: str) -> str:
-    return ROLE_OBSERVER if value == ROLE_OBSERVER else ROLE_WRITER
-
-
-def display_session_key(session_key: str) -> str:
-    if not session_key:
-        return "(none)"
-    if session_key == WORKSPACE_FALLBACK_SESSION_KEY:
-        return "workspace-default"
-    return session_key
-
-
-def session_registry_dir(plan_root: Path) -> Path:
-    return plan_root / SESSION_DIR_NAME
-
-
-def session_binding_name(session_key: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", session_key).strip("-.") or "session"
-    digest = hashlib.sha1(session_key.encode("utf-8")).hexdigest()[:12]
-    return f"{cleaned[:48]}-{digest}.json"
-
-
-def session_binding_path(plan_root: Path, session_key: str) -> Path | None:
-    key = resolve_session_key(session_key)
-    if not key:
-        return None
-    return session_registry_dir(plan_root) / session_binding_name(key)
-
-
-def iter_session_bindings(plan_root: Path) -> list[tuple[Path, dict]]:
-    registry = session_registry_dir(plan_root)
-    if not registry.is_dir():
-        return []
-
-    bindings = []
-    for entry in registry.iterdir():
-        if not entry.is_file() or entry.suffix != ".json":
-            continue
-        bindings.append((entry, safe_json(entry)))
-    return bindings
-
-
-def read_session_binding(plan_root: Path, session_key: str) -> dict:
-    key = resolve_session_key(session_key)
-    if not key:
-        return {}
-
-    path = session_binding_path(plan_root, key)
-    if path is None:
-        return {}
-
-    binding = safe_json(path)
-    if not binding:
-        return {}
-    if binding.get("session_key") and binding.get("session_key") != key:
-        return {}
-    binding.setdefault("session_key", key)
-    binding["role"] = normalize_role(str(binding.get("role") or ROLE_WRITER))
-    binding.setdefault("path", str(path))
-    return binding
-
-
-def write_session_binding(
-    plan_root: Path, session_key: str, task_slug: str, role: str = ROLE_WRITER
-) -> None:
-    key = resolve_session_key(session_key)
-    if not key or not task_slug:
-        return
-
-    path = session_binding_path(plan_root, key)
-    if path is None:
-        return
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": "1.0.0",
-        "session_key": key,
-        "task_slug": task_slug,
-        "role": normalize_role(role),
-        "updated_at": utc_now(),
-    }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def clear_session_binding(plan_root: Path, session_key: str) -> bool:
-    path = session_binding_path(plan_root, session_key)
-    if path is None or not path.exists():
-        return False
-    path.unlink()
-    return True
-
-
-def clear_task_session_bindings(plan_root: Path, task_slug: str) -> list[str]:
-    cleared = []
-    for path, binding in iter_session_bindings(plan_root):
-        if binding.get("task_slug") != task_slug:
-            continue
-        session_key = str(binding.get("session_key") or "").strip()
-        try:
-            path.unlink()
-            if session_key:
-                cleared.append(session_key)
-        except OSError:
-            continue
-    return cleared
-
-
-def task_bindings(plan_root: Path, task_slug: str) -> list[dict]:
-    bindings = []
-    for path, binding in iter_session_bindings(plan_root):
-        if str(binding.get("task_slug") or "").strip() != task_slug:
-            continue
-        session_key = str(binding.get("session_key") or "").strip()
-        if not session_key:
-            continue
-        bindings.append(
-            {
-                "path": str(path),
-                "session_key": session_key,
-                "task_slug": task_slug,
-                "role": normalize_role(str(binding.get("role") or ROLE_WRITER)),
-                "updated_at": str(binding.get("updated_at") or ""),
-            }
-        )
-    bindings.sort(
-        key=lambda item: (
-            item["role"] != ROLE_WRITER,
-            item["updated_at"],
-            item["session_key"],
-        )
-    )
-    return bindings
-
-
-def writer_binding_for_task(plan_root: Path, task_slug: str) -> dict:
-    for binding in task_bindings(plan_root, task_slug):
-        if binding["role"] == ROLE_WRITER:
-            return binding
-    return {}
-
-
-def binding_role_for_task(plan_root: Path, session_key: str, task_slug: str) -> str:
-    binding = read_session_binding(plan_root, session_key)
-    if str(binding.get("task_slug") or "").strip() != task_slug:
-        return ""
-    return normalize_role(str(binding.get("role") or ROLE_WRITER))
-
-
-def demote_writer_binding(plan_root: Path, task_slug: str) -> str:
-    writer = writer_binding_for_task(plan_root, task_slug)
-    session_key = str(writer.get("session_key") or "").strip()
-    if not session_key:
-        return ""
-    write_session_binding(plan_root, session_key, task_slug, ROLE_OBSERVER)
-    return session_key
-
-
-def runtime_dir(plan_root: Path) -> Path:
-    return plan_root / RUNTIME_DIR_NAME
-
-
-def repo_registry_path(plan_root: Path) -> Path:
-    return runtime_dir(plan_root) / REPO_REGISTRY_FILE
-
-
-def task_repo_binding_path(plan_root: Path, task_slug: str) -> Path:
-    return runtime_dir(plan_root) / TASK_REPO_BINDING_DIR / f"{task_slug}.json"
-
-
-def normalize_repo_id(value: str) -> str:
-    lowered = value.strip().lower()
-    lowered = re.sub(r"[^a-z0-9]+", "-", lowered)
-    lowered = re.sub(r"-+", "-", lowered).strip("-")
-    return lowered
-
-
-def write_json_file(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def relative_to_workspace(workspace_root: Path, absolute_path: Path) -> str:
-    try:
-        return str(absolute_path.resolve().relative_to(workspace_root.resolve())) or "."
-    except ValueError as exc:
-        raise SystemExit(
-            f"Path `{absolute_path}` must live under workspace `{workspace_root}`."
-        ) from exc
-
-
-def resolve_path_in_workspace(workspace_root: Path, raw_path: str) -> Path:
-    candidate = Path(raw_path).expanduser()
-    if not candidate.is_absolute():
-        candidate = workspace_root / candidate
-    try:
-        return candidate.resolve()
-    except OSError as exc:
-        raise SystemExit(f"Could not resolve path `{raw_path}`: {exc}") from exc
-
-
-def read_repo_registry(plan_root: Path) -> list[dict]:
-    payload = safe_json(repo_registry_path(plan_root))
-    repos = payload.get("repos", []) if isinstance(payload, dict) else []
-    if not isinstance(repos, list):
-        return []
-
-    normalized = []
-    seen = set()
-    for repo in repos:
-        if not isinstance(repo, dict):
-            continue
-        repo_id = normalize_repo_id(str(repo.get("id") or ""))
-        repo_path = str(repo.get("path") or "").strip()
-        if not repo_id or not repo_path or repo_id in seen:
-            continue
-        seen.add(repo_id)
-        normalized.append(
-            {
-                "id": repo_id,
-                "path": repo_path,
-                "registration_mode": str(repo.get("registration_mode") or "manual"),
-                "registered_at": str(repo.get("registered_at") or ""),
-                "updated_at": str(repo.get("updated_at") or ""),
-            }
-        )
-    return normalized
-
-
-def write_repo_registry(plan_root: Path, repos: list[dict]) -> None:
-    payload = {
-        "schema_version": "1.0.0",
-        "repos": repos,
-        "updated_at": utc_now(),
-    }
-    write_json_file(repo_registry_path(plan_root), payload)
-
-
-def repo_by_id(plan_root: Path, repo_id: str) -> dict:
-    wanted = normalize_repo_id(repo_id)
-    for repo in read_repo_registry(plan_root):
-        if repo["id"] == wanted:
-            return repo
-    return {}
-
-
-def registered_repo_absolute_path(workspace_root: Path, repo: dict) -> Path:
-    repo_path = str(repo.get("path") or "").strip() or "."
-    return resolve_path_in_workspace(workspace_root, repo_path)
-
-
-def discover_workspace_repos(workspace_root: Path) -> list[dict]:
-    candidates = [workspace_root]
-    for entry in sorted(workspace_root.iterdir(), key=lambda item: item.name):
-        if not entry.is_dir() or entry.name.startswith("."):
-            continue
-        if entry.name in {"node_modules", "vendor", WORKTREE_ROOT_NAME}:
-            continue
-        candidates.append(entry)
-
-    discovered = []
-    seen_paths = set()
-    for candidate in candidates:
-        git_root = git_root_for(candidate)
-        if git_root is None:
-            continue
-        rel_path = relative_to_workspace(workspace_root, git_root)
-        if rel_path in seen_paths:
-            continue
-        seen_paths.add(rel_path)
-        repo_id = normalize_repo_id(
-            git_root.name if rel_path != "." else workspace_root.name
-        )
-        discovered.append(
-            {
-                "id": repo_id or "workspace",
-                "path": rel_path,
-            }
-        )
-
-    discovered.sort(key=lambda repo: (repo["path"] != ".", repo["path"], repo["id"]))
-    return discovered
-
-
-def register_workspace_repo(
-    plan_root: Path, workspace_root: Path, raw_path: str, requested_id: str = ""
-) -> dict:
-    resolved_path = resolve_path_in_workspace(workspace_root, raw_path)
-    git_root = git_root_for(resolved_path)
-    if git_root is None:
-        raise SystemExit(f"Path `{raw_path}` is not inside a git repository.")
-
-    repo_path = relative_to_workspace(workspace_root, git_root)
-    repo_id = normalize_repo_id(requested_id or git_root.name or repo_path)
-    if not repo_id:
-        raise SystemExit("Could not derive a repo id. Pass --id explicitly.")
-
-    repos = read_repo_registry(plan_root)
-    for repo in repos:
-        if repo["id"] == repo_id and repo["path"] != repo_path:
-            raise SystemExit(
-                f"Repo id `{repo_id}` is already registered for `{repo['path']}`."
-            )
-        if repo["path"] == repo_path and repo["id"] != repo_id:
-            raise SystemExit(
-                f"Repo path `{repo_path}` is already registered as `{repo['id']}`."
-            )
-
-    timestamp = utc_now()
-    entry = {
-        "id": repo_id,
-        "path": repo_path,
-        "registration_mode": "manual",
-        "registered_at": timestamp,
-        "updated_at": timestamp,
-    }
-
-    updated = False
-    for index, repo in enumerate(repos):
-        if repo["id"] == repo_id:
-            entry["registered_at"] = repo.get("registered_at") or timestamp
-            repos[index] = entry
-            updated = True
-            break
-
-    if not updated:
-        repos.append(entry)
-        repos.sort(key=lambda repo: repo["id"])
-
-    write_repo_registry(plan_root, repos)
-    return entry
-
-
-def read_task_repo_binding_overrides(plan_root: Path, task_slug: str) -> list[dict]:
-    payload = safe_json(task_repo_binding_path(plan_root, task_slug))
-    bindings = payload.get("bindings", []) if isinstance(payload, dict) else []
-    if not isinstance(bindings, list):
-        return []
-
-    normalized = []
-    for binding in bindings:
-        if not isinstance(binding, dict):
-            continue
-        repo_id = normalize_repo_id(str(binding.get("repo_id") or ""))
-        checkout_path = str(binding.get("checkout_path") or "").strip()
-        mode = str(binding.get("mode") or "shared").strip() or "shared"
-        if not repo_id or not checkout_path:
-            continue
-        normalized.append(
-            {
-                "repo_id": repo_id,
-                "mode": "worktree" if mode == "worktree" else "shared",
-                "checkout_path": checkout_path,
-                "branch": str(binding.get("branch") or "").strip(),
-                "base_branch": str(binding.get("base_branch") or "").strip(),
-                "updated_at": str(binding.get("updated_at") or "").strip(),
-            }
-        )
-    return normalized
-
-
-def write_task_repo_binding_overrides(
-    plan_root: Path, task_slug: str, bindings: list[dict]
-) -> None:
-    payload = {
-        "schema_version": "1.0.0",
-        "task_slug": task_slug,
-        "bindings": bindings,
-        "updated_at": utc_now(),
-    }
-    write_json_file(task_repo_binding_path(plan_root, task_slug), payload)
-
-
-def load_task_state(plan_dir: Path) -> dict:
-    state = safe_json(plan_dir / "state.json")
-    if state:
-        return state
-    return {"slug": plan_dir.name, "title": plan_dir.name}
 
 
 def nonempty_text_list(values: object) -> list[str]:

@@ -172,7 +172,5 @@ if progress_path.exists():
         fh.write("  - Delegate findings promoted into findings.md via promote-delegate.sh\n")
 PY
 
-"$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_NAME" --refresh --json >/dev/null
-
 echo "[context-task-planning] Promoted delegate: $DELEGATE_ID"
 echo "[context-task-planning] Findings file: $FINDINGS_FILE"

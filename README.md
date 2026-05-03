@@ -92,8 +92,6 @@ I lost context on this task. Recover the active task from local planning files a
 
 If the agent can continue from `.planning/<slug>/` without you re-teaching the whole task, the workflow is working.
 
-When the task has grown enough that replaying multiple markdown files feels noisy, a compact recovery view is available. See `docs/onboarding.md` for when to use it.
-
 ### 5. If this worked, choose only the next doc you need
 
 - `docs/onboarding.md` - the full user journey, from first success to multi-session, multi-repo, worktree, delegate, and verification workflows
@@ -130,7 +128,6 @@ The shared shell entry points now map cleanly to those basics:
 
 - `sh skill/scripts/current-task.sh` - human-readable summary of the resolved task plus the recommended next step
 - `sh skill/scripts/current-task.sh --compact` - short status for prompts, tmux, or status bars
-- `sh skill/scripts/compact-context.sh` - compact recovery view for larger tasks; see `docs/onboarding.md`
 - `sh skill/scripts/validate-task.sh --fix-warnings` - repair warning-level snapshot drift after manual edits or long-running work
 
 Claude Code users also get thin skill-style entry points for the same high-frequency flows. In plugin installs they are namespaced as `/context-task-planning:<name>`; in standalone skill installs they appear as `/task-*`:

@@ -91,9 +91,8 @@ printf '%s\n' "$WORKSPACE_STATUSLINE" | grep -F "wksp:latest-demo" >/dev/null ||
 WORKSPACE_SESSION_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/session_start.py")
 WORKSPACE_PROMPT_SUBMIT=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"prompt\":\"Investigate the fallback task\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/user_prompt_submit.py")
 WORKSPACE_PRE_TOOL=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\",\"tool_name\":\"Task\",\"tool_input\":{\"description\":\"Investigate the fallback task\"}}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/pre_tool_use.py")
-WORKSPACE_COMPACT_START=$(printf '%s' "{\"cwd\":\"$LATEST_ROOT\",\"session_id\":\"wksp-session\"}" | PLAN_SESSION_KEY= "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
 [ -z "$WORKSPACE_PROMPT_SUBMIT" ] || fail "fallback user prompt submit should stay quiet after session-start advisory"
-"$PYTHON_BIN" - "$WORKSPACE_SESSION_START" "$WORKSPACE_PRE_TOOL" "$WORKSPACE_COMPACT_START" <<'PY'
+"$PYTHON_BIN" - "$WORKSPACE_SESSION_START" "$WORKSPACE_PRE_TOOL" <<'PY'
 import json
 import sys
 
@@ -109,7 +108,6 @@ for payload in payloads:
         "Task `latest-demo` | status `active`",
         "Next action:",
         "Keep Task launches scoped to the current task.",
-        "Compact policy:",
     ]
     for item in forbidden:
         if item in context:
@@ -360,11 +358,6 @@ for item in required:
         raise SystemExit(f"session_start output missing {item!r}: {context!r}")
 PY
 
-COMPACT_TEXT=$(sh "$SCRIPT_DIR/compact-context.sh" --task bridge-task)
-printf '%s\n' "$COMPACT_TEXT" | grep -F "Linked artifacts:" >/dev/null || fail "compact-context text output missed linked artifacts heading"
-printf '%s\n' "$COMPACT_TEXT" | grep -F "openspec/changes/auth-refresh/proposal.md" >/dev/null || fail "compact-context text output missed linked proposal ref"
-printf '%s\n' "$PREFLIGHT_TEXT" | grep -F "Primary spec ref: openspec/changes/auth-refresh" >/dev/null || fail "subagent-preflight text output missed linked primary spec ref"
-
 DRIFT_JSON=$(sh "$SCRIPT_DIR/check-task-drift.sh" --task bridge-task --prompt "Continue work in openspec/changes/auth-refresh/proposal.md" --json)
 "$PYTHON_BIN" - "$DRIFT_JSON" <<'PY'
 import json
@@ -418,7 +411,6 @@ cd "$AMBIG_ROOT"
 sh "$SCRIPT_DIR/init-task.sh" --slug runtime --title "Runtime" >/dev/null
 AMBIG_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --task runtime --json)
 AMBIG_TEXT=$(sh "$SCRIPT_DIR/current-task.sh" --task runtime)
-AMBIG_COMPACT=$(sh "$SCRIPT_DIR/compact-context.sh" --task runtime)
 AMBIG_PREFLIGHT_JSON=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --json)
 AMBIG_PREFLIGHT_TEXT=$(sh "$SCRIPT_DIR/subagent-preflight.sh" --task runtime --host codex --tool-name Task --task-text "Investigate the runtime candidates" --text)
 PLAN_SESSION_KEY=claude:runtime-session sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal runtime >/dev/null
@@ -483,8 +475,6 @@ printf '%s\n' "$AMBIG_TEXT" | grep -F "Spec candidates:" >/dev/null || fail "cur
 printf '%s\n' "$AMBIG_TEXT" | grep -F "openspec/changes/runtime-session" >/dev/null || fail "current-task text output missed runtime-session candidate"
 printf '%s\n' "$AMBIG_TEXT" | grep -F "openspec/changes/session-runtime" >/dev/null || fail "current-task text output missed session-runtime candidate"
 printf '%s\n' "$AMBIG_TEXT" | grep -F "Resolve with: sh skill/scripts/set-task-spec-context.sh --task runtime --ref openspec/changes/" >/dev/null || fail "current-task text output missed ambiguous resolve command"
-printf '%s\n' "$AMBIG_COMPACT" | grep -F "Spec candidates:" >/dev/null || fail "compact-context output missed ambiguous candidates heading"
-printf '%s\n' "$AMBIG_COMPACT" | grep -F "Resolve explicitly: sh skill/scripts/set-task-spec-context.sh --task runtime --ref <chosen-spec-ref>" >/dev/null || fail "compact-context output missed ambiguous resolve hint"
 printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Spec candidates:" >/dev/null || fail "subagent-preflight text output missed ambiguous candidates heading"
 printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Resolve explicitly: sh skill/scripts/set-task-spec-context.sh --task runtime --ref <chosen-spec-ref>" >/dev/null || fail "subagent-preflight text output missed ambiguous resolve hint"
 printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Exploratory work may reference these as non-authoritative candidates." >/dev/null || fail "subagent-preflight text output missed ambiguous exploratory guidance"
@@ -555,99 +545,15 @@ state_path = plan_dir / "state.json"
 progress_path = plan_dir / "progress.md"
 
 state = json.loads(state_path.read_text(encoding="utf-8"))
-state["goal"] = "Refresh compact hook writer coverage."
+state["goal"] = "Refresh hook writer coverage."
 state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
 progress = progress_path.read_text(encoding="utf-8")
 progress = progress.replace(
     "- Next Action: Fill in goal, non-goals, acceptance criteria, constraints, and open questions before implementation.",
-    "- Next Action: compact hook stale action",
+    "- Next Action: hook stale action",
 )
 progress_path.write_text(progress, encoding="utf-8")
 PY
 
-PLAN_SESSION_KEY=claude:compact-writer sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal warning-demo >/dev/null
-COMPACT_SESSION_START=$(printf '%s' "{\"cwd\":\"$VALIDATE_ROOT\",\"session_id\":\"compact-writer\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
-"$PYTHON_BIN" - "$COMPACT_SESSION_START" <<'PY'
-import json
-import sys
-
-payload = json.loads(sys.argv[1])
-context = payload.get("hookSpecificOutput", {}).get("additionalContext", "")
-required = [
-    "Task `warning-demo` | status `active`",
-    "Goal: Refresh compact hook writer coverage.",
-    "Compact policy:",
-]
-for item in required:
-    if item not in context:
-        raise SystemExit(f"compact_session_start output missing {item!r}: {context!r}")
-PY
-POST_COMPACT_VALIDATE=$(sh "$SCRIPT_DIR/validate-task.sh" --task warning-demo)
-printf '%s\n' "$POST_COMPACT_VALIDATE" | grep -F "Validation passed." >/dev/null || fail "compact_session_start did not leave writer task clean"
-[ -f "$VALIDATE_ROOT/.planning/warning-demo/.derived/context_compact.json" ] || fail "compact_session_start did not refresh compact artifact"
-
-sh "$SCRIPT_DIR/init-task.sh" --slug compact-fail --title "Compact fail" >/dev/null
-PLAN_SESSION_KEY=claude:compact-fail sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --steal compact-fail >/dev/null
-rm "$VALIDATE_ROOT/.planning/compact-fail/progress.md"
-COMPACT_FAIL_SESSION_START=$(printf '%s' "{\"cwd\":\"$VALIDATE_ROOT\",\"session_id\":\"compact-fail\"}" | "$PYTHON_BIN" "$CLAUDE_HOOKS_DIR/compact_session_start.py")
-"$PYTHON_BIN" - "$COMPACT_FAIL_SESSION_START" <<'PY'
-import json
-import sys
-
-payload = json.loads(sys.argv[1])
-context = payload.get("hookSpecificOutput", {}).get("additionalContext", "")
-required = [
-    "Compact sync warning for `compact-fail`:",
-    "Missing required file: progress.md",
-    "Task `compact-fail` | status `active`",
-]
-for item in required:
-    if item not in context:
-        raise SystemExit(f"compact_session_start failure output missing {item!r}: {context!r}")
-if "Compression estimate:" in context:
-    raise SystemExit(f"compact_session_start failure output unexpectedly used compact context: {context!r}")
-PY
-
-sh "$SCRIPT_DIR/init-task.sh" --slug observer-demo --title "Observer demo" >/dev/null
-"$PYTHON_BIN" - "$VALIDATE_ROOT/.planning/observer-demo" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-plan_dir = Path(sys.argv[1])
-state_path = plan_dir / "state.json"
-progress_path = plan_dir / "progress.md"
-
-state = json.loads(state_path.read_text(encoding="utf-8"))
-state["goal"] = "Observer compact sync should stay derived-only."
-state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-
-progress = progress_path.read_text(encoding="utf-8")
-progress = progress.replace(
-    "- Next Action: Fill in goal, non-goals, acceptance criteria, constraints, and open questions before implementation.",
-    "- Next Action: observer stale action",
-)
-progress_path.write_text(progress, encoding="utf-8")
-PY
-PLAN_SESSION_KEY=claude:observer-compact sh "$SCRIPT_DIR/set-active-task.sh" --allow-dirty --observe observer-demo >/dev/null
-OBSERVER_SYNC_JSON=$(cd "$VALIDATE_ROOT" && PLAN_SESSION_KEY=claude:observer-compact sh "$SCRIPT_DIR/compact-sync.sh" --task observer-demo --json)
-"$PYTHON_BIN" - "$OBSERVER_SYNC_JSON" <<'PY'
-import json
-import sys
-
-payload = json.loads(sys.argv[1])
-if payload.get("task", {}).get("binding_role") != "observer":
-    raise SystemExit(f"unexpected observer binding role: {payload!r}")
-if payload.get("main_sync", {}).get("status") != "skipped_observer":
-    raise SystemExit(f"observer compact sync unexpectedly touched main planning: {payload!r}")
-if payload.get("artifact_sync", {}).get("status") != "persisted":
-    raise SystemExit(f"observer compact sync did not refresh artifact: {payload!r}")
-PY
-[ -f "$VALIDATE_ROOT/.planning/observer-demo/.derived/context_compact.json" ] || fail "observer compact sync did not write compact artifact"
-OBSERVER_VALIDATE=$(sh "$SCRIPT_DIR/validate-task.sh" --task observer-demo)
-printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "Validation passed with warnings." >/dev/null || fail "observer compact sync should preserve main-planning warnings"
-printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "task_plan.md Hot Context goal differs from state.json goal" >/dev/null || fail "observer compact sync unexpectedly cleared task_plan warning"
-printf '%s\n' "$OBSERVER_VALIDATE" | grep -F "progress.md Snapshot \`next_action\` differs from state.json" >/dev/null || fail "observer compact sync unexpectedly cleared progress warning"
-
-echo "[context-task-planning] smoke test passed: CLI guidance, warning autofix, and compact sync"
+echo "[context-task-planning] smoke test passed: CLI guidance and warning autofix"

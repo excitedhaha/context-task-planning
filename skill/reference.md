@@ -14,12 +14,6 @@ This skill treats context engineering as three coordinated layers:
 
 Capture goals, non-goals, acceptance criteria, constraints, and open questions before implementation.
 
-### Hot context over full replay
-
-Repeated reads should prefer a compact snapshot over reloading entire notes.
-
-When task files start to sprawl, use `sh skill/scripts/compact-context.sh` to read the derived compact view. It prefers a fresh `.planning/<slug>/.derived/context_compact.json` when one exists and otherwise rebuilds an ephemeral compact view from the current task files.
-
 ### Markdown for humans, JSON for tools
 
 Use markdown for explanation and review. Use `state.json` for stable machine-readable state.
@@ -90,13 +84,12 @@ When the active task carries linked spec context, the preflight text prefix incl
 Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown snapshots, and delegate status files.
 
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
-- softer warnings can cover stale `progress.md` snapshots, stale compact artifacts, or other recoverable drift
-- `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift or refresh a derived compact artifact, not hard failures or operational truth in `state.json`
-- `compact-sync.sh` is the safe compact-time helper for host adapters and manual recovery. Writers may run warning-level fixes plus a compact artifact refresh; observers only refresh `.derived/context_compact.json`.
+- softer warnings can cover stale `progress.md` snapshots or other recoverable drift
+- `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift, not hard failures or operational truth in `state.json`
 
 ## Task focus guard
 
-Use `current-task.sh` when you need the resolved task plus the next recommended action. Keep `current-task.sh --compact` for shell prompts, tmux status lines, or other space-constrained surfaces.
+Use `current-task.sh` when you need the resolved task plus the next recommended action.
 
 For the deeper architecture behind session bindings, repo scope, and worktree isolation, see `docs/design.md`.
 
@@ -144,7 +137,7 @@ On hosts without runtime adapters, treat `likely-unrelated` as a prompt to confi
 
 Linked provider refs from `spec_context` also feed `check-task-drift.sh` and `subagent-preflight.sh`, so prompts that mention the chosen OpenSpec change or spec artifact continue to route as part of the current task.
 
-If OpenSpec detection lands in `status=ambiguous`, `current-task` and `compact-context` now show the candidate refs plus an explicit `set-task-spec-context.sh` hint. Use `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>` to record the manual override in `.planning/<slug>/state.json` without editing provider files. Add `--artifact <ref>` when you want the linked artifact refs to stay explicit, or `--clear` to return to the default embedded fallback.
+If OpenSpec detection lands in `status=ambiguous`, `current-task` shows the candidate refs plus an explicit `set-task-spec-context.sh` hint. Use `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>` to record the manual override in `.planning/<slug>/state.json` without editing provider files. Add `--artifact <ref>` when you want the linked artifact refs to stay explicit, or `--clear` to return to the default embedded fallback.
 
 For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.
 
@@ -178,12 +171,10 @@ Poor delegate candidates:
 If context feels stale, answer these in order:
 
 1. Which task is active?
-2. Can `sh skill/scripts/compact-sync.sh` refresh the local compact artifact safely first?
-3. Can `sh skill/scripts/compact-context.sh` answer the rest without replaying the full task files?
-4. What mode is it in?
-5. What is the next action?
-6. What is blocked?
-7. What proves the task is done?
+2. What mode is it in?
+3. What is the next action?
+4. What is blocked?
+5. What proves the task is done?
 
 Those answers should be available from the task folder without relying on session history.
 

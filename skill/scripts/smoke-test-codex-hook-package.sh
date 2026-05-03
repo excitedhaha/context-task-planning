@@ -37,7 +37,7 @@ run_hook() {
 
 run_hook session_start "{\"hook_event_name\":\"SessionStart\",\"cwd\":\"$REPO_ROOT\",\"session_id\":\"smoke\",\"turn_id\":\"start\"}"
 run_hook user_prompt_submit "{\"hook_event_name\":\"UserPromptSubmit\",\"cwd\":\"$REPO_ROOT\",\"session_id\":\"smoke\",\"turn_id\":\"prompt\",\"prompt\":\"Continue the current task.\"}"
-run_hook post_tool_use "{\"hook_event_name\":\"PostToolUse\",\"cwd\":\"$REPO_ROOT\",\"session_id\":\"smoke\",\"turn_id\":\"prompt\",\"tool_name\":\"Bash\",\"tool_input\":{\"cmd\":\"sh skill/scripts/current-task.sh --compact\"}}"
+run_hook post_tool_use "{\"hook_event_name\":\"PostToolUse\",\"cwd\":\"$REPO_ROOT\",\"session_id\":\"smoke\",\"turn_id\":\"prompt\",\"tool_name\":\"Bash\",\"tool_input\":{\"cmd\":\"sh skill/scripts/current-task.sh\"}}"
 run_hook stop "{\"hook_event_name\":\"Stop\",\"cwd\":\"$REPO_ROOT\",\"session_id\":\"smoke\",\"turn_id\":\"prompt\",\"stop_hook_active\":true}"
 
 command_for_event() {

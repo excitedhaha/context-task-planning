@@ -49,7 +49,6 @@ After you enable the plugin or standalone adapter, Claude Code can surface the s
 
 - optional native status line cues such as `task!:<slug>`, `obs:<slug>`, or `wksp:<slug>` when you enable the status-line fallback
 - strong task-context recovery on session start for explicit bindings or `PLAN_TASK`, while workspace fallback stays advisory
-- safe compact-time sync before Claude compresses context: writer sessions may repair warning-level snapshot drift and refresh `.derived/context_compact.json`, while observer sessions only refresh the derived compact artifact
 - prompt-time route evidence only for high-signal `likely-unrelated` prompts; normal and heuristic-`unclear` prompts stay quiet so Claude can use conversation context
 - stronger routing guidance before native `Task` launches when the fit is truly mismatched
 - shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related or heuristic-unclear work and routing or delegate escalation when the fit is wrong for explicitly bound sessions; fallback-only sessions stay routing-only
@@ -90,7 +89,6 @@ These are implemented as skills, not a separate Claude `commands/` directory. Th
 After restarting Claude Code, you should see:
 
 - automatic strong task-context recovery when the session starts for explicit bindings; fallback-only sessions get a short advisory instead of the full task snapshot
-- on context compaction, Claude refreshes compact recovery context from the shared helper for explicit bindings instead of replaying only the shorter session-start snapshot; fallback-only sessions do not inherit compact recovery payloads
 - internal route evidence for Claude when a prompt has strong switch signals, without drift toasts or repeated task summaries on ordinary turns
 - the same task still resolving when Claude starts inside a registered repo path or recorded worktree under a parent workspace
 - startup and native-`Task` preflight summaries can mention one linked spec ref, or a few candidate refs when the runtime refuses to guess
@@ -131,15 +129,12 @@ If the task resolves a linked OpenSpec context for an explicitly bound session, 
 
 The core skill still works without Claude-specific hooks. You keep the file-backed task workflow, but you lose the native status line, route-evidence hints, and native-`Task` preflight.
 
-Claude's compact hook only does the safe MVP path: it never invents progress from transcript history. For writer sessions it may repair warning-level markdown snapshot drift with `validate-task.sh --fix-warnings`, then it refreshes `.planning/<slug>/.derived/context_compact.json`. For observer sessions it only refreshes the derived compact artifact.
-
 ## Manual fallback
 
 Useful shell commands when you want direct control instead of the bundled task-entry skills:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
-- `sh skill/scripts/current-task.sh --compact`
-- `sh skill/scripts/compact-sync.sh`
+- `sh skill/scripts/current-task.sh`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host claude --tool-name Task --task-text "Investigate auth entry points" --text`
 - `sh skill/scripts/validate-task.sh`

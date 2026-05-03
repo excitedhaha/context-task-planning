@@ -21,7 +21,6 @@ grep -F -- '--title "<final task title>" --slug "<final task slug>"' "$COMMAND_F
 
 "$NODE_BIN" "$PLUGIN_DIR/task-focus-guard.binding-title.smoke.mjs"
 "$NODE_BIN" "$PLUGIN_DIR/task-focus-guard.smoke.mjs"
-"$NODE_BIN" "$PLUGIN_DIR/task-focus-guard.compact-sync.smoke.mjs"
 "$NODE_BIN" "$PLUGIN_DIR/task-focus-guard.ancestor-fallback.smoke.mjs"
 
 echo "[context-task-planning] smoke test passed: OpenCode plugin smoke suite"

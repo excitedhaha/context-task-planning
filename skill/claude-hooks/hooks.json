@@ -12,17 +12,6 @@
             "statusMessage": "Loading task context"
           }
         ]
-      },
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skill/claude-hooks/scripts/compact_session_start.py\"",
-            "timeout": 12,
-            "statusMessage": "Syncing compact task context"
-          }
-        ]
       }
     ],
     "UserPromptSubmit": [

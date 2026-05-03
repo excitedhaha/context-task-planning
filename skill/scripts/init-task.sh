@@ -314,8 +314,6 @@ else
     printf '%s\n' "$TASK_SLUG" > "$ACTIVE_FILE"
 fi
 
-"$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_SLUG" --refresh --json >/dev/null
-
 echo "Task ready: $TASK_TITLE"
 echo "Task slug: $TASK_SLUG"
 echo "Workspace root: $WORKSPACE_ROOT"

@@ -52,7 +52,7 @@ Each task lives in its own directory:
 ### File roles
 
 - `state.json` - machine-readable source of truth for current task status
-- `task_plan.md` - human-readable plan, with a compact `Hot Context` section at the top
+- `task_plan.md` - human-readable plan, with a concise `Hot Context` section at the top
 - `findings.md` - durable discoveries, external information, and material to distill later
 - `progress.md` - session log, checkpoints, and verification results
 
@@ -118,7 +118,7 @@ Repeated reads should focus on the smallest useful snapshot:
 - blockers
 - verification target
 
-Do not repeatedly reload large notes when a compact snapshot will do.
+Do not repeatedly reload large notes when a concise summary will do.
 
 ### 3. Treat `state.json` as operational truth
 
@@ -236,7 +236,7 @@ This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Co
 - `codex-hooks/config.example.toml` - manual fallback Codex lifecycle hooks for session-start task context, high-signal route evidence, and end-of-turn planning sync
 - `../hooks/context-task-planning/` - installable Codex hook package that writes `hooks.json` and delegates to the skill hooks
 - `scripts/set-active-task.sh <slug>` - update the current session binding when available, otherwise the shared fallback pointer; use `--observe` for read-only sessions or `--steal` to take over the writer lease
-- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, delegates, and derived compact artifacts; add `--fix-warnings` to resync warning-level snapshot drift from `state.json` and refresh compact artifacts when needed
+- `scripts/validate-task.sh` - check task state consistency across `state.json`, markdown files, and delegates; add `--fix-warnings` to resync warning-level snapshot drift from `state.json`
 - `scripts/prepare-delegate.sh` - infer and create a delegate lane, optionally auto-starting it
 - `scripts/create-delegate.sh` - create a delegate lane under the current task
 - `scripts/list-delegates.sh` - show delegate lanes for the current task

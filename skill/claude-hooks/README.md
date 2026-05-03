@@ -11,7 +11,6 @@ When plugin hooks are enabled, Claude Code receives task context on lifecycle ev
 
 - optional `statusLine` fallback - show the current task in Claude Code's native status line when configured through settings
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/` for explicit bindings, while workspace fallback stays advisory
-- `SessionStart` on `compact` - run a safe compact-time sync, then inject compact recovery context only for explicit bindings
 - `UserPromptSubmit` - stay quiet for normal turns and inject route evidence only for high-signal `likely-unrelated` prompts
 - `PreToolUse` - run native-`Task` preflight for explicit bindings, with stronger routing guidance when the request is truly mismatched
 
@@ -19,7 +18,7 @@ When plugin hooks are enabled, Claude Code receives task context on lifecycle ev
 
 - they do not replace the core file protocol
 - they do not parse host-specific session history
-- they do not auto-write semantic progress updates from session history; compact-time sync only repairs warning-level drift for writers and refreshes the derived compact artifact
+- they do not auto-write semantic progress updates from session history
 
 ## Install
 

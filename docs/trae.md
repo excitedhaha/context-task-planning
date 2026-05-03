@@ -41,10 +41,9 @@ After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed tas
 - native `Task` preflight guidance through `pre_tool_use` when available
 - `post_tool_use` planning evidence tracking for mutating tools
 - a `stop` guard that can ask the agent to continue once when a mutating turn is about to finish without planning sync evidence
-- best-effort `pre_compact` compact sync before long context is compressed
 - namespaced slash commands for the common task loop
 
-The plugin does not provide a native status line or session-title cue today. Use `current-task.sh --compact` in a shell prompt or tmux status line if you want always-visible task text.
+The plugin does not provide a native status line or session-title cue today. Use `current-task.sh` in a shell prompt or tmux status line if you want always-visible task text.
 
 ## Bundled Slash Commands
 
@@ -68,7 +67,6 @@ Current hooks in `coco.yaml` map to shared runtime behavior:
 - `pre_tool_use` - run shared native-`Task` preflight for `Task` launches
 - `post_tool_use` - record whether this turn read planning files, used mutating tools, or updated planning files
 - `stop` - continue once if TraeCLI/Coco is about to finish without required planning read or update evidence
-- `pre_compact` - run the shared compact-sync helper and surface compact recovery context when the session is explicitly bound
 
 The hooks derive a session binding key from TraeCLI/Coco's `session_id`. If you run shell commands outside the host and need deterministic parallel sessions, export `PLAN_SESSION_KEY` before starting TraeCLI/Coco or before running the scripts manually.
 
@@ -106,8 +104,6 @@ Useful commands when you want direct control:
 
 - `sh skill/scripts/init-task.sh "Implement auth flow"`
 - `sh skill/scripts/current-task.sh`
-- `sh skill/scripts/current-task.sh --compact`
-- `sh skill/scripts/compact-context.sh`
 - `sh skill/scripts/check-task-drift.sh --prompt "Also investigate the billing webhook regression" --json`
 - `sh skill/scripts/subagent-preflight.sh --cwd "$PWD" --host trae --tool-name Task --task-text "Investigate auth entry points" --json`
 - `sh skill/scripts/validate-task.sh`

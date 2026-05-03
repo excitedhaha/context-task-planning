@@ -38,7 +38,6 @@ for event in [
     "pre_tool_use",
     "post_tool_use",
     "stop",
-    "pre_compact",
 ]:
     if f"event: {event}" not in coco_yaml:
         raise SystemExit(f"missing hook event in coco.yaml: {event}")
@@ -49,7 +48,6 @@ for script in [
     "pre_tool_use.py",
     "post_tool_use.py",
     "stop.py",
-    "pre_compact.py",
 ]:
     expected = f'${{COCO_PLUGIN_ROOT}}/skill/trae-hooks/scripts/{script}'
     if expected not in coco_yaml:

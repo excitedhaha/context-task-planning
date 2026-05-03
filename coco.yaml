@@ -30,9 +30,3 @@ hooks:
     timeout: 8s
     matchers:
       - event: stop
-
-  - type: command
-    command: 'python3 "${COCO_PLUGIN_ROOT}/skill/trae-hooks/scripts/pre_compact.py"'
-    timeout: 12s
-    matchers:
-      - event: pre_compact

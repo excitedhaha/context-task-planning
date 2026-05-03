@@ -53,7 +53,6 @@ script_dir = Path(sys.argv[3])
 if str(script_dir) not in sys.path:
     sys.path.insert(0, str(script_dir))
 
-import compact_context
 import task_guard
 
 state_file = plan_dir / "state.json"
@@ -82,6 +81,39 @@ def normalize_free_text(value: str) -> str:
 
 def normalized_items(values: list[str]) -> list[str]:
     return [normalize_free_text(str(value)) for value in values if str(value).strip()]
+
+
+
+def extract_level2_sections(text: str) -> dict:
+    """Extract level 2 sections from markdown text."""
+    sections = {}
+    current_title = None
+    current_lines = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if current_title is not None:
+                sections[current_title] = current_lines
+            current_title = line[3:].strip()
+            current_lines = []
+        elif current_title is not None:
+            current_lines.append(line)
+    if current_title is not None:
+        sections[current_title] = current_lines
+    return sections
+
+
+def bullet_items(lines: list) -> list:
+    """Extract bullet items from markdown lines, filtering placeholders."""
+    items = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            text = stripped[2:].strip()
+            # Filter out placeholder text like [fill this first]
+            if text.startswith("[") and text.endswith("]"):
+                continue
+            items.append(text)
+    return items
 
 
 def read_json(path: Path, label: str, issues: list[str]):
@@ -268,54 +300,6 @@ def sync_progress_snapshot(path: Path, state: dict) -> list[str]:
     return applied
 
 
-def compact_validation_context(state: dict) -> dict | None:
-    if not state:
-        return None
-
-    source_path = str(state.get("source_path") or "").strip()
-    workspace_root = Path(source_path) if source_path else plan_dir.parent.parent
-    task = {
-        "workspace_root": str(workspace_root),
-        "plan_dir": str(plan_dir),
-    }
-    artifact_path, _, current, is_fresh = compact_context.freshness_state(task)
-    read_policy = current.get("read_policy", {})
-    payload_profile = str(read_policy.get("payload_profile") or "compact_optional")
-    artifact_exists = artifact_path.exists()
-    warning = ""
-    if artifact_exists and not is_fresh:
-        warning = (
-            "Derived compact context artifact is stale: "
-            f"{compact_context.rel_path(workspace_root, artifact_path)}"
-        )
-    elif not artifact_exists and read_policy.get("should_prefer_compact"):
-        warning = (
-            "Derived compact context artifact is missing for a "
-            f"`{payload_profile}` task: {compact_context.rel_path(workspace_root, artifact_path)}"
-        )
-
-    return {
-        "workspace_root": workspace_root,
-        "artifact_path": artifact_path,
-        "current": current,
-        "artifact_exists": artifact_exists,
-        "warning": warning,
-    }
-
-
-def refresh_compact_artifact(state: dict) -> str | None:
-    context = compact_validation_context(state)
-    if not context or not context.get("warning"):
-        return None
-
-    compact_context.persist_payload(context["current"], plan_dir)
-    rel_artifact = compact_context.rel_path(
-        context["workspace_root"], context["artifact_path"]
-    )
-    action = "refreshed" if context.get("artifact_exists") else "created"
-    return f"{rel_artifact} -> {action} derived compact context"
-
-
 def effective_spec_context_for_state(state: dict) -> dict:
     source_path = str(state.get("source_path") or "").strip()
     workspace_root = Path(source_path) if source_path else plan_dir.parent.parent
@@ -433,7 +417,7 @@ def validate_task() -> tuple[dict, list[str], list[str], dict]:
                 )
 
     if task_plan_file.exists() and state:
-        task_plan_sections = compact_context.extract_level2_sections(
+        task_plan_sections = extract_level2_sections(
             task_plan_file.read_text(encoding="utf-8")
         )
         hot = parse_task_plan_hot_context(task_plan_file)
@@ -487,7 +471,7 @@ def validate_task() -> tuple[dict, list[str], list[str], dict]:
                 )
 
         state_acceptance = task_guard.nonempty_text_list(state.get("acceptance_criteria"))
-        plan_acceptance = compact_context.bullet_items(
+        plan_acceptance = bullet_items(
             task_plan_sections.get("Acceptance Criteria", [])
         )
         if normalized_items(state_acceptance) != normalized_items(plan_acceptance):
@@ -496,7 +480,7 @@ def validate_task() -> tuple[dict, list[str], list[str], dict]:
             )
 
         state_edge_cases = task_guard.nonempty_text_list(state.get("edge_cases"))
-        plan_edge_cases = compact_context.bullet_items(
+        plan_edge_cases = bullet_items(
             task_plan_sections.get("Edge Cases", [])
         )
         if normalized_items(state_edge_cases) != normalized_items(plan_edge_cases):
@@ -620,10 +604,6 @@ def validate_task() -> tuple[dict, list[str], list[str], dict]:
                 "state.json spec_context is ambiguous without an open question or summary note recording how to resolve it"
             )
 
-        compact_info = compact_validation_context(state)
-        if compact_info and compact_info.get("warning"):
-            warnings.append(str(compact_info["warning"]))
-
     return state, issues, warnings, effective_spec_context
 
 
@@ -663,9 +643,6 @@ if fix_warnings and not issues:
     if progress_file.exists():
         for line in sync_progress_snapshot(progress_file, state):
             applied_fixes.append(f"progress.md -> {line}")
-    compact_fix = refresh_compact_artifact(state)
-    if compact_fix:
-        applied_fixes.append(compact_fix)
 
     if applied_fixes:
         print(

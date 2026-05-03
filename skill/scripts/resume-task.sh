@@ -177,8 +177,6 @@ else
     printf '%s\n' "$TASK_SLUG" > "$ACTIVE_FILE"
 fi
 
-"$PYTHON_BIN" "$SCRIPT_DIR/compact_context.py" --cwd "$PLAN_DIR" --task "$TASK_SLUG" --refresh --json >/dev/null
-
 echo "[context-task-planning] Resumed task: $TASK_SLUG"
 echo "[context-task-planning] Task directory: $PLAN_DIR"
 if [ -n "${PLAN_SESSION_KEY:-}" ]; then

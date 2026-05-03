@@ -181,7 +181,7 @@ Suggested sections:
 - `Verification Commands`
 - `Spec Context`
 
-The top `Hot Context` block should stay compact. It should summarize these
+The top `Hot Context` block should stay concise. It should summarize these
 fields rather than duplicate every bullet.
 
 ## Runtime Touchpoints
@@ -218,13 +218,13 @@ highest-signal spec facts, such as:
 - whether the task is using embedded or linked spec context
 - whether clarification is still incomplete
 
-### Compact recovery
+### Task recovery
 
-`compact-context.sh` should include distilled acceptance criteria, edge cases,
-and linked artifact refs in the derived compact payload.
+Task recovery should read distilled acceptance criteria, edge cases,
+and linked artifact refs from the task files.
 
 This matters because spec coding is valuable mainly when that intent survives
-context loss. The compact artifact is the natural place to preserve it.
+context loss. The task files are the authoritative source.
 
 ### Drift checks
 
@@ -334,7 +334,7 @@ Deliverables:
 - add `Acceptance Criteria`, `Edge Cases`, and `Spec Context` sections to the
   task template
 - update `init-task.sh` wording to require a richer clarify step
-- surface acceptance criteria in compact recovery
+- surface acceptance criteria in task recovery
 - add warning-level validation for missing acceptance on active complex tasks
 - update skill and user docs so the agent-first path asks for a lightweight task
   brief before execution
@@ -353,7 +353,7 @@ Deliverables:
 
 - detect OpenSpec presence from the shared core
 - attach `spec_context` metadata to current task resolution
-- show linked artifact refs in `current-task`, compact recovery, and preflight
+- show linked artifact refs in `current-task` and preflight
 - include linked refs in drift terms
 - surface spec context in the OpenCode plugin and Claude/Codex-facing docs
 
@@ -384,7 +384,6 @@ P2 should stay optional. The default user story should remain lightweight.
 - `skill/templates/task_plan.md`
 - `skill/scripts/init-task.sh`
 - `skill/schemas/state.schema.json`
-- `skill/scripts/compact_context.py`
 - `skill/scripts/task_guard.py`
 - `skill/scripts/validate-task.sh`
 - `skill/SKILL.md`
@@ -395,7 +394,6 @@ P2 should stay optional. The default user story should remain lightweight.
 ### P1
 
 - `skill/scripts/task_guard.py`
-- `skill/scripts/compact_context.py`
 - `skill/scripts/validate-task.sh`
 - `skill/opencode-plugin/task-focus-guard.js`
 - `docs/opencode.md`

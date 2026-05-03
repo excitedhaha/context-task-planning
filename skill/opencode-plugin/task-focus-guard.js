@@ -11,32 +11,12 @@ const TASK_GUARD_SCRIPT = path.join(SKILL_ROOT, "scripts", "task_guard.py")
 const CURRENT_TASK_SCRIPT = path.join(SKILL_ROOT, "scripts", "current-task.sh")
 const CHECK_DRIFT_SCRIPT = path.join(SKILL_ROOT, "scripts", "check-task-drift.sh")
 const SUBAGENT_PREFLIGHT_SCRIPT = path.join(SKILL_ROOT, "scripts", "subagent-preflight.sh")
-const COMPACT_SYNC_SCRIPT = path.join(SKILL_ROOT, "scripts", "compact-sync.sh")
-const COMPACT_CONTEXT_SCRIPT = path.join(SKILL_ROOT, "scripts", "compact-context.sh")
 const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
 const FRESHNESS_WORK_THRESHOLD = 2
 const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
-const COMPACT_SYNC_DEBOUNCE_MS = 1500
 const FRESHNESS_TRACKED_TOOLS = new Set(["apply_patch", "bash", "edit", "multiedit", "write", "task"])
 const PLANNING_FILES = ["state.json", "task_plan.md", "progress.md", "findings.md"]
 const FRESHNESS_SYNC_FILES = ["state.json", "progress.md"]
-const COMPACT_SIGNAL_RE = /\b(compact|compacted|compacting|compaction|compress|compression|compressed)\b/i
-const COMPACT_SIGNAL_VALUE_KEYS = new Set([
-  "type",
-  "reason",
-  "action",
-  "event",
-  "kind",
-  "name",
-  "status",
-  "phase",
-  "updateType",
-  "changeType",
-  "mode",
-])
-function compactSignalKey(value) {
-  return COMPACT_SIGNAL_RE.test(String(value || ""))
-}
 
 function runJsonScript(script, args, cwd) {
   const result = spawnSync("sh", [script, ...args], {
@@ -106,123 +86,6 @@ function collectPromptText(parts) {
   return lines.join("\n").trim()
 }
 
-function hasCompactSignal(value, seen = new Set(), parentKey = "") {
-  if (!value) {
-    return false
-  }
-
-  if (typeof value === "string") {
-    return (
-      (COMPACT_SIGNAL_VALUE_KEYS.has(parentKey) || compactSignalKey(parentKey)) &&
-      COMPACT_SIGNAL_RE.test(value)
-    )
-  }
-
-  if (typeof value === "boolean") {
-    return compactSignalKey(parentKey) && value
-  }
-
-  if (typeof value === "number") {
-    return compactSignalKey(parentKey) && value > 0
-  }
-
-  if (typeof value !== "object") {
-    return false
-  }
-
-  if (seen.has(value)) {
-    return false
-  }
-  seen.add(value)
-
-  if (Array.isArray(value)) {
-    return value.some((item) => hasCompactSignal(item, seen, parentKey))
-  }
-
-  return Object.entries(value).some(([key, nested]) => {
-    if (typeof nested === "boolean" || typeof nested === "number") {
-      return hasCompactSignal(nested, seen, key)
-    }
-    return hasCompactSignal(nested, seen, key)
-  })
-}
-
-function compactSyncIssueDetail(result) {
-  const sources = []
-  if (Array.isArray(result?.warnings)) {
-    sources.push(...result.warnings)
-  }
-  sources.push(result?.main_sync?.message || "")
-  sources.push(result?.artifact_sync?.message || "")
-
-  for (const source of sources) {
-    const lines = String(source || "")
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter(Boolean)
-    for (let index = lines.length - 1; index >= 0; index -= 1) {
-      const cleaned = lines[index]
-        .replace(/^\[context-task-planning\]\s*/u, "")
-        .replace(/^-\s*/u, "")
-        .trim()
-      if (cleaned) {
-        return cleaned
-      }
-    }
-  }
-
-  return ""
-}
-
-function compactSyncWarningToast(task, result) {
-  const slug = result?.task?.slug || task?.slug || "(current task)"
-  const detail = compactSyncIssueDetail(result)
-  const message = !result
-    ? `Compact sync status was unavailable for ${slug}; review .planning/${slug}/ manually if recovery looks stale.`
-    : detail
-      ? `${slug}: ${detail}`
-      : `Compact sync did not complete cleanly for ${slug}; review .planning/${slug}/ manually.`
-
-  return {
-    title: "Compact sync warning",
-    message,
-    variant: "warning",
-  }
-}
-
-function compactSyncWarningText(task, result) {
-  if (result?.ok !== false) {
-    return ""
-  }
-
-  const toast = compactSyncWarningToast(task, result)
-  return `[context-task-planning] ${toast.title}: ${toast.message}`
-}
-
-function compactEventSignature(event) {
-  try {
-    return JSON.stringify(event) || String(event?.type || "compact")
-  } catch {
-    return String(event?.type || "compact")
-  }
-}
-
-function shouldRunCompactSync(store, sessionID, event) {
-  if (!sessionID || !hasCompactSignal(event)) {
-    return false
-  }
-
-  const now = Date.now()
-  const signature = compactEventSignature(event)
-  const previous = store.get(sessionID)
-  if (previous && previous.signature === signature && now - previous.at < COMPACT_SYNC_DEBOUNCE_MS) {
-    return false
-  }
-
-  store.set(sessionID, { signature, at: now })
-  return true
-}
-
 function noActiveTaskReminder(result) {
   if (!result || result.classification !== "no-active-task" || !result.complex_prompt) {
     return null
@@ -266,25 +129,6 @@ function taskToolPrefix(task, result) {
       ? "This session is observe-only for the main planning files; keep any subagent output inside delegate lanes instead."
       : "",
   ].filter(Boolean).join("\n")
-}
-
-function compactRecoverySystemPrompt(task, compactContext, warning = "") {
-  const slug = task?.slug || "(unknown)"
-  const parts = []
-  if (warning) {
-    parts.push(warning)
-  }
-  parts.push(
-    [
-      `[context-task-planning] This session recently compacted for task \`${slug}\`.`,
-      `Treat the compact recovery context below as the current hot context before more implementation or planning-file updates.`,
-      `If this turn depends on recent task details or will update planning, re-read \`.planning/${slug}/progress.md\` and \`.planning/${slug}/task_plan.md\` first.`,
-    ].join(" "),
-  )
-  if (compactContext) {
-    parts.push(compactContext)
-  }
-  return parts.join("\n\n")
 }
 
 function planningRecoveryPaths(task) {
@@ -759,8 +603,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const completedTaskBySession = new Map()
   const fallbackAdvisoryBySession = new Set()
   const freshnessBySession = new Map()
-  const compactSyncBySession = new Map()
-  const postCompactContextBySession = new Map()
   const planningRecoveryBySession = new Map()
   const userPromptByMessageID = new Map()
   const assistantStateByMessageID = new Map()
@@ -938,24 +780,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       scriptArgs.push("--session-key", sessionKey)
     }
     return runJsonScript(SUBAGENT_PREFLIGHT_SCRIPT, scriptArgs, cwd)
-  }
-
-  function readCompactSync(cwd = baseCwd, sessionID = "") {
-    const scriptArgs = ["--json", "--host", "opencode"]
-    const sessionKey = pluginSessionKey(sessionID)
-    if (sessionKey) {
-      scriptArgs.push("--session-key", sessionKey)
-    }
-    return runJsonScript(COMPACT_SYNC_SCRIPT, scriptArgs, cwd)
-  }
-
-  function readCompactContext(cwd = baseCwd, sessionID = "") {
-    const scriptArgs = []
-    const sessionKey = pluginSessionKey(sessionID)
-    if (sessionKey) {
-      scriptArgs.push("--session-key", sessionKey)
-    }
-    return runTextScript(COMPACT_CONTEXT_SCRIPT, scriptArgs, cwd)
   }
 
   function bindSessionTask(sessionID, taskSlug, role = "writer") {
@@ -1336,15 +1160,10 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         (cacheSessionID ? driftBySession.get(cacheSessionID) : null) ||
         readDrift(prompt, baseCwd, session.readSessionID)
       const { state: freshnessState, planning } = refreshFreshnessState(freshnessBySession, cacheSessionID, task)
-      const compactRecovery = visibleSessionID ? postCompactContextBySession.get(visibleSessionID) || "" : ""
       const planningRecovery = visibleSessionID ? planningRecoveryBySession.get(visibleSessionID) || null : null
       const explicitTaskContext = explicitTaskContextEligible(task)
 
       if (task && task.found) {
-        if (explicitTaskContext && compactRecovery) {
-          output.system.push(compactRecovery)
-          postCompactContextBySession.delete(visibleSessionID)
-        }
         if (explicitTaskContext) {
           const planningRecoveryText = planningRecoveryReminder(task, planningRecovery)
           if (planningRecoveryText) {
@@ -1372,29 +1191,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const noTaskHint = noActiveTaskReminder(drift)
       if (noTaskHint) {
         output.system.push(noTaskHint)
-      }
-    },
-
-    "experimental.session.compacting": async (input, output) => {
-      const sessionID = resolveExplicitSessionID(input)
-      const task = readCurrentTask(baseCwd, sessionID)
-      if (!pluginEnabled(task) || !task?.found) {
-        return
-      }
-
-      requirePlanningRecovery(sessionID)
-
-      const syncResult = readCompactSync(baseCwd, sessionID)
-      const refreshedTask = readCurrentTask(baseCwd, sessionID)
-      if (!explicitTaskContextEligible(refreshedTask)) {
-        return
-      }
-      const warning = compactSyncWarningText(refreshedTask, syncResult)
-      const compactContext = readCompactContext(baseCwd, sessionID)
-      const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
-      if (recovery) {
-        output.context.push(recovery)
-        postCompactContextBySession.set(sessionID, recovery)
       }
     },
 
@@ -1553,7 +1349,6 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     },
 
     event: async ({ event }) => {
-      const compactEvent = hasCompactSignal(event)
       if (event?.type === "message.updated") {
         mergeAssistantMessage(event.properties?.info)
       }
@@ -1581,47 +1376,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         return
       }
 
-      if (event?.type === "session.compacted") {
-        const explicitSessionID = resolveExplicitSessionID(event)
-        if (!explicitSessionID) {
-          return
-        }
-
-        const session = sessionContext(event)
-        const task = readCurrentTask(baseCwd, session.readSessionID)
-        if (!pluginEnabled(task) || !task?.found) {
-          return
-        }
-
-        if (!shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
-          return
-        }
-
-        requirePlanningRecovery(explicitSessionID)
-
-        const syncResult = readCompactSync(baseCwd, session.readSessionID)
-        const refreshedTask = readCurrentTask(baseCwd, session.readSessionID)
-        if (explicitTaskContextEligible(refreshedTask)) {
-          const warning = compactSyncWarningText(refreshedTask, syncResult)
-          const compactContext = readCompactContext(baseCwd, session.readSessionID)
-          const recovery = compactRecoverySystemPrompt(refreshedTask, compactContext, warning)
-          if (recovery) {
-            postCompactContextBySession.set(explicitSessionID, recovery)
-          }
-        }
-
-        if (!syncResult || syncResult.ok === false) {
-          const toast = compactSyncWarningToast(refreshedTask, syncResult)
-          await showToast(toast.title, toast.message, toast.variant)
-        }
-        const cacheSessionID = sessionCacheKey(session, true)
-        refreshFreshnessState(freshnessBySession, cacheSessionID, refreshedTask)
-        await syncVisibleTask(explicitSessionID, refreshedTask, null)
-        return
-      }
-
       if (
-        !compactEvent &&
         event?.type !== "session.created" &&
         event?.type !== "session.updated" &&
         event?.type !== "tui.session.select" &&
@@ -1643,26 +1398,9 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const session = sessionContext(event)
 
-      let task = readCurrentTask(baseCwd, session.readSessionID)
+      const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
         return
-      }
-
-      if (shouldRunCompactSync(compactSyncBySession, session.readSessionID, event)) {
-        const compactSync = readCompactSync(baseCwd, session.readSessionID)
-        task = readCurrentTask(baseCwd, session.readSessionID)
-        if (compactEvent && explicitTaskContextEligible(task)) {
-          const warning = compactSyncWarningText(task, compactSync)
-          const compactContext = readCompactContext(baseCwd, session.readSessionID)
-          const recovery = compactRecoverySystemPrompt(task, compactContext, warning)
-          if (recovery) {
-            postCompactContextBySession.set(explicitSessionID, recovery)
-          }
-        }
-        if (!compactSync || compactSync.ok === false) {
-          const toast = compactSyncWarningToast(task, compactSync)
-          await showToast(toast.title, toast.message, toast.variant)
-        }
       }
 
       const cacheSessionID = sessionCacheKey(session, true)
