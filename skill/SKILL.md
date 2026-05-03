@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -227,7 +227,7 @@ This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Co
 - `scripts/set-task-repos.sh <slug> --repo <repo-id> [--repo ...] [--primary <repo-id>]` - declare which registered repos a task is allowed to touch and print which repos are safe to keep shared versus which now need a worktree
 - `scripts/prepare-task-worktree.sh --task <slug> --repo <repo-id>` - create and bind a dedicated checkout for an overlapping writer task; the standard location is `.worktrees/<task-slug>/<repo-id>/`
 - `scripts/list-worktrees.sh` - inspect task-scoped worktree bindings grouped by task
-- `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory
+- `scripts/install-opencode-plugin.sh` - symlink the bundled OpenCode plugin into the standard plugin directory (legacy; prefer `opencode plugin context-task-planning-opencode --global`)
 - `scripts/check-version.sh` - validate `VERSION`, skill metadata, Claude plugin metadata, and changelog release section are in sync
 - `scripts/extract-release-notes.sh [version]` - print the matching `CHANGELOG.md` section for GitHub Release notes
 - `claude-hooks/hooks.json` - Claude Code plugin hook configuration for lifecycle context injection

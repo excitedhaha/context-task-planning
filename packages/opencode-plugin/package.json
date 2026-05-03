@@ -1,0 +1,29 @@
+{
+  "name": "context-task-planning-opencode",
+  "version": "0.6.0",
+  "description": "OpenCode plugin for context-task-planning: task-scoped context engineering with session binding, route evidence, and freshness tracking",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "task-planning",
+    "context-engineering"
+  ],
+  "author": {
+    "name": "excitedhaha"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/excitedhaha/context-task-planning.git",
+    "directory": "packages/opencode-plugin"
+  },
+  "files": [
+    "index.js",
+    "commands/"
+  ]
+}

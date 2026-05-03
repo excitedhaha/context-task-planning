@@ -8,6 +8,7 @@ SKILL_NAME="context-task-planning"
 CLAUDE_EXTRA_SKILLS_DIR="$SKILL_DIR/../skills"
 INSTALL_OPENCODE_PLUGIN=1
 INSTALL_OPENCODE_COMMANDS=1
+FORCE=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -17,9 +18,12 @@ for arg in "$@"; do
         --skip-opencode-commands)
             INSTALL_OPENCODE_COMMANDS=0
             ;;
+        --force)
+            FORCE=1
+            ;;
         *)
             echo "Unknown argument: $arg" >&2
-            echo "Usage: sh skill/scripts/install-macos.sh [--skip-opencode-plugin] [--skip-opencode-commands]" >&2
+            echo "Usage: sh skill/scripts/install-macos.sh [--skip-opencode-plugin] [--skip-opencode-commands] [--force]" >&2
             exit 1
             ;;
     esac
@@ -66,13 +70,21 @@ if [ -d "$CLAUDE_EXTRA_SKILLS_DIR" ]; then
 fi
 
 if [ "$INSTALL_OPENCODE_PLUGIN" -eq 1 ]; then
-    sh "$SCRIPT_DIR/install-opencode-plugin.sh"
+    if [ "$FORCE" -eq 1 ]; then
+        sh "$SCRIPT_DIR/install-opencode-plugin.sh" --force
+    else
+        sh "$SCRIPT_DIR/install-opencode-plugin.sh"
+    fi
 else
     echo "Skipped OpenCode plugin install."
 fi
 
 if [ "$INSTALL_OPENCODE_COMMANDS" -eq 1 ]; then
-    sh "$SCRIPT_DIR/install-opencode-commands.sh"
+    if [ "$FORCE" -eq 1 ]; then
+        sh "$SCRIPT_DIR/install-opencode-commands.sh" --force
+    else
+        sh "$SCRIPT_DIR/install-opencode-commands.sh"
+    fi
 else
     echo "Skipped OpenCode command install."
 fi

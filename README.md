@@ -47,7 +47,14 @@ npx skills add excitedhaha/context-task-planning -g
 
 Choose `context-task-planning` and the agent(s) you want when prompted. Claude Code standalone-skill users can also choose the bundled thin task-entry skills: `task-init`, `task-current`, `task-list`, `task-validate`, `task-drift`, and `task-done`.
 
-If you mainly use OpenCode, you can also enable a small bundled slash-command surface for common task flows. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
+If you mainly use OpenCode, install the plugin after the skill for full integration:
+
+```bash
+npx skills add excitedhaha/context-task-planning -g
+opencode plugin context-task-planning-opencode --global
+```
+
+The plugin auto-installs slash commands on first load. The OpenCode-specific install and smoke-test steps live in `docs/opencode.md`.
 
 TraeCLI/Coco recommended install:
 

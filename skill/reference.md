@@ -139,7 +139,7 @@ Linked provider refs from `spec_context` also feed `check-task-drift.sh` and `su
 
 If OpenSpec detection lands in `status=ambiguous`, `current-task` shows the candidate refs plus an explicit `set-task-spec-context.sh` hint. Use `sh skill/scripts/set-task-spec-context.sh --task <slug> --ref <spec-ref>` to record the manual override in `.planning/<slug>/state.json` without editing provider files. Add `--artifact <ref>` when you want the linked artifact refs to stay explicit, or `--clear` to return to the default embedded fallback.
 
-For OpenCode specifically, the bundled plugin can be installed with `install-opencode-plugin.sh`; it is designed to stay quiet in repositories that do not already use `.planning/`.
+For OpenCode specifically, prefer `opencode plugin context-task-planning-opencode --global` after installing the skill; the npm plugin auto-installs slash commands on first load. The legacy symlink-based `install-opencode-plugin.sh` and `install-opencode-commands.sh` scripts still work but are deprecated. The plugin is designed to stay quiet in repositories that do not already use `.planning/`.
 
 For Claude Code specifically, prefer the plugin declared by `.claude-plugin/plugin.json`. It bundles the main skill, task-entry skills, and `skill/claude-hooks/hooks.json` so users do not hand-merge hook settings. The legacy `skill/claude-hooks/settings.example.json` remains the standalone fallback and also carries the optional native `statusLine` configuration.
 
@@ -149,7 +149,7 @@ For TraeCLI/Coco specifically, prefer the plugin root with `coco.yaml`, `command
 
 Claude Code also supports bundled thin task-entry skills for the same high-frequency flows. Those skills should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
 
-OpenCode also supports bundled slash commands installed through `install-opencode-commands.sh`. Those commands should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
+OpenCode also supports bundled slash commands; these are auto-installed by the npm plugin on first load, or installed manually through `install-opencode-commands.sh` (legacy). Those commands should stay thin wrappers over the shared shell scripts rather than becoming a second workflow implementation.
 
 TraeCLI/Coco slash commands live under root `commands/` and should follow the same thin-wrapper rule.
 

@@ -78,7 +78,7 @@ If you did not explicitly name the task, the agent should propose the inferred t
 You should see one of these:
 
 - `Claude Code` - plugin hooks inject task context and reminders; if you also enable the optional status-line fallback, it can show `task!:<slug>` for writer bindings, `obs:<slug>` for observer bindings, or `wksp:<slug>` for the workspace fallback pointer
-- `OpenCode` - `task:<slug> | ...` in the session title; if you also enabled the OpenCode command helpers, bundled slash commands such as `/task-current` and `/task-list`
+- `OpenCode` - `task:<slug> | ...` in the session title; if you installed the npm plugin (`opencode plugin context-task-planning-opencode --global`), bundled slash commands such as `/task-current` and `/task-list` are auto-installed
 - `Codex` - optional hooks inject task reminders on new turns and can ask Codex to sync planning before finishing; `sh skill/scripts/current-task.sh` remains the manual visibility check
 - `TraeCLI/Coco` - plugin hooks inject task reminders and planning-sync guardrails; bundled slash commands appear as `/context-task-planning:task-current` and `/context-task-planning:task-list`
 

@@ -57,5 +57,37 @@ if not re.search(heading, changelog, re.MULTILINE):
 if "## [Unreleased]" not in changelog:
     raise SystemExit("CHANGELOG.md must keep an Unreleased section")
 
+# Check OpenCode plugin version
+opencode_plugin_path = root / "skill" / "opencode-plugin" / "task-focus-guard.js"
+if opencode_plugin_path.is_file():
+    plugin_text = opencode_plugin_path.read_text(encoding="utf-8")
+    plugin_version_match = re.search(r'^const PLUGIN_VERSION\s*=\s*["\']([^"\']+)["\']', plugin_text, re.MULTILINE)
+    if not plugin_version_match:
+        raise SystemExit("skill/opencode-plugin/task-focus-guard.js PLUGIN_VERSION is missing")
+    if plugin_version_match.group(1) != version:
+        raise SystemExit(
+            f"skill/opencode-plugin/task-focus-guard.js PLUGIN_VERSION {plugin_version_match.group(1)!r} "
+            f"does not match VERSION {version!r}"
+        )
+
+# Check OpenCode command files exist
+opencode_commands_dir = root / "skill" / "opencode-commands"
+expected_commands = ["task-current.md", "task-done.md", "task-drift.md", "task-init.md", "task-list.md", "task-validate.md"]
+for cmd in expected_commands:
+    if not (opencode_commands_dir / cmd).is_file():
+        raise SystemExit(f"Missing OpenCode command file: skill/opencode-commands/{cmd}")
+
+# Check npm package version (if built)
+npm_package_path = root / "packages" / "opencode-plugin" / "package.json"
+if npm_package_path.is_file():
+    with npm_package_path.open(encoding="utf-8") as fh:
+        npm_pkg = json.load(fh)
+    npm_version = npm_pkg.get("version")
+    if npm_version != version:
+        raise SystemExit(
+            f"packages/opencode-plugin/package.json version {npm_version!r} "
+            f"does not match VERSION {version!r}"
+        )
+
 print(f"Version metadata is consistent: {version}")
 PY

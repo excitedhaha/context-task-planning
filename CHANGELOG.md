@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-03
+
+### Added
+- Published `context-task-planning-opencode` npm package for native `opencode plugin context-task-planning-opencode --global` install.
+- Added `resolveSkillRoot()` to OpenCode plugin: dynamically discovers skill scripts at env override, legacy symlink, global OpenCode, project-local, or ancestor directory locations (previously hardcoded `../`).
+- Added `autoInstallCommands()` to OpenCode plugin: npm package auto-installs slash commands to `~/.config/opencode/commands/` on first load using `{{SKILL_SCRIPTS_DIR}}` template resolution.
+- Added `PLUGIN_VERSION` constant to `task-focus-guard.js` for runtime version identification.
+- Added graceful degradation when skill scripts are not found: all hook handlers become no-ops, and a toast with install instructions is shown on first session creation.
+- Added OpenCode plugin and npm package smoke tests to CI release workflow.
+- Added npm publish step to CI release workflow using OIDC trusted publishers (no NPM_TOKEN needed).
+- Added `--force` and `--uninstall` flags to `install-opencode-plugin.sh` and `install-opencode-commands.sh`.
+- Added `--force` flag passthrough to `install-macos.sh`.
+- Extended `check-version.sh` to validate OpenCode plugin `PLUGIN_VERSION` and command file existence.
+
+### Changed
+- OpenCode install is now two steps (`npx skills add` + `opencode plugin`) instead of three (symlink scripts are deprecated).
+- Updated all docs (`README.md`, `docs/opencode.md`, `docs/onboarding.md`, `docs/sharing.md`, `skill/SKILL.md`, `skill/reference.md`) to recommend `opencode plugin` and mark symlink scripts as legacy.
+
 ## [0.5.0] - 2026-05-03
 
 ### Changed

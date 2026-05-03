@@ -7,34 +7,49 @@ OpenCode support in this project has two thin host-specific layers over the same
 - an OpenCode plugin for visibility, operational toasts, session binding, route evidence, and native-`Task` preflight
 - bundled slash commands for common task workflows such as init, inspect, list, validate, and drift-check
 
-If you only want the shortest path: install the skill, run the plugin and command helpers once, restart OpenCode, then smoke-test `/task-current` and `/task-list`.
+If you only want the shortest path: install the skill, install the plugin, restart OpenCode, then smoke-test `/task-current` and `/task-list`.
 
 ## Install
 
-Recommended install:
+### Recommended (npm plugin)
+
+```bash
+# Step 1: Install the skill
+npx skills add excitedhaha/context-task-planning -g
+
+# Step 2: Install the OpenCode plugin
+opencode plugin context-task-planning-opencode --global
+
+# Step 3: Restart OpenCode
+```
+
+The plugin auto-installs slash commands on first load. No separate command-install step is needed.
+
+Choose `context-task-planning` and the OpenCode agent when prompted in step 1.
+
+To pin or update the plugin version:
+
+```bash
+opencode plugin context-task-planning-opencode@0.5.0 --global --force
+```
+
+### Legacy (symlink-based)
+
+If you prefer manual symlinks or are developing from a local clone:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
+sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh
+sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh
 ```
 
-Choose `context-task-planning` and the OpenCode agent when prompted.
-
-Local fallback while developing from a clone:
+Or from a local clone:
 
 ```bash
 sh skill/scripts/install-macos.sh
 ```
 
-A global install makes the skill available under:
-
-```text
-~/.config/opencode/skills/context-task-planning
-```
-
-The OpenCode-specific extras install into separate locations:
-
-- plugin: `~/.config/opencode/plugins/`
-- slash commands: `~/.config/opencode/commands/`
+Both symlink scripts support `--force` (replace existing) and `--uninstall` (remove) flags.
 
 ## What OpenCode adds
 
@@ -53,6 +68,8 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 
 ## Enable the OpenCode plugin and commands
 
+If you installed via the recommended npm method (`opencode plugin context-task-planning-opencode --global`), the plugin and slash commands are installed automatically. Restart OpenCode and run the smoke test below.
+
 If you installed from a local clone with:
 
 ```bash
@@ -61,7 +78,7 @@ sh skill/scripts/install-macos.sh
 
 the OpenCode plugin and bundled slash commands are installed automatically by default, so you can usually skip straight to restarting OpenCode and running the smoke test below.
 
-If you installed through `npx skills add`, run the bundled helpers once because OpenCode loads skills, plugins, and commands from different directories:
+If you installed through `npx skills add` alone (without the npm plugin), run the bundled helpers once because OpenCode loads skills, plugins, and commands from different directories:
 
 ```bash
 sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh
@@ -74,6 +91,8 @@ You can also run the helper from a local clone:
 sh skill/scripts/install-opencode-plugin.sh
 sh skill/scripts/install-opencode-commands.sh
 ```
+
+Both scripts support `--force` (replace existing symlinks) and `--uninstall` (remove symlinks).
 
 Then restart OpenCode so it picks up new plugins and slash commands.
 
@@ -149,8 +168,9 @@ If the commands do not appear right away:
 
 - make sure the command files exist under `~/.config/opencode/commands/`
 - restart OpenCode after running the install helper
-- rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh` if the command symlinks are missing
-- rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` if the title/toast behavior is missing but slash commands are present
+- if you used the npm plugin, commands are auto-installed on first load; restart OpenCode to trigger auto-install
+- if you used symlink install, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh` if the command symlinks are missing (or use `--force` to replace stale ones)
+- if the title/toast behavior is missing but slash commands are present, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` (or `opencode plugin context-task-planning-opencode@0.5.0 --global --force`)
 - if the slash commands work but the task title never updates, verify that the plugin loaded and that you restarted OpenCode after installation
 
 ## Plugin lifecycle

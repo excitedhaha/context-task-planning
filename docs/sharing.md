@@ -44,6 +44,12 @@ For OpenCode, Codex, or standalone skill installs:
 npx skills add excitedhaha/context-task-planning -g
 ```
 
+For OpenCode plugin integration after the skill is installed:
+
+```bash
+opencode plugin context-task-planning-opencode --global
+```
+
 For TraeCLI/Coco, install the plugin:
 
 ```bash
