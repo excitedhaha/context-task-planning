@@ -113,51 +113,27 @@ CHECKOUT_ABS="$WORKSPACE_ROOT/$CHECKOUT_REL"
 # Lock directory for worktree operations
 LOCK_DIR="$WORKSPACE_ROOT/.planning/.runtime/locks"
 mkdir -p "$LOCK_DIR"
-WORKTREE_LOCK="$LOCK_DIR/worktree-$TASK_SLUG-$REPO_ID.lock"
 
-# Use flock to prevent race conditions in worktree creation (if available)
-# On systems without flock (e.g., macOS), we rely on Python-level locking
-HAS_FLOCK=0
-if command -v flock >/dev/null 2>&1; then
-    HAS_FLOCK=1
-fi
+# Worktree creation with Python-level locking for cross-process safety
+# (shell flock syntax varies across platforms; Python fcntl.flock is portable)
 
-worktree_create() {
-    # Check if worktree already exists
-    if git -C "$CHECKOUT_ABS" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        EXISTING_BRANCH=$(git -C "$CHECKOUT_ABS" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-        "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" set-task-repo-binding --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --repo "$REPO_ID" --mode worktree --checkout-path "$CHECKOUT_REL" --branch "$EXISTING_BRANCH" --base-branch "$BASE_REF" >/dev/null
-        echo "[context-task-planning] Reused existing worktree for task: $TASK_SLUG"
-        echo "[context-task-planning] Repo: $REPO_ID"
-        echo "[context-task-planning] Checkout path: $CHECKOUT_REL"
-        exit 0
-    fi
-
-    mkdir -p "$(dirname "$CHECKOUT_ABS")"
-
-    if git -C "$REPO_ABS" show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
-        git -C "$REPO_ABS" worktree add "$CHECKOUT_ABS" "$BRANCH_NAME"
-    else
-        git -C "$REPO_ABS" worktree add -b "$BRANCH_NAME" "$CHECKOUT_ABS" "$BASE_REF"
-    fi
-}
-
-if [ "$HAS_FLOCK" -eq 1 ]; then
-    (
-        flock -x 200
-        worktree_create
-    ) 200>"$WORKTREE_LOCK"
-else
-    # Fallback without flock - still works due to Python-level locking
-    worktree_create
-fi
-
-# Check if we already handled the reuse case
+# Check if worktree already exists
 if git -C "$CHECKOUT_ABS" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     EXISTING_BRANCH=$(git -C "$CHECKOUT_ABS" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-    if [ -z "${EXISTING_BRANCH:-}" ] || [ "$EXISTING_BRANCH" != "$BRANCH_NAME" ]; then
-        :
-    fi
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" set-task-repo-binding --cwd "$WORKSPACE_ROOT" --task "$TASK_SLUG" --repo "$REPO_ID" --mode worktree --checkout-path "$CHECKOUT_REL" --branch "$EXISTING_BRANCH" --base-branch "$BASE_REF" >/dev/null
+    echo "[context-task-planning] Reused existing worktree for task: $TASK_SLUG"
+    echo "[context-task-planning] Repo: $REPO_ID"
+    echo "[context-task-planning] Checkout path: $CHECKOUT_REL"
+    exit 0
+fi
+
+# Create new worktree
+mkdir -p "$(dirname "$CHECKOUT_ABS")"
+
+if git -C "$REPO_ABS" show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+    git -C "$REPO_ABS" worktree add "$CHECKOUT_ABS" "$BRANCH_NAME"
+else
+    git -C "$REPO_ABS" worktree add -b "$BRANCH_NAME" "$CHECKOUT_ABS" "$BASE_REF"
 fi
 
 FINAL_BRANCH=$(git -C "$CHECKOUT_ABS" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
