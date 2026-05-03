@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-05-03
+
+### Removed
+- Removed context compression feature designed for 4K-8K token models, now obsolete for modern 256K-1M token models. Deleted compact_context.py (1103 lines), compact_sync.py (196 lines), and related hooks/scripts, simplifying 15+ integration points.
+
+### Changed
+- Refactored task_guard.py (2000+ lines) into modular components: constants.py, file_lock.py, file_utils.py, repo_registry.py, and session_binding.py for better maintainability and testability.
+- Fixed POSIX sh compatibility in prepare-task-worktree.sh by removing non-portable flock file descriptor syntax, relying on Python-level fcntl.flock() instead.
+
+### Added
+- Added unit tests for core modules (constants, file_lock, file_utils, repo_registry, session_binding) with 100+ test cases.
+- Added pyproject.toml for pytest configuration.
+
 ## [0.4.2] - 2026-04-30
 
 ### Changed
