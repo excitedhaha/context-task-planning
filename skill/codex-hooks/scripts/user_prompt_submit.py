@@ -6,7 +6,6 @@ from codex_hook_common import (
     codex_planning_guard_text,
     codex_session_key,
     create_turn_marker,
-    delegate_hint_for_text,
     explicit_task_context_eligible,
     fallback_task_advisory,
     init_task_hint,

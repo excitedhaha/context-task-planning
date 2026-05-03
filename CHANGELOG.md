@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-03
+
+### Changed
+- Migrated Claude Code subagent context injection from `PreToolUse` additionalContext to `SubagentStart` additionalContext, so task context appears at the start of the subagent conversation rather than next to the tool call result.
+- Simplified `PreToolUse` on Task to only handle `delegate_required` gating; context injection is now handled by `SubagentStart`.
+- Replaced `delegate_hint_for_text` with `delegate_hint_from_preflight` across all hosts, using the preflight result's `delegate.kind` and `delegate.command` as the single source of truth instead of duplicating the keyword classification logic from `task_guard.py`.
+- Cleaned up unused `delegate_hint_for_text` imports from `user_prompt_submit.py` across Claude, Trae, and Codex hooks.
+
+### Added
+- Added `SubagentStart` hook to Claude Code hooks.json with `subagent_start.py` that injects task state and prompt prefix into newly spawned subagents.
+- Added `pre_tool_ask_payload` for Claude Code `PreToolUse` responses that use `permissionDecision: "ask"` to surface confirmation dialogs.
+- Added `delegate_required` blocking in Claude Code `PreToolUse`: when preflight returns `delegate_required`, the user must confirm before the Task/Agent tool proceeds.
+- Added delegate command hint to OpenCode's `payload_plus_delegate_recommended` path, so users can copy the `prepare-delegate.sh` command directly.
+- Added `context-aware-worker.toml` Codex custom agent definition that guides subagents to run `subagent-preflight.sh` before starting work.
+- Documented Codex custom agent approach in `docs/codex.md`.
+
+### Removed
+- Removed duplicate `delegate_kind_for_text`, `prepare_delegate_command`, and `default_delegate_title` from `hook_common.py` — the authoritative implementations remain in `task_guard.py`.
+
 ## [0.4.3] - 2026-05-03
 
 ### Removed

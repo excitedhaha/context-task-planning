@@ -1233,6 +1233,23 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         } else if (preflight.operator_message) {
           prefixes.push(preflight.operator_message)
         }
+
+        // Append delegate command hint when a delegate is recommended.
+        // The preflight result already contains the delegate.kind and
+        // delegate.command computed by task_guard.py (single source of truth).
+        if (
+          preflight.decision === "payload_plus_delegate_recommended" &&
+          preflight.delegate
+        ) {
+          const delegate = preflight.delegate
+          const kind = delegate.kind || ""
+          const command = delegate.command || ""
+          if (kind && command) {
+            prefixes.push(
+              `[context-task-planning] If this turns into a bounded \`${kind}\` side quest, a delegate lane may help. Optional command: \`${command}\`. Keep it optional unless observe-only routing or durable lifecycle tracking makes a delegate required.`,
+            )
+          }
+        }
       } else if (drift) {
         const task = drift.task && drift.task.found ? drift.task : currentTask
         if (task && task.found) {

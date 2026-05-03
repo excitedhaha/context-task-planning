@@ -6,10 +6,11 @@ from pathlib import Path
 try:
     from .hook_common import (
         allow_delegate_hint,
-        delegate_hint_for_text,
+        delegate_hint_from_preflight,
         explicit_task_context_eligible,
         fallback_task_advisory,
         load_state,
+        pre_tool_ask_payload,
         pre_tool_payload,
         read_hook_input,
         resolve_task_meta,
@@ -25,10 +26,11 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from hook_common import (  # type: ignore
         allow_delegate_hint,
-        delegate_hint_for_text,
+        delegate_hint_from_preflight,
         explicit_task_context_eligible,
         fallback_task_advisory,
         load_state,
+        pre_tool_ask_payload,
         pre_tool_payload,
         read_hook_input,
         resolve_task_meta,
@@ -84,6 +86,10 @@ def main():
         return
 
     if tool_name == "Task":
+        # PreToolUse on Task: only handle delegate_required gating.
+        # Context injection (state_summary + prompt_prefix) is handled by
+        # SubagentStart, which injects at the start of the subagent
+        # conversation rather than next to the tool call result.
         task_text = task_tool_text(tool_input)
         preflight = subagent_preflight_result(
             task_text,
@@ -92,34 +98,21 @@ def main():
             host="claude",
             tool_name=tool_name,
         )
-        if preflight:
-            context = state_summary(state, task_meta=task_meta)
-            decision = preflight.get("decision")
-            prompt_prefix = str(preflight.get("prompt_prefix") or "").strip()
-            operator_message = str(preflight.get("operator_message") or "").strip()
-            if (
-                decision in {"payload_only", "payload_plus_delegate_recommended"}
-                and prompt_prefix
-            ):
-                context += "\n" + prompt_prefix
-            if operator_message and (
-                decision in {"routing_only", "delegate_required"} or not prompt_prefix
-            ):
-                context += "\n" + operator_message
-            print(pre_tool_payload(context))
-            return
 
-        drift_result = task_drift_result(task_text, cwd, session_key=session_key)
-        summary_tool_name = tool_name if allow_delegate_hint(drift_result) else None
-        context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name)
-        drift_hint = task_drift_hint(drift_result, tool_name=tool_name)
-        if drift_hint:
-            context += "\n" + drift_hint
-        if allow_delegate_hint(drift_result):
-            delegate_hint = delegate_hint_for_text(task_text, state)
-            if delegate_hint:
-                context += "\n" + delegate_hint
-        print(pre_tool_payload(context))
+        if preflight and preflight.get("decision") == "delegate_required":
+            operator_message = str(preflight.get("operator_message") or "").strip()
+            delegate = preflight.get("delegate") or {}
+            delegate_reason = str(
+                delegate.get("reason") or operator_message or "a delegate lane is required"
+            ).strip()
+            ask_reason = (
+                f"[context-task-planning] delegate_required: {delegate_reason}. "
+                "Consider creating a delegate lane instead."
+            )
+            print(pre_tool_ask_payload(operator_message, reason=ask_reason))
+
+        # For non-delegate_required decisions, SubagentStart handles
+        # context injection. No additional PreToolUse output needed.
         return
 
     return

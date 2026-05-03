@@ -3,7 +3,7 @@
 from trae_hook_common import (
     HOST,
     allow_delegate_hint,
-    delegate_hint_for_text,
+    delegate_hint_from_preflight,
     explicit_task_context_eligible,
     fallback_task_advisory,
     load_state,
@@ -85,7 +85,7 @@ def main() -> None:
         if drift_hint:
             context += "\n" + drift_hint
         if allow_delegate_hint(drift_result):
-            delegate_hint = delegate_hint_for_text(task_text, state, host=HOST)
+            delegate_hint = delegate_hint_from_preflight(None, state, host=HOST, task_text=task_text)
             if delegate_hint:
                 context += "\n" + delegate_hint
         print_context(context)

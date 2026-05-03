@@ -6,7 +6,6 @@ from pathlib import Path
 try:
     from .hook_common import (
         allow_delegate_hint,
-        delegate_hint_for_text,
         explicit_task_context_eligible,
         fallback_task_advisory,
         init_task_hint,
@@ -26,7 +25,6 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from hook_common import (  # type: ignore
         allow_delegate_hint,
-        delegate_hint_for_text,
         explicit_task_context_eligible,
         fallback_task_advisory,
         init_task_hint,

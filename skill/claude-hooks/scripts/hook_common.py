@@ -338,91 +338,118 @@ def spec_summary_lines(task_meta: dict | None) -> list[str]:
     return lines
 
 
-def delegate_kind_for_text(text: str) -> str | None:
-    lowered = text.lower()
-    patterns = [
-        (
-            "review",
-            ["review", "diff review", "code review", "pr review", "审查", "评审"],
-        ),
-        (
-            "verify",
-            [
-                "verify",
-                "validation",
-                "regression",
-                "failing test",
-                "test failure",
-                "triage",
-                "验证",
-                "回归",
-                "测试失败",
-                "失败排查",
-            ],
-        ),
-        (
-            "spike",
-            [
-                "spike",
-                "prototype",
-                "poc",
-                "feasibility",
-                "compare options",
-                "方案对比",
-                "可行性",
-            ],
-        ),
-        (
-            "discovery",
-            [
-                "investigate",
-                "analyze",
-                "map",
-                "scan",
-                "explore",
-                "entry point",
-                "dependency",
-                "research",
-                "调研",
-                "分析",
-                "找入口",
-                "排查",
-            ],
-        ),
-    ]
-    for kind, keywords in patterns:
-        if any(keyword in lowered for keyword in keywords):
-            return kind
-    return None
-
-
-def default_delegate_title(kind: str) -> str:
-    titles = {
-        "discovery": "Repo scan",
-        "spike": "Option spike",
-        "verify": "Verification triage",
-        "review": "Review lane",
-        "catchup": "Catchup lane",
-        "other": "Delegate lane",
-    }
-    return titles.get(kind, "Delegate lane")
-
-
-def prepare_delegate_command(text: str, kind: str, host: str = "claude") -> str:
-    normalized = " ".join(text.split()) or default_delegate_title(kind)
-    if len(normalized) > 80:
-        normalized = normalized[:77].rstrip() + "..."
-    return f"{installed_skill_command('prepare-delegate.sh', host=host)} --kind {kind} {shlex.quote(normalized)}"
-
-
-def delegate_hint_for_text(
-    text: str, state: dict | None = None, host: str = "claude"
+def delegate_hint_from_preflight(
+    preflight: dict | None,
+    state: dict | None = None,
+    host: str = "claude",
+    task_text: str = "",
 ) -> str | None:
-    kind = delegate_kind_for_text(text)
+    """Build a delegate hint from a preflight result's delegate field.
+
+    Uses the delegate.kind and delegate.command already computed by
+    task_guard.py (single source of truth). Falls back to a lightweight
+    keyword scan only when preflight is unavailable.
+    """
+    delegate = None
+    kind = None
+    command = None
+
+    if isinstance(preflight, dict):
+        delegate = preflight.get("delegate")
+        if isinstance(delegate, dict):
+            kind = str(delegate.get("kind") or "").strip() or None
+            command = str(delegate.get("command") or "").strip() or None
+
+    # Fallback: lightweight keyword scan when preflight is unavailable.
+    # This mirrors task_guard.py DELEGATE_KIND_PATTERNS but is intentionally
+    # simpler — the authoritative logic lives in task_guard.py.
+    if not kind:
+        raw_text = task_text or (
+            str(preflight.get("task_text", "") or "").strip()
+            if isinstance(preflight, dict)
+            else ""
+        )
+        lowered = " ".join(raw_text.lower().split())
+        if not lowered:
+            return None
+        patterns = [
+            (
+                "review",
+                ["review", "diff review", "code review", "pr review", "审查", "评审"],
+            ),
+            (
+                "verify",
+                [
+                    "verify",
+                    "validation",
+                    "regression",
+                    "failing test",
+                    "test failure",
+                    "triage",
+                    "验证",
+                    "回归",
+                    "测试失败",
+                    "失败排查",
+                ],
+            ),
+            (
+                "spike",
+                [
+                    "spike",
+                    "prototype",
+                    "poc",
+                    "feasibility",
+                    "compare options",
+                    "方案对比",
+                    "可行性",
+                ],
+            ),
+            (
+                "discovery",
+                [
+                    "investigate",
+                    "analyze",
+                    "map",
+                    "scan",
+                    "explore",
+                    "entry point",
+                    "dependency",
+                    "research",
+                    "调研",
+                    "分析",
+                    "找入口",
+                    "排查",
+                ],
+            ),
+        ]
+        for pkind, keywords in patterns:
+            if any(keyword in lowered for keyword in keywords):
+                kind = pkind
+                break
+
     if not kind:
         return None
 
-    command = prepare_delegate_command(text, kind, host=host)
+    # Reconstruct command if preflight didn't provide one.
+    if not command:
+        titles = {
+            "discovery": "Repo scan",
+            "spike": "Option spike",
+            "verify": "Verification triage",
+            "review": "Review lane",
+            "catchup": "Catchup lane",
+            "other": "Delegate lane",
+        }
+        raw_text = task_text or (
+            str(preflight.get("task_text", "") or "").strip()
+            if isinstance(preflight, dict)
+            else ""
+        )
+        normalized = " ".join(raw_text.split()) or titles.get(kind, "Delegate lane")
+        if len(normalized) > 80:
+            normalized = normalized[:77].rstrip() + "..."
+        command = f"{installed_skill_command('prepare-delegate.sh', host=host)} --kind {kind} {shlex.quote(normalized)}"
+
     base = (
         f"[context-task-planning] If this turns into a bounded `{kind}` side quest, a delegate lane may help. "
         f"Optional command: `{command}`. Keep it optional unless observe-only routing or durable lifecycle tracking makes a delegate required."
@@ -701,6 +728,42 @@ def pre_tool_payload(context: str) -> str:
         {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
+                "additionalContext": context,
+            }
+        },
+        ensure_ascii=False,
+    )
+
+
+def pre_tool_ask_payload(context: str, reason: str) -> str:
+    """Return a PreToolUse payload that asks the user to confirm the tool call.
+
+    Uses permissionDecision "ask" so Claude Code surfaces a confirmation
+    dialog with the given reason.
+    """
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "additionalContext": context,
+                "reason": reason,
+            }
+        },
+        ensure_ascii=False,
+    )
+
+
+def subagent_start_payload(context: str) -> str:
+    """Return a SubagentStart payload that injects context into the subagent.
+
+    The additionalContext is added to the subagent's context at the start
+    of its conversation, before its first prompt.
+    """
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStart",
                 "additionalContext": context,
             }
         },

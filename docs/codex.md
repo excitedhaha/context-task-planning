@@ -162,7 +162,26 @@ If that quick check prints `task=<slug> ...`, the fallback visibility path is wo
 
 ## Shell-first Task preflight
 
-Codex hooks currently do not provide a reliable native subagent prompt mutation path. Use the shared helper directly when you launch native subagents manually or through a wrapper:
+Codex hooks currently do not provide a reliable native subagent prompt mutation path. Two approaches are available:
+
+### Option A: Custom agent with preflight awareness
+
+Copy the `context-aware-worker.toml` agent definition to your project or user config:
+
+```bash
+# Project-scoped
+cp skill/codex-hooks/agents/context-aware-worker.toml .codex/agents/
+# User-scoped
+cp skill/codex-hooks/agents/context-aware-worker.toml ~/.codex/agents/
+```
+
+Then tell Codex: "Use the context-aware-worker agent to investigate the auth module."
+
+The agent's `developer_instructions` tell it to run `subagent-preflight.sh` before starting and follow the routing guidance. This is not automatic injection but provides a structured workflow for task-scoped subagents.
+
+### Option B: Manual preflight invocation
+
+Use the shared helper directly when you launch native subagents manually or through a wrapper:
 
 ```bash
 sh skill/scripts/subagent-preflight.sh \

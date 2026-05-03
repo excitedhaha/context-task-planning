@@ -4,7 +4,6 @@ from trae_hook_common import (
     HOST,
     allow_delegate_hint,
     create_turn_marker,
-    delegate_hint_for_text,
     explicit_task_context_eligible,
     fallback_task_advisory,
     init_task_hint,

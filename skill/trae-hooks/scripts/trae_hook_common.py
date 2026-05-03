@@ -25,7 +25,7 @@ _import_shared_hooks()
 from hook_common import (  # noqa: E402
     allow_delegate_hint,
     compact_context_text,
-    delegate_hint_for_text,
+    delegate_hint_from_preflight,
     explicit_task_context_eligible,
     fallback_task_advisory,
     find_named_string,
@@ -265,7 +265,7 @@ __all__ = [
     "allow_delegate_hint",
     "compact_context_text",
     "create_turn_marker",
-    "delegate_hint_for_text",
+    "delegate_hint_from_preflight",
     "explicit_task_context_eligible",
     "fallback_task_advisory",
     "init_task_hint",
