@@ -108,14 +108,12 @@ jobs:
             --target "$GITHUB_SHA"
 
       - name: Set up Node.js for npm publish
-        if: steps.release.outputs.exists == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Build and publish OpenCode npm package
-        if: steps.release.outputs.exists == 'false'
         run: |
           sh scripts/build-opencode-npm-package.sh
           cd packages/opencode-plugin
