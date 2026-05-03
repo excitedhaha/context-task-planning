@@ -116,9 +116,7 @@ jobs:
 
       - name: Build and publish OpenCode npm package
         if: steps.release.outputs.exists == 'false'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           sh scripts/build-opencode-npm-package.sh
           cd packages/opencode-plugin
-          npm publish --access public
+          npm publish --access public --provenance
