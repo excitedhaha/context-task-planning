@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   release:
@@ -118,6 +117,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          # Verify token is available
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NODE_AUTH_TOKEN is empty — check that the secret exists in the release environment"
+            exit 1
+          fi
           sh scripts/build-opencode-npm-package.sh
           cd packages/opencode-plugin
           npm publish --access public
