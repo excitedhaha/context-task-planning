@@ -13,6 +13,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - name: Checkout
@@ -114,7 +115,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Build and publish OpenCode npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           sh scripts/build-opencode-npm-package.sh
           cd packages/opencode-plugin
-          npm publish --access public --provenance
+          npm publish --access public
