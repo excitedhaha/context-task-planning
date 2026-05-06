@@ -1,6 +1,6 @@
 # Codex Hooks
 
-This directory contains an optional Codex automation layer for `context-task-planning`.
+This directory contains the Codex automation layer for `context-task-planning`.
 
 The core skill remains shell-first and file-backed. These hooks only adapt Codex's lifecycle events to the shared scripts and `.planning/<slug>/` state.
 
@@ -20,28 +20,13 @@ The core skill remains shell-first and file-backed. These hooks only adapt Codex
 
 ## Install
 
-1. Make sure `codex --version` is a build that exposes `codex_hooks` in `codex features list`; `codex-cli 0.125.0` is verified.
-2. Make sure the skill is installed at `~/.codex/skills/context-task-planning`.
-3. Prefer the packaged hook install:
+These hooks are bundled with the Codex plugin. Install the plugin:
 
 ```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+codex plugin marketplace add excitedhaha/context-task-planning
+codex plugin install context-task-planning@context-task-planning
 ```
 
-Use `--project` from a repository for a trusted project-local install.
+Make sure `codex --version` is a build that exposes `codex_hooks` in `codex features list`; `codex-cli 0.125.0` is verified.
 
-Manual fallback: merge `config.example.toml` into either:
-
-- `~/.codex/config.toml`
-- `.codex/config.toml`
-
-For first-time testing, user-level hooks are usually simpler. Project-local `.codex/` hooks only load after Codex trusts the project.
-
-Codex hooks are behind the `codex_hooks` feature flag, so keep this line when merging the example:
-
-```toml
-[features]
-codex_hooks = true
-```
-
-After enabling hooks, `codex exec "Do not modify files or run commands. Reply exactly: OK"` should report `SessionStart Completed`, `UserPromptSubmit Completed`, and `Stop Completed`. A turn that runs a shell command should also report `PostToolUse Completed`.
+After plugin installation, `codex exec "Do not modify files or run commands. Reply exactly: OK"` should report `SessionStart Completed`, `UserPromptSubmit Completed`, and `Stop Completed`. A turn that runs a shell command should also report `PostToolUse Completed`.

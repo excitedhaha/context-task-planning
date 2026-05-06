@@ -6,7 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PLUGIN_VERSION = "0.6.0" // sync with VERSION file
+const PLUGIN_VERSION = "0.7.0" // sync with VERSION file
 
 /**
  * Discover the skill root directory containing scripts/task_guard.py.

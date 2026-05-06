@@ -64,10 +64,11 @@ coco plugin install --type=github excitedhaha/context-task-planning --name conte
 
 Restart TraeCLI/Coco after installation. The plugin exposes the main skill, bundled `/context-task-planning:task-*` slash commands, and lifecycle hooks declared in `coco.yaml`.
 
-If you use Codex and want lifecycle hooks, install the hook package after the skill:
+Codex recommended install (skills + hooks bundled):
 
 ```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+codex plugin marketplace add excitedhaha/context-task-planning
+codex plugin install context-task-planning@context-task-planning
 ```
 
 For preview or local contributor install paths, see `docs/sharing.md`.

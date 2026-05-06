@@ -10,6 +10,7 @@
 - `README.md`: positioning and quickstart
 - `VERSION`, `CHANGELOG.md`: release source of truth and release notes
 - `.claude-plugin/plugin.json`: Claude Code plugin manifest
+- `.codex-plugin/plugin.json`: Codex plugin manifest
 - `coco.yaml`: TraeCLI/Coco plugin hook manifest
 - `.github/workflows/release.yml`: automatic tag and GitHub Release workflow
 - `docs/onboarding.md`: user workflow
@@ -25,7 +26,7 @@
 
 ## Release Discipline
 - Treat user-visible, install/distribution, workflow, hook, script, or doc behavior changes as release-bearing changes.
-- Maintain version metadata and release notes in the same change when release files exist: keep `VERSION`, `skill/SKILL.md` `metadata.version`, and `.claude-plugin/plugin.json` `version` in sync.
+- Maintain version metadata and release notes in the same change when release files exist: keep `VERSION`, `skill/SKILL.md` `metadata.version`, `.claude-plugin/plugin.json` `version`, and `.codex-plugin/plugin.json` `version` in sync.
 - Maintain `CHANGELOG.md` using an `Unreleased` section plus dated version sections; GitHub release notes should be derived from the released version section.
 - Do not create tags or GitHub releases manually unless explicitly requested. The GitHub Action owns automatic tag and release creation after the version/changelog change lands.
 
@@ -33,5 +34,6 @@
 - Doc-only changes: reread the touched markdown and keep it concise.
 - Script changes: `for f in skill/scripts/*.sh; do sh -n "$f"; done`
 - Claude hook changes: `python3 -m py_compile skill/claude-hooks/scripts/*.py`
+- Codex hook changes: `python3 -m py_compile skill/codex-hooks/scripts/*.py`
 - Trae hook changes: `python3 -m py_compile skill/trae-hooks/scripts/*.py`
 - Workflow changes: run the relevant smoke test plus `sh skill/scripts/validate-task.sh`
