@@ -16,6 +16,7 @@ version_path = root / "VERSION"
 skill_path = root / "skill" / "SKILL.md"
 plugin_path = root / ".claude-plugin" / "plugin.json"
 marketplace_path = root / ".claude-plugin" / "marketplace.json"
+codex_plugin_path = root / ".codex-plugin" / "plugin.json"
 changelog_path = root / "CHANGELOG.md"
 
 if not version_path.is_file():
@@ -41,6 +42,16 @@ if plugin_version != version:
     raise SystemExit(
         f".claude-plugin/plugin.json version {plugin_version!r} does not match VERSION {version!r}"
     )
+
+# Check Codex plugin version
+if codex_plugin_path.is_file():
+    with codex_plugin_path.open(encoding="utf-8") as fh:
+        codex_plugin = json.load(fh)
+    codex_plugin_version = codex_plugin.get("version")
+    if codex_plugin_version != version:
+        raise SystemExit(
+            f".codex-plugin/plugin.json version {codex_plugin_version!r} does not match VERSION {version!r}"
+        )
 
 with marketplace_path.open(encoding="utf-8") as fh:
     marketplace = json.load(fh)

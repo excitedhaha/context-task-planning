@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-06
+
+### Added
+- Added `.codex-plugin/` directory with `plugin.json` and `hooks.json` for complete Codex plugin support.
+- Added `smoke-test-codex-plugin.sh` to validate Codex plugin structure and configuration.
+
+### Changed
+- Codex install is now a single plugin command (`codex plugin install`) instead of two-step skill + hook package install.
+- Updated all docs (`README.md`, `docs/codex.md`, `docs/sharing.md`, `skill/SKILL.md`, `skill/reference.md`, `skill/codex-hooks/README.md`) to recommend Codex plugin install.
+- Extended `check-version.sh` to validate `.codex-plugin/plugin.json` version.
+
+### Removed
+- Removed standalone `hooks/context-task-planning/` hook package (replaced by bundled plugin hooks).
+- Removed `skill/codex-hooks/config.example.toml` manual fallback (no longer needed with plugin install).
+- Removed `skill/scripts/smoke-test-codex-hook-package.sh` (replaced by plugin smoke test).
+
 ## [0.6.0] - 2026-05-03
 
 ### Added

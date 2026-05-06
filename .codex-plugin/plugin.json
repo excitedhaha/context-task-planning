@@ -22,5 +22,5 @@
     "./skills/task-list",
     "./skills/task-validate"
   ],
-  "hooks": "./skill/claude-hooks/hooks.json"
+  "hooks": "./.codex-plugin/hooks.json"
 }

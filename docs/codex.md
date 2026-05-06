@@ -4,33 +4,20 @@ This page only covers Codex-specific setup and behavior. Use `README.md` for the
 
 ## Install
 
-Recommended install:
+Recommended plugin install (skills + hooks bundled):
+
+```bash
+codex plugin marketplace add excitedhaha/context-task-planning
+codex plugin install context-task-planning@context-task-planning
+```
+
+Alternative skill-only install:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
 ```
 
 Choose `context-task-planning` and the Codex agent when prompted.
-
-Recommended hook install:
-
-```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
-```
-
-Use `--project` instead of `--global` from a repository when you want the hooks only in that trusted project. This package install is the preferred path because it writes `hooks.json` and enables `features.codex_hooks = true` without asking users to hand-merge TOML.
-
-For unattended team bootstrap scripts, append `--yes` after you have reviewed the hook package:
-
-```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global --yes
-```
-
-Local fallback while developing from a clone:
-
-```bash
-sh skill/scripts/install-macos.sh
-```
 
 A global install makes the skill available under:
 
@@ -73,50 +60,18 @@ Use observe mode when a second thread should watch the same task without becomin
 sh skill/scripts/set-active-task.sh --observe feature-auth
 ```
 
-## Optional Codex hooks
+## Codex hooks
 
-Codex hooks require a Codex CLI build that lists `codex_hooks` in `codex features list`; this workflow has been verified with `codex-cli 0.125.0`.
-
-Preferred install after the skill is installed:
-
-```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
-```
-
-For a repo-local install:
-
-```bash
-npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --project
-```
-
-The package lives under:
-
-```text
-hooks/context-task-planning/
-```
-
-It installs a Codex `hooks.json` layer plus a thin dispatcher that delegates back to the installed skill, so the hook logic still has one source of truth under `skill/codex-hooks/scripts/`.
-
-Keep this as a hook package, not a plugin-local hook bundle, until Codex documents plugin-local hooks as a reliable runtime surface. The supported hook discovery path is currently config-layer `hooks.json` or inline `[hooks]`.
-
-Manual fallback, for environments without the hook-package installer: merge this file into either `~/.codex/config.toml` or a trusted project `.codex/config.toml`:
-
-```text
-skill/codex-hooks/config.example.toml
-```
-
-Both install paths enable:
+The plugin bundles hooks that enable:
 
 - `SessionStart` - inject explicit task context on startup, resume, or clear
 - `UserPromptSubmit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
 - `PostToolUse` - track whether this turn read planning files, used mutating tools, or updated planning files
 - `Stop` - continue once if Codex is about to finish without the required planning read or update
 
-The scripts emit Codex hook JSON with `hookSpecificOutput.additionalContext` for prompt-visible context. This avoids Codex treating bracket-prefixed plain text such as `[context-task-planning] ...` as malformed JSON-like output.
+Codex hooks require a Codex CLI build that lists `codex_hooks` in `codex features list`; this workflow has been verified with `codex-cli 0.125.0`.
 
-Codex project-local hooks only load after the project `.codex/` layer is trusted. User-level hooks are simpler for first-time testing. Keep hook enablement explicit: Codex hooks run local commands, so silently enabling them as a side effect of skill installation would be the wrong security default.
-
-Quick verification after enabling hooks:
+Quick verification after plugin install:
 
 ```bash
 codex --version
@@ -129,10 +84,8 @@ The last command should show `SessionStart Completed`, `UserPromptSubmit Complet
 Contributor/package verification from a checkout:
 
 ```bash
-sh skill/scripts/smoke-test-codex-hook-package.sh
+sh skill/scripts/smoke-test-codex-plugin.sh
 ```
-
-That smoke test validates the hook package JSON, Python hook scripts, global hook lookup, and project-local `.codex/hooks/` lookup without writing to your real Codex config. A full `codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --project -y` install can only pass after the new `hooks/context-task-planning/` package has been published to GitHub. If GitHub rejects the request with a rate-limit or `403`, set `GITHUB_TOKEN` and retry.
 
 If you want the current task visible all the time, put this in your shell prompt, tmux status line, or a quick manual check:
 

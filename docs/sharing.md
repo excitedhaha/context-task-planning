@@ -62,13 +62,12 @@ Notes:
 2. With `npx skills add`, choose `context-task-planning` and any task-entry skills your teammate wants when prompted.
 3. If they want to preview before installing, they can run `npx skills add excitedhaha/context-task-planning -l`.
 4. If they use Claude Code without the plugin and want hook automation, merge `skill/claude-hooks/settings.example.json` into either `~/.claude/settings.json` or `.claude/settings.local.json`. Do not enable both plugin hooks and manual hook entries at the same time.
-5. If they use Codex and want hook automation, prefer the packaged hook install:
+5. If they use Codex, install the plugin for bundled skills + hooks:
 
    ```bash
-   npx codex-marketplace add excitedhaha/context-task-planning/hooks/context-task-planning --hook --global
+   codex plugin marketplace add excitedhaha/context-task-planning
+   codex plugin install context-task-planning@context-task-planning
    ```
-
-   Use `--project` from a repository for a trusted project-local install. Team bootstrap scripts can append `--yes` after reviewing the hook package. If GitHub rejects the marketplace request with a rate-limit or `403`, set `GITHUB_TOKEN` and retry. If the hook-package installer is unavailable, merge `skill/codex-hooks/config.example.toml` manually into `~/.codex/config.toml` or a trusted project `.codex/config.toml`.
 
 6. If they use TraeCLI/Coco, restart the CLI after plugin installation and verify the command surface with `coco plugin validate context-task-planning` or `/plugin list`.
 7. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
@@ -122,9 +121,8 @@ sh skill/scripts/check-version.sh
 sh skill/scripts/extract-release-notes.sh "$(cat VERSION)" >/dev/null
 python3 -m py_compile skill/claude-hooks/scripts/*.py skill/codex-hooks/scripts/*.py
 python3 -m py_compile skill/trae-hooks/scripts/*.py
-python3 -m py_compile hooks/context-task-planning/scripts/*.py
 sh skill/scripts/smoke-test-claude-plugin.sh
-sh skill/scripts/smoke-test-codex-hook-package.sh
+sh skill/scripts/smoke-test-codex-plugin.sh
 sh skill/scripts/smoke-test-trae-plugin.sh
 coco plugin validate --path .
 npx skills add . -l
@@ -132,11 +130,11 @@ sh skill/scripts/validate-task.sh || true
 ```
 
 2. Confirm `.planning/` is not staged.
-3. Confirm `VERSION`, `skill/SKILL.md` `metadata.version`, `.claude-plugin/plugin.json` `version`, and `CHANGELOG.md` describe the same release.
+3. Confirm `VERSION`, `skill/SKILL.md` `metadata.version`, `.claude-plugin/plugin.json` `version`, `.codex-plugin/plugin.json` `version`, and `CHANGELOG.md` describe the same release.
 4. Confirm local absolute paths only appear in private planning state, not in shareable docs.
 5. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
 6. Confirm install commands point at `excitedhaha/context-task-planning`.
-7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/config.example.toml`, `hooks/context-task-planning/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
+7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `.codex-plugin/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
 8. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` handles `v$(cat VERSION)` after the change lands on `main`.
 
 ## Notes on `.planning/`
