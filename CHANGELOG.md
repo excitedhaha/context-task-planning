@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-05-07
+
+### Fixed
+- Fixed Codex plugin hooks.json to use plugin directory path instead of skills directory path.
+
 ## [0.7.0] - 2026-05-06
 
 ### Added
