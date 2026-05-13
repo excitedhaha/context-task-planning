@@ -1,6 +1,6 @@
 {
   "name": "context-task-planning-opencode",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "OpenCode plugin for context-task-planning: task-scoped context engineering with session binding, route evidence, and freshness tracking",
   "type": "module",
   "main": "index.js",
