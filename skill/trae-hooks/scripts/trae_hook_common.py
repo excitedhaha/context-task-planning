@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from hashlib import sha256
@@ -12,6 +13,7 @@ from pathlib import Path
 HOST = "trae"
 TRACKED_PLANNING_FILES = ("state.json", "progress.md", "task_plan.md", "findings.md")
 SYNC_REQUIRED_FILES = ("state.json", "progress.md")
+WORKSPACE_FALLBACK_SESSION_KEY = "workspace:default"
 
 
 def _import_shared_hooks() -> None:
@@ -59,6 +61,11 @@ PLANNING_READ_RE = re.compile(
 STALE_CONTEXT_RE = re.compile(
     r"(continue|resume|recover|lost context|context loss|继续|恢复|上下文|压缩|compact)",
     re.IGNORECASE,
+)
+
+INIT_TASK_BASH_RE = re.compile(r"(?:^|[;&|]\s*)sh\s+[\"']?[^\"'\n]*init-task\.sh\b", re.IGNORECASE)
+INIT_TASK_SLUG_RE = re.compile(
+    r'--slug\s+(?:"(?P<double>[^"]+)"|\'(?P<single>[^\']+)\'|(?P<bare>[^\s;&|]+))'
 )
 
 
@@ -256,6 +263,70 @@ def update_marker_for_tool(plan_dir: Path, payload: dict) -> dict:
     return marker
 
 
+def init_task_slug_from_payload(payload: dict) -> str:
+    text = tool_text(payload)
+    if not text or not INIT_TASK_BASH_RE.search(text):
+        return ""
+    match = INIT_TASK_SLUG_RE.search(text)
+    if not match:
+        return ""
+    return str(
+        match.group("double") or match.group("single") or match.group("bare") or ""
+    ).strip()
+
+
+def bootstrap_session_binding_after_init(cwd: str | None, payload: dict) -> bool:
+    session_key = trae_session_key(payload)
+    if not session_key:
+        return False
+
+    task_slug = init_task_slug_from_payload(payload)
+    if not task_slug:
+        return False
+
+    task_meta = resolve_task_meta(cwd=cwd, session_key=session_key)
+    if explicit_task_context_eligible(task_meta):
+        return False
+    if not isinstance(task_meta, dict) or not task_meta.get("found"):
+        return False
+    if str(task_meta.get("slug") or "").strip() != task_slug:
+        return False
+    if str(task_meta.get("selection_source") or "") != "active_pointer":
+        return False
+
+    writer_session_key = str(task_meta.get("writer_session_key") or "").strip()
+    if writer_session_key != WORKSPACE_FALLBACK_SESSION_KEY:
+        return False
+
+    scripts_root = Path(__file__).resolve().parents[2] / "scripts"
+    task_guard = scripts_root / "task_guard.py"
+    command = [
+        sys.executable or "python3",
+        str(task_guard),
+        "bind-session-task",
+        "--cwd",
+        cwd or os.getcwd(),
+        "--session-key",
+        session_key,
+        "--task",
+        task_slug,
+        "--role",
+        "writer",
+        "--steal",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            text=True,
+            capture_output=True,
+            cwd=cwd or os.getcwd(),
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
+
+
 def stop_block_payload(reason: str) -> str:
     return json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False)
 
@@ -263,11 +334,13 @@ def stop_block_payload(reason: str) -> str:
 __all__ = [
     "HOST",
     "allow_delegate_hint",
+    "bootstrap_session_binding_after_init",
     "compact_context_text",
     "create_turn_marker",
     "delegate_hint_from_preflight",
     "explicit_task_context_eligible",
     "fallback_task_advisory",
+    "init_task_slug_from_payload",
     "init_task_hint",
     "load_state",
     "looks_complex",

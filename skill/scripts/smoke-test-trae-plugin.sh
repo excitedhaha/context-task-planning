@@ -109,4 +109,33 @@ if expected not in context:
     raise SystemExit(f"plugin-root command missing from Trae hint: {context!r}")
 PY
 
+TASK_TITLE="Bootstrap session binding"
+TASK_SLUG="bootstrap-session-binding"
+(
+    cd "$TMP_ROOT"
+    sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$TASK_TITLE" --slug "$TASK_SLUG" >/dev/null
+)
+
+printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"trae-bootstrap-smoke\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sh \\\"$REPO_ROOT/skill/scripts/init-task.sh\\\" --title \\\"$TASK_TITLE\\\" --slug \\\"$TASK_SLUG\\\"\"}}" |
+    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
+
+CURRENT_JSON=$(
+    cd "$TMP_ROOT" &&
+        PLAN_SESSION_KEY="trae:trae-bootstrap-smoke" sh "$REPO_ROOT/skill/scripts/current-task.sh" --json 2>/dev/null || true
+)
+
+"$PYTHON_BIN" - "$CURRENT_JSON" "$TASK_SLUG" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+task_slug = sys.argv[2]
+if payload.get("selection_source") != "session_binding":
+    raise SystemExit(f"expected session_binding after Trae bootstrap, got {payload.get('selection_source')!r}")
+if payload.get("session_binding") != task_slug:
+    raise SystemExit(f"expected session binding for {task_slug!r}, got {payload.get('session_binding')!r}")
+if payload.get("binding_role") != "writer":
+    raise SystemExit(f"expected writer binding after Trae bootstrap, got {payload.get('binding_role')!r}")
+PY
+
 echo "[context-task-planning] smoke test passed: Trae/Coco plugin packaging"

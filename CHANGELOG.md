@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-05-13
+
+### Fixed
+- Fixed TraeCLI/Coco task initialization so `/context-task-planning:task-init` now upgrades the newly created workspace-fallback writer binding into the current session binding during `post_tool_use`, keeping subsequent task resolution and hooks on the same explicit session.
+
+### Added
+- Added Trae/Coco smoke-test coverage for the `task-init` session-binding bootstrap path.
+
 ## [0.7.1] - 2026-05-07
 
 ### Fixed

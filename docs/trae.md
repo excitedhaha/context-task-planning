@@ -39,7 +39,7 @@ After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed tas
 - automatic task-context recovery on `session_start`
 - prompt-time route evidence only for high-signal `likely-unrelated` prompts
 - native `Task` preflight guidance through `pre_tool_use` when available
-- `post_tool_use` planning evidence tracking for mutating tools
+- `post_tool_use` planning evidence tracking for mutating tools and session-binding bootstrap after `/context-task-planning:task-init`
 - a `stop` guard that can ask the agent to continue once when a mutating turn is about to finish without planning sync evidence
 - namespaced slash commands for the common task loop
 
@@ -76,6 +76,7 @@ After restarting TraeCLI/Coco:
 
 - `/skills` should include `context-task-planning` and the bundled task-entry skills
 - `/context-task-planning:task-current` should resolve the current task or explain why no task is active
+- after `/context-task-planning:task-init <task title>`, the same TraeCLI/Coco session should resolve that task through `session_binding` instead of only the shared workspace fallback
 - a complex first prompt in a repo without `.planning/` should receive an initialization hint instead of silently starting ad hoc work
 - when task creation is inferred from context, the command flow should show both the proposed title and proposed slug before the task is created
 - a high-signal scope-switch prompt should give the main LLM route evidence so it can ask before mixing unrelated work
