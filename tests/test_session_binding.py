@@ -21,6 +21,7 @@ from session_binding import (
     resolve_session_key,
     session_binding_name,
     session_binding_path,
+    session_key_candidates,
     session_registry_dir,
     task_bindings,
     utc_now,
@@ -187,6 +188,25 @@ class TestSessionBindingPath:
         assert result is None
 
 
+class TestSessionKeyCandidates:
+    """Tests for legacy-compatible session key lookup."""
+
+    def test_returns_exact_key_first(self):
+        assert session_key_candidates("trae:session-1") == [
+            "trae:session-1",
+            "traecli:session-1",
+        ]
+
+    def test_returns_legacy_alias_for_traecli(self):
+        assert session_key_candidates("traecli:session-1") == [
+            "traecli:session-1",
+            "trae:session-1",
+        ]
+
+    def test_returns_only_exact_key_for_other_hosts(self):
+        assert session_key_candidates("opencode:session-1") == ["opencode:session-1"]
+
+
 class TestWriteAndReadSessionBinding:
     """Tests for write_session_binding and read_session_binding functions."""
 
@@ -235,6 +255,29 @@ class TestWriteAndReadSessionBinding:
         plan_root.mkdir(parents=True)
 
         assert clear_session_binding(plan_root, "nonexistent") is False
+
+    def test_reads_legacy_traecli_binding_via_trae_key(self, tmp_path):
+        """Test that current Trae host can read older TraeCLI bindings."""
+        plan_root = tmp_path / ".planning"
+        plan_root.mkdir(parents=True)
+
+        write_session_binding(plan_root, "traecli:session-1", "my-task", ROLE_OBSERVER)
+
+        result = read_session_binding(plan_root, "trae:session-1")
+
+        assert result["session_key"] == "traecli:session-1"
+        assert result["task_slug"] == "my-task"
+        assert result["role"] == ROLE_OBSERVER
+
+    def test_clears_legacy_traecli_binding_via_trae_key(self, tmp_path):
+        """Test that clear_session_binding removes compatible legacy aliases."""
+        plan_root = tmp_path / ".planning"
+        plan_root.mkdir(parents=True)
+
+        write_session_binding(plan_root, "traecli:session-1", "my-task")
+
+        assert clear_session_binding(plan_root, "trae:session-1") is True
+        assert read_session_binding(plan_root, "traecli:session-1") == {}
 
 
 class TestTaskBindings:

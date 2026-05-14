@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-05-13
+
+### Fixed
+- Fixed TraeCLI/Coco session binding lookup to honor legacy `traecli:<session_id>` bindings when current hooks resolve `trae:<session_id>`, so existing bound tasks continue to get explicit context recovery and `stop` planning-sync reminders after the host rename.
+
+### Added
+- Added unit coverage for legacy TraeCLI session-binding alias lookup and clearing.
+
 ## [0.7.2] - 2026-05-13
 
 ### Fixed

@@ -25,6 +25,12 @@ from file_utils import atomic_write_json
 from file_lock import file_lock, lock_path_for
 
 
+LEGACY_HOST_SESSION_PREFIXES = {
+    "trae": ("traecli",),
+    "traecli": ("trae",),
+}
+
+
 def utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
     from datetime import datetime, timezone
@@ -99,6 +105,22 @@ def session_binding_path(plan_root: Path, session_key: str) -> Path | None:
     return session_registry_dir(plan_root) / session_binding_name(key)
 
 
+def session_key_candidates(session_key: str) -> list[str]:
+    """Return exact session key plus compatible legacy aliases."""
+    key = resolve_session_key(session_key)
+    if not key:
+        return []
+
+    candidates = [key]
+    host, sep, raw = key.partition(":")
+    if sep and raw:
+        for alias_host in LEGACY_HOST_SESSION_PREFIXES.get(host, ()):
+            alias = f"{alias_host}:{raw}"
+            if alias not in candidates:
+                candidates.append(alias)
+    return candidates
+
+
 def iter_session_bindings(plan_root: Path) -> list[tuple[Path, dict]]:
     """Iterate over all session bindings in a plan."""
     registry = session_registry_dir(plan_root)
@@ -115,23 +137,32 @@ def iter_session_bindings(plan_root: Path) -> list[tuple[Path, dict]]:
 
 def read_session_binding(plan_root: Path, session_key: str) -> dict:
     """Read a session binding, returning empty dict if not found."""
-    key = resolve_session_key(session_key)
-    if not key:
+    candidates = session_key_candidates(session_key)
+    if not candidates:
         return {}
 
-    path = session_binding_path(plan_root, key)
-    if path is None:
-        return {}
+    for key in candidates:
+        path = session_binding_path(plan_root, key)
+        if path is not None and path.exists():
+            binding = safe_json(path)
+            if binding and (
+                not binding.get("session_key") or binding.get("session_key") == key
+            ):
+                binding.setdefault("session_key", key)
+                binding["role"] = normalize_role(str(binding.get("role") or ROLE_WRITER))
+                binding.setdefault("path", str(path))
+                return binding
 
-    binding = safe_json(path)
-    if not binding:
-        return {}
-    if binding.get("session_key") and binding.get("session_key") != key:
-        return {}
-    binding.setdefault("session_key", key)
-    binding["role"] = normalize_role(str(binding.get("role") or ROLE_WRITER))
-    binding.setdefault("path", str(path))
-    return binding
+    for path, binding in iter_session_bindings(plan_root):
+        key = str(binding.get("session_key") or "").strip()
+        if key not in candidates:
+            continue
+        binding = dict(binding)
+        binding.setdefault("session_key", key)
+        binding["role"] = normalize_role(str(binding.get("role") or ROLE_WRITER))
+        binding.setdefault("path", str(path))
+        return binding
+    return {}
 
 
 def write_session_binding(
@@ -162,11 +193,24 @@ def write_session_binding(
 
 def clear_session_binding(plan_root: Path, session_key: str) -> bool:
     """Clear a session binding, return True if successful."""
-    path = session_binding_path(plan_root, session_key)
-    if path is None or not path.exists():
-        return False
-    path.unlink()
-    return True
+    removed = False
+    for key in session_key_candidates(session_key):
+        path = session_binding_path(plan_root, key)
+        if path is None or not path.exists():
+            continue
+        path.unlink()
+        removed = True
+
+    for path, binding in iter_session_bindings(plan_root):
+        key = str(binding.get("session_key") or "").strip()
+        if key not in session_key_candidates(session_key):
+            continue
+        try:
+            path.unlink()
+            removed = True
+        except OSError:
+            continue
+    return removed
 
 
 def clear_task_session_bindings(plan_root: Path, task_slug: str) -> list[str]:
