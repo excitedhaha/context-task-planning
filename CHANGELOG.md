@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-05-14
+
+### Fixed
+- Fixed TraeCLI/Coco planning sync so mutating turns now accumulate prompt/file/action evidence during the turn and auto-record `state.json` / `progress.md` through `record-progress` from the `stop` hook when the current session owns the writer lease.
+
+### Added
+- Added Trae/Coco smoke-test coverage for automatic `record-progress` writeback during `stop`, including touched-file and journal-note assertions.
+
 ## [0.7.3] - 2026-05-13
 
 ### Fixed

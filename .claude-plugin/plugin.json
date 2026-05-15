@@ -1,6 +1,6 @@
 {
   "name": "context-task-planning",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Task-scoped context engineering for recoverable, visible, and isolated long-running coding work.",
   "author": {
     "name": "excitedhaha"

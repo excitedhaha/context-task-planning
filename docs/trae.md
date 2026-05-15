@@ -39,8 +39,8 @@ After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed tas
 - automatic task-context recovery on `session_start`
 - prompt-time route evidence only for high-signal `likely-unrelated` prompts
 - native `Task` preflight guidance through `pre_tool_use` when available
-- `post_tool_use` planning evidence tracking for mutating tools and session-binding bootstrap after `/context-task-planning:task-init`
-- a `stop` guard that can ask the agent to continue once when a mutating turn is about to finish without planning sync evidence
+- `post_tool_use` planning evidence tracking for mutating tools plus per-turn prompt/file/action capture, alongside session-binding bootstrap after `/context-task-planning:task-init`
+- automatic `record-progress` writeback from `stop` for writer-owned mutating turns, with a fallback guard that can still ask the agent to continue once if planning sync evidence is still missing
 - namespaced slash commands for the common task loop
 
 The plugin does not provide a native status line or session-title cue today. Use `current-task.sh` in a shell prompt or tmux status line if you want always-visible task text.
@@ -65,8 +65,8 @@ Current hooks in `coco.yaml` map to shared runtime behavior:
 - `session_start` - inject explicit task context or a weaker fallback advisory
 - `user_prompt_submit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
 - `pre_tool_use` - run shared native-`Task` preflight for `Task` launches
-- `post_tool_use` - record whether this turn read planning files, used mutating tools, or updated planning files
-- `stop` - continue once if TraeCLI/Coco is about to finish without required planning read or update evidence
+- `post_tool_use` - record whether this turn read planning files, used mutating tools, updated planning files, and which prompt/files/actions should be journaled if auto-sync runs later
+- `stop` - auto-run `record-progress` for writer-owned mutating turns, then continue once only if required planning read or update evidence is still missing
 
 The hooks derive a session binding key from TraeCLI/Coco's `session_id`. If you run shell commands outside the host and need deterministic parallel sessions, export `PLAN_SESSION_KEY` before starting TraeCLI/Coco or before running the scripts manually.
 
@@ -80,7 +80,7 @@ After restarting TraeCLI/Coco:
 - a complex first prompt in a repo without `.planning/` should receive an initialization hint instead of silently starting ad hoc work
 - when task creation is inferred from context, the command flow should show both the proposed title and proposed slug before the task is created
 - a high-signal scope-switch prompt should give the main LLM route evidence so it can ask before mixing unrelated work
-- after a code-changing turn, TraeCLI/Coco may ask once to update `.planning/<slug>/progress.md` and `.planning/<slug>/state.json` before finalizing
+- after a writer-owned code-changing turn, TraeCLI/Coco should usually auto-sync `.planning/<slug>/progress.md` and `.planning/<slug>/state.json` before finalizing; if the plugin still cannot prove planning sync, it may ask once for manual follow-up
 
 ## Quick Validation And Troubleshooting
 

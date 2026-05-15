@@ -138,4 +138,55 @@ if payload.get("binding_role") != "writer":
     raise SystemExit(f"expected writer binding after Trae bootstrap, got {payload.get('binding_role')!r}")
 PY
 
+AUTO_TASK_TITLE="Automatic progress sync"
+AUTO_TASK_SLUG="automatic-progress-sync"
+AUTO_SESSION_ID="trae-autosync-smoke"
+AUTO_PROMPT="Update the task runtime to persist automatic sync progress."
+AUTO_FILE="$TMP_ROOT/src/demo.py"
+(
+    cd "$TMP_ROOT"
+    sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$AUTO_TASK_TITLE" --slug "$AUTO_TASK_SLUG" >/dev/null
+    "$PYTHON_BIN" "$REPO_ROOT/skill/scripts/task_guard.py" bind-session-task \
+        --cwd "$TMP_ROOT" \
+        --session-key "trae:$AUTO_SESSION_ID" \
+        --task "$AUTO_TASK_SLUG" \
+        --role writer \
+        --steal >/dev/null
+)
+
+printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\",\"prompt\":\"$AUTO_PROMPT\"}" |
+    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/user_prompt_submit.py" >/dev/null
+
+printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$AUTO_FILE\"}}" |
+    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
+
+STOP_OUTPUT=$(
+    printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\"}" |
+        COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/stop.py"
+)
+
+"$PYTHON_BIN" - "$TMP_ROOT" "$AUTO_TASK_SLUG" "$STOP_OUTPUT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tmp_root = Path(sys.argv[1])
+task_slug = sys.argv[2]
+stop_output = sys.argv[3].strip()
+if stop_output:
+    raise SystemExit(f"expected auto sync to avoid stop block, got {stop_output!r}")
+
+plan_dir = tmp_root / ".planning" / task_slug
+state = json.loads((plan_dir / "state.json").read_text(encoding="utf-8"))
+progress = (plan_dir / "progress.md").read_text(encoding="utf-8")
+
+checkpoint = str(state.get("latest_checkpoint") or "")
+if not checkpoint.startswith("Handled: Update the task runtime to persist automatic sync progress."):
+    raise SystemExit(f"unexpected auto-sync checkpoint: {checkpoint!r}")
+if "src/demo.py" not in progress:
+    raise SystemExit("auto-synced progress is missing touched file entry")
+if "Automated Trae/Coco turn sync appended this journal entry." not in progress:
+    raise SystemExit("auto-synced progress is missing Trae sync note")
+PY
+
 echo "[context-task-planning] smoke test passed: Trae/Coco plugin packaging"

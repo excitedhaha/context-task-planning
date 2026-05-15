@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.7.3"
+  version: "0.7.4"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 

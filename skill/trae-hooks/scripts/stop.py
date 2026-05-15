@@ -4,6 +4,7 @@ from trae_hook_common import (
     explicit_task_context_eligible,
     read_hook_input,
     read_marker,
+    record_progress_from_marker,
     resolve_plan_dir,
     resolve_task_meta,
     stop_block_payload,
@@ -39,6 +40,10 @@ def main() -> None:
 
     needs_read = bool(marker.get("needs_planning_read")) and not bool(marker.get("planning_read"))
     needs_update = bool(marker.get("tool_mutated")) and not bool(marker.get("planning_updated"))
+
+    if needs_update and record_progress_from_marker(cwd, payload, marker, task_meta):
+        marker["planning_updated"] = True
+        needs_update = False
 
     if marker.get("stop_prompted") or not (needs_read or needs_update):
         write_marker(plan_dir, payload, marker)

@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 
@@ -14,6 +15,21 @@ HOST = "trae"
 TRACKED_PLANNING_FILES = ("state.json", "progress.md", "task_plan.md", "findings.md")
 SYNC_REQUIRED_FILES = ("state.json", "progress.md")
 WORKSPACE_FALLBACK_SESSION_KEY = "workspace:default"
+PATH_LIKE_KEYS = {
+    "path",
+    "file",
+    "file_path",
+    "filepath",
+    "target_file",
+    "target_path",
+    "old_abs_path",
+    "new_abs_path",
+    "old_path",
+    "new_path",
+}
+PATH_LIST_KEYS = {"paths", "files", "file_paths", "filepaths", "targets"}
+PATCH_FILE_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
+PATCH_MOVE_RE = re.compile(r"^\*\*\* Move to: (.+)$", re.MULTILINE)
 
 
 def _import_shared_hooks() -> None:
@@ -39,6 +55,7 @@ from hook_common import (  # noqa: E402
     read_hook_input,
     resolve_plan_dir,
     resolve_task_meta,
+    resolve_workspace_root,
     run_compact_sync,
     session_key_from_payload,
     state_summary,
@@ -183,6 +200,7 @@ def create_turn_marker(plan_dir: Path, payload: dict, task_meta: dict | None, pr
         "turn_id": str(payload.get("turn_id") or payload.get("message_id") or payload.get("request_id") or ""),
         "session_key": trae_session_key(payload),
         "task_slug": slug,
+        "prompt_summary": truncate_text(prompt, limit=100),
         "started_at": time.time(),
         "baseline_mtimes": planning_mtimes(plan_dir),
         "needs_planning_read": bool(needs_planning_read),
@@ -191,6 +209,9 @@ def create_turn_marker(plan_dir: Path, payload: dict, task_meta: dict | None, pr
         "tool_mutated": False,
         "stop_prompted": False,
         "tools": [],
+        "files": [],
+        "actions": [],
+        "notes": [],
     }
     write_marker(plan_dir, payload, marker)
     return marker
@@ -209,6 +230,208 @@ def tool_text(payload: dict) -> str:
     if command:
         return command
     return json_text(tool_input)
+
+
+def unique_items(values: list[object], limit: int = 20) -> list[str]:
+    seen = set()
+    items: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        items.append(text)
+    if len(items) > limit:
+        return items[-limit:]
+    return items
+
+
+def truncate_text(value: object, limit: int = 120) -> str:
+    compact = " ".join(str(value or "").split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "…"
+
+
+def extract_patch_paths(patch_text: str) -> list[str]:
+    return unique_items(PATCH_FILE_RE.findall(patch_text) + PATCH_MOVE_RE.findall(patch_text), limit=12)
+
+
+def extract_paths(value: object) -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            lowered = str(key).strip().lower()
+            if lowered in PATH_LIKE_KEYS and isinstance(nested, str):
+                paths.append(nested)
+                continue
+            if lowered in PATH_LIST_KEYS and isinstance(nested, list):
+                paths.extend(str(item) for item in nested if isinstance(item, str))
+                continue
+            paths.extend(extract_paths(nested))
+    elif isinstance(value, list):
+        for item in value:
+            paths.extend(extract_paths(item))
+    return unique_items(paths, limit=20)
+
+
+def relativize_paths(paths: list[str], cwd: str | None = None) -> list[str]:
+    workspace_root = resolve_workspace_root(cwd=cwd) or Path(cwd or os.getcwd())
+    try:
+        resolved_root = workspace_root.resolve()
+    except OSError:
+        resolved_root = workspace_root
+
+    normalized: list[str] = []
+    for raw in paths:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        path = Path(text)
+        if path.is_absolute():
+            try:
+                text = str(path.resolve().relative_to(resolved_root))
+            except Exception:
+                text = str(path)
+        normalized.append(text)
+    return unique_items(normalized, limit=20)
+
+
+def tool_files(payload: dict, cwd: str | None = None) -> list[str]:
+    tool_input = payload.get("tool_input") or {}
+    files = extract_paths(tool_input)
+    patch_text = find_named_string(tool_input, {"patch"})
+    if patch_text:
+        files.extend(extract_patch_paths(patch_text))
+    return relativize_paths(unique_items(files, limit=20), cwd=cwd)
+
+
+def tool_action(payload: dict, files: list[str] | None = None) -> str:
+    tool_name = str(payload.get("tool_name") or "tool").strip() or "tool"
+    lowered = tool_name.lower()
+    file_list = files or []
+    if lowered in {"applypatch", "apply_patch"}:
+        if file_list:
+            lead = ", ".join(file_list[:2])
+            suffix = " and more" if len(file_list) > 2 else ""
+            return f"Applied a patch to {lead}{suffix}."
+        return "Applied a patch."
+    if lowered in {"write", "edit", "multiedit", "multi_edit"}:
+        if file_list:
+            lead = ", ".join(file_list[:2])
+            suffix = " and more" if len(file_list) > 2 else ""
+            return f"Updated {lead}{suffix}."
+        return f"Updated files with {tool_name}."
+    if lowered == "bash":
+        text = truncate_text(tool_text(payload), limit=100)
+        if text:
+            return f"Ran mutating Bash command: `{text}`."
+        return "Ran a mutating Bash command."
+    return f"Used mutating tool `{tool_name}`."
+
+
+def tool_notes(payload: dict) -> list[str]:
+    tool_name = str(payload.get("tool_name") or "tool").strip() or "tool"
+    text = truncate_text(tool_text(payload), limit=140)
+    notes = [f"Tools: {tool_name}"]
+    if text:
+        notes.append(f"Tool input: {text}")
+    return unique_items(notes, limit=6)
+
+
+def record_progress_from_marker(
+    cwd: str | None,
+    payload: dict,
+    marker: dict | None,
+    task_meta: dict | None,
+) -> bool:
+    if not isinstance(marker, dict) or not isinstance(task_meta, dict):
+        return False
+    if str(task_meta.get("binding_role") or "").strip() != "writer":
+        return False
+
+    session_key = str(marker.get("session_key") or trae_session_key(payload)).strip()
+    task_slug = str(marker.get("task_slug") or task_meta.get("slug") or "").strip()
+    if not session_key or not task_slug:
+        return False
+
+    scripts_root = Path(__file__).resolve().parents[2] / "scripts"
+    task_guard = scripts_root / "task_guard.py"
+    session_id = str(payload.get("session_id") or marker.get("session_id") or "session")
+    turn_id = str(
+        payload.get("turn_id")
+        or payload.get("message_id")
+        or payload.get("request_id")
+        or marker.get("turn_id")
+        or "turn"
+    )
+    timestamp = str(payload.get("timestamp") or "").strip() or datetime.now(timezone.utc).isoformat()
+    actions = unique_items(marker.get("actions") or [], limit=6)
+    prompt_summary = truncate_text(marker.get("prompt_summary") or "", limit=100)
+    if prompt_summary:
+        actions = unique_items([f"Handled: {prompt_summary}", *actions], limit=6)
+    if not actions:
+        actions = ["Recorded Trae/Coco turn progress."]
+
+    files = unique_items(marker.get("files") or [], limit=12)
+    notes = unique_items(marker.get("notes") or [], limit=8)
+    if not notes:
+        notes = ["Automated Trae/Coco turn sync appended this journal entry."]
+    elif "Automated Trae/Coco turn sync appended this journal entry." not in notes:
+        notes.append("Automated Trae/Coco turn sync appended this journal entry.")
+
+    command = [
+        sys.executable or "python3",
+        str(task_guard),
+        "record-progress",
+        "--json",
+        "--cwd",
+        cwd or os.getcwd(),
+        "--session-key",
+        session_key,
+        "--task",
+        task_slug,
+        "--source-id",
+        f"trae-stop:{safe_fragment(session_id)}:{safe_fragment(turn_id)}",
+        "--timestamp",
+        timestamp,
+        "--status",
+        "complete",
+        "--checkpoint",
+        actions[0],
+        "--task-status",
+        str(task_meta.get("status") or "").strip(),
+        "--mode",
+        str(task_meta.get("mode") or "").strip(),
+        "--phase",
+        str(task_meta.get("current_phase") or "").strip(),
+        "--next-action",
+        str(task_meta.get("next_action") or "").strip(),
+        "--primary-repo",
+        str(task_meta.get("primary_repo") or "").strip(),
+    ]
+    for repo in task_meta.get("repo_scope") or []:
+        repo_text = str(repo or "").strip()
+        if repo_text:
+            command.extend(["--repo", repo_text])
+    for action in actions:
+        command.extend(["--action", action])
+    for file_path in files:
+        command.extend(["--file", file_path])
+    for note in notes:
+        command.extend(["--note", note])
+
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            text=True,
+            capture_output=True,
+            cwd=cwd or os.getcwd(),
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
 
 
 def tool_mentions_planning(payload: dict) -> bool:
@@ -238,6 +461,7 @@ def update_marker_for_tool(plan_dir: Path, payload: dict) -> dict:
             "turn_id": str(payload.get("turn_id") or payload.get("message_id") or payload.get("request_id") or ""),
             "session_key": trae_session_key(payload),
             "task_slug": "",
+            "prompt_summary": "",
             "baseline_mtimes": planning_mtimes(plan_dir),
             "needs_planning_read": False,
             "planning_read": False,
@@ -245,6 +469,9 @@ def update_marker_for_tool(plan_dir: Path, payload: dict) -> dict:
             "tool_mutated": False,
             "stop_prompted": False,
             "tools": [],
+            "files": [],
+            "actions": [],
+            "notes": [],
         }
 
     tool_name = str(payload.get("tool_name") or "")
@@ -252,6 +479,11 @@ def update_marker_for_tool(plan_dir: Path, payload: dict) -> dict:
     if isinstance(tools, list):
         tools.append(tool_name)
         del tools[:-20]
+
+    files = tool_files(payload, cwd=str(payload.get("cwd") or "").strip() or None)
+    marker["files"] = unique_items([*(marker.get("files") or []), *files], limit=20)
+    marker["actions"] = unique_items([*(marker.get("actions") or []), tool_action(payload, files)], limit=12)
+    marker["notes"] = unique_items([*(marker.get("notes") or []), *tool_notes(payload)], limit=12)
 
     marker["planning_read"] = bool(marker.get("planning_read")) or tool_mentions_planning(payload)
     marker["tool_mutated"] = bool(marker.get("tool_mutated")) or tool_is_mutating(payload)
@@ -349,6 +581,7 @@ __all__ = [
     "print_system_message",
     "read_hook_input",
     "read_marker",
+    "record_progress_from_marker",
     "resolve_plan_dir",
     "resolve_task_meta",
     "run_compact_sync",
