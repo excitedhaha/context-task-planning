@@ -42,7 +42,6 @@ _import_shared_hooks()
 
 from hook_common import (  # noqa: E402
     allow_delegate_hint,
-    compact_context_text,
     delegate_hint_from_preflight,
     explicit_task_context_eligible,
     fallback_task_advisory,
@@ -56,7 +55,6 @@ from hook_common import (  # noqa: E402
     resolve_plan_dir,
     resolve_task_meta,
     resolve_workspace_root,
-    run_compact_sync,
     session_key_from_payload,
     state_summary,
     subagent_preflight_result,
@@ -72,7 +70,7 @@ MUTATING_BASH_RE = re.compile(
 )
 
 PLANNING_READ_RE = re.compile(
-    r"(current-task\.sh|compact-context\.sh|validate-task\.sh|\.planning/[^\s]*?(state\.json|progress\.md|task_plan\.md|findings\.md))"
+    r"(current-task\.sh|validate-task\.sh|\.planning/[^\s]*?(state\.json|progress\.md|task_plan\.md|findings\.md))"
 )
 
 STALE_CONTEXT_RE = re.compile(
@@ -113,12 +111,11 @@ def print_system_message(message: str | None) -> None:
 
 def trae_planning_guard_text(slug: str | None = None) -> str:
     current_task = installed_skill_command("current-task.sh", host=HOST)
-    compact_context = installed_skill_command("compact-context.sh", host=HOST)
     target = f"`.planning/{slug}/progress.md` and `.planning/{slug}/state.json`" if slug else "the current task's `progress.md` and `state.json`"
     return "\n".join(
         [
             "[context-task-planning] TraeCLI/Coco long-context guard:",
-            f"- If task context may be stale, refresh it with `{current_task}` or `{compact_context}` before acting on the task.",
+            f"- If task context may be stale, refresh it with `{current_task}` before acting on the task.",
             f"- If this turn changes code, decisions, verification status, blockers, or next action, update {target} before the final answer.",
             "- If no planning update is needed, say why explicitly instead of silently skipping it.",
         ]
@@ -567,7 +564,6 @@ __all__ = [
     "HOST",
     "allow_delegate_hint",
     "bootstrap_session_binding_after_init",
-    "compact_context_text",
     "create_turn_marker",
     "delegate_hint_from_preflight",
     "explicit_task_context_eligible",
@@ -584,7 +580,6 @@ __all__ = [
     "record_progress_from_marker",
     "resolve_plan_dir",
     "resolve_task_meta",
-    "run_compact_sync",
     "state_summary",
     "stop_block_payload",
     "subagent_preflight_result",

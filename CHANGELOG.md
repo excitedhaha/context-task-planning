@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-05-24
+
+### Fixed
+- Removed stale `compact-context.sh` / `compact-sync.sh` references from shared hook helpers and Codex/Trae planning guard prompts after the compact context feature was removed.
+- Updated Codex/Trae planning-read detection to rely on current task, validation, or direct planning-file reads instead of the removed compact context command.
+
 ## [0.7.4] - 2026-05-14
 
 ### Fixed

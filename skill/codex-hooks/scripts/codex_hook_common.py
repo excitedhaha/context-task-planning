@@ -50,7 +50,7 @@ MUTATING_BASH_RE = re.compile(
 )
 
 PLANNING_READ_RE = re.compile(
-    r"(current-task\.sh|compact-context\.sh|validate-task\.sh|\.planning/[^\s]*?(state\.json|progress\.md|task_plan\.md|findings\.md))"
+    r"(current-task\.sh|validate-task\.sh|\.planning/[^\s]*?(state\.json|progress\.md|task_plan\.md|findings\.md))"
 )
 
 STALE_CONTEXT_RE = re.compile(
@@ -88,12 +88,11 @@ def print_context(context: str | None, hook_event_name: str | None = None) -> No
 
 def codex_planning_guard_text(slug: str | None = None) -> str:
     current_task = installed_skill_command("current-task.sh", host=HOST)
-    compact_context = installed_skill_command("compact-context.sh", host=HOST)
     target = f"`.planning/{slug}/progress.md` and `.planning/{slug}/state.json`" if slug else "the current task's `progress.md` and `state.json`"
     return "\n".join(
         [
             "[context-task-planning] Codex long-context guard:",
-            f"- If task context may be stale, refresh it with `{current_task}` or `{compact_context}` before acting on the task.",
+            f"- If task context may be stale, refresh it with `{current_task}` before acting on the task.",
             f"- If this turn changes code, decisions, verification status, blockers, or next action, update {target} before the final answer.",
             "- If no planning update is needed, say why explicitly instead of silently skipping it.",
         ]
