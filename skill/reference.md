@@ -75,7 +75,7 @@ The shared decisions are:
 - `payload_plus_delegate_recommended` - inject the canonical prompt prefix and add non-blocking delegate guidance
 - `delegate_required` - do not treat the native subagent launch as sufficient; create or reuse a delegate lane first
 
-The shell wrapper calls `task_guard.py subagent-preflight`, so task resolution, drift classification, repo scope, and worktree bindings stay in one place.
+The shell wrapper calls `task_guard.py subagent-preflight`, so the CLI contract stays stable. Internally, the preflight decision lives in `task_preflight.py` and reuses the shared drift and spec-context modules, keeping task resolution, drift classification, repo scope, and worktree bindings in one core instead of host adapters.
 
 When the active task carries linked spec context, the preflight text prefix includes the same spec summary. If that spec context is `status=ambiguous`, the preflight JSON now also exposes `task.spec_candidate_refs`, `task.spec_resolution_hint`, and `task.spec_resolution_commands`, and the text prefix tells the subagent to resolve one candidate explicitly before treating it as authoritative unless the work is exploratory only.
 

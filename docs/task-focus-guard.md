@@ -20,8 +20,10 @@ Shared pieces:
 - `skill/scripts/current-task.sh`
 - `skill/scripts/check-task-drift.sh`
 - `skill/scripts/task_guard.py`
+- `skill/scripts/task_drift.py`
+- `skill/scripts/task_text.py`
 
-The wrappers stay shell-friendly. The Python core owns task selection and heuristic evidence so Claude Code, OpenCode, Codex, and TraeCLI/Coco can reuse one contract without treating the heuristic as the final route decision.
+The wrappers stay shell-friendly. `task_guard.py` exposes the CLI contract, while `task_drift.py` and `task_text.py` own heuristic evidence so Claude Code, OpenCode, Codex, and TraeCLI/Coco can reuse one contract without treating the heuristic as the final route decision.
 
 For the deeper architecture behind session bindings, repo scope, and worktree-aware routing, see `docs/design.md`.
 

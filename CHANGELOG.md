@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-05-24
+
+### Changed
+- Refactored shared task guard internals by moving text heuristics, spec context handling, drift classification, and subagent preflight decisions into focused modules while preserving the existing CLI contracts.
+- Documented the new shared-core module boundaries and added script-level development guidance for future agents.
+
+### Fixed
+- Removed duplicate delegate and complexity heuristics from host hook helpers so adapters depend on the shared preflight and text modules.
+
 ## [0.7.5] - 2026-05-24
 
 ### Fixed

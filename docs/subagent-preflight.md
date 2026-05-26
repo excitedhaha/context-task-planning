@@ -36,11 +36,11 @@ P0 adds one shared shell-first preflight entry point:
 
 - `skill/scripts/subagent-preflight.sh`
 
-The wrapper should call a new `task_guard.py` subcommand instead of introducing a second Python core:
+The wrapper calls the `task_guard.py` subcommand instead of introducing a second Python core:
 
 - `python task_guard.py subagent-preflight ...`
 
-This keeps task resolution, drift classification, repo scope, and worktree binding truth in one place.
+`task_guard.py` remains the CLI facade. The reusable preflight decision model lives in `task_preflight.py`, which reuses `task_drift.py`, `spec_context.py`, and task metadata resolved by the shared core. This keeps task resolution, drift classification, repo scope, and worktree binding truth in one place while avoiding duplicate adapter logic.
 
 ## Inputs
 
@@ -75,7 +75,7 @@ P0 flags:
 The helper should reuse existing shared state only:
 
 - current task resolution from `task_guard.py current-task`
-- drift classification from `task_guard.py check-drift`
+- drift classification from the shared `task_drift.py` model exposed through `task_guard.py check-drift`
 - repo scope and bindings from current task metadata
 - session role from the resolved binding (`writer` or `observer`)
 

@@ -72,8 +72,10 @@ possible.
 ### Keep shared truth in the shared core
 
 Detection, linking, drift terms, and preflight payloads should stay in the
-shared shell/Python core, mainly `task_guard.py` plus the existing task files.
-Host adapters should surface the same truth, not invent their own version.
+shared shell/Python core under `skill/scripts/` plus the existing task files.
+`spec_context.py` owns provider detection and display helpers, while
+`task_guard.py` exposes the CLI contract. Host adapters should surface the same
+truth, not invent their own version.
 
 ## Operating Modes
 
@@ -283,8 +285,9 @@ Each provider should answer:
 - what short summary should the runtime surface?
 - what stable refs can recovery and preflight include?
 
-The first implementation can stay inside `task_guard.py`. A separate module only
-becomes worth it after the second provider is real.
+Provider detection now lives in `spec_context.py` so OpenSpec behavior, future
+providers, drift terms, and preflight payloads share one implementation without
+adding more logic to the CLI facade.
 
 ### OpenSpec first
 
@@ -385,6 +388,7 @@ P2 should stay optional. The default user story should remain lightweight.
 - `skill/scripts/init-task.sh`
 - `skill/schemas/state.schema.json`
 - `skill/scripts/task_guard.py`
+- `skill/scripts/spec_context.py`
 - `skill/scripts/validate-task.sh`
 - `skill/SKILL.md`
 - `skill/examples.md`
@@ -419,8 +423,7 @@ Recommended checks:
 
 - should `acceptance_criteria` be required for every task, or only for tasks that
   cross a complexity threshold?
-- should provider linking live entirely in `task_guard.py` until at least two
-  real providers exist?
+- when adding a second provider, what stable artifact patterns are reliable enough for automatic detection?
 - the first resolution path can stay lightweight: write an explicit
   `spec_context` override through a thin helper such as
   `set-task-spec-context.sh`, and keep provider files read-only in P1

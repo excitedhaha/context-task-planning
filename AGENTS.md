@@ -3,7 +3,7 @@
 ## Project
 - `context-task-planning` is a shell-first, file-backed skill for long-running AI coding tasks.
 - Shared truth lives in `skill/scripts/` and local task state under `.planning/<slug>/`.
-- Keep routing, drift, repo, and worktree logic in the shared core, mainly `skill/scripts/task_guard.py` and `skill/scripts/*.sh`.
+- Keep routing, drift, repo, and worktree logic in the shared core under `skill/scripts/`; `task_guard.py` is the CLI facade, while focused modules such as `task_drift.py`, `task_preflight.py`, `spec_context.py`, and `task_text.py` own reusable decisions.
 - Host integrations in `skill/claude-hooks/`, `skill/opencode-plugin/`, `skill/codex-hooks/`, and `skill/trae-hooks/` are thin adapters, not alternate sources of truth.
 
 ## Key Files

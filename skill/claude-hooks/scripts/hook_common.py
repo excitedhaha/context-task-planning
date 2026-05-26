@@ -29,11 +29,15 @@ try:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     from task_guard import classify_drift, resolve_task as resolve_guard_task  # type: ignore
+    from task_text import looks_complex  # type: ignore
 
     TASK_GUARD_IMPORT_OK = True
 except ImportError:
     classify_drift = None  # type: ignore
     resolve_guard_task = None  # type: ignore
+
+    def looks_complex(prompt: str) -> bool:  # type: ignore
+        return False
 
 
 def host_skill_home(host: str = "claude") -> str:
@@ -288,9 +292,8 @@ def delegate_hint_from_preflight(
 ) -> str | None:
     """Build a delegate hint from a preflight result's delegate field.
 
-    Uses the delegate.kind and delegate.command already computed by
-    task_guard.py (single source of truth). Falls back to a lightweight
-    keyword scan only when preflight is unavailable.
+    Uses the delegate.kind and delegate.command already computed by the shared
+    preflight core so host adapters do not carry separate delegate heuristics.
     """
     delegate = None
     kind = None
@@ -301,73 +304,6 @@ def delegate_hint_from_preflight(
         if isinstance(delegate, dict):
             kind = str(delegate.get("kind") or "").strip() or None
             command = str(delegate.get("command") or "").strip() or None
-
-    # Fallback: lightweight keyword scan when preflight is unavailable.
-    # This mirrors task_guard.py DELEGATE_KIND_PATTERNS but is intentionally
-    # simpler — the authoritative logic lives in task_guard.py.
-    if not kind:
-        raw_text = task_text or (
-            str(preflight.get("task_text", "") or "").strip()
-            if isinstance(preflight, dict)
-            else ""
-        )
-        lowered = " ".join(raw_text.lower().split())
-        if not lowered:
-            return None
-        patterns = [
-            (
-                "review",
-                ["review", "diff review", "code review", "pr review", "审查", "评审"],
-            ),
-            (
-                "verify",
-                [
-                    "verify",
-                    "validation",
-                    "regression",
-                    "failing test",
-                    "test failure",
-                    "triage",
-                    "验证",
-                    "回归",
-                    "测试失败",
-                    "失败排查",
-                ],
-            ),
-            (
-                "spike",
-                [
-                    "spike",
-                    "prototype",
-                    "poc",
-                    "feasibility",
-                    "compare options",
-                    "方案对比",
-                    "可行性",
-                ],
-            ),
-            (
-                "discovery",
-                [
-                    "investigate",
-                    "analyze",
-                    "map",
-                    "scan",
-                    "explore",
-                    "entry point",
-                    "dependency",
-                    "research",
-                    "调研",
-                    "分析",
-                    "找入口",
-                    "排查",
-                ],
-            ),
-        ]
-        for pkind, keywords in patterns:
-            if any(keyword in lowered for keyword in keywords):
-                kind = pkind
-                break
 
     if not kind:
         return None
@@ -593,53 +529,6 @@ def no_active_task_hint(cwd: str | None = None, host: str = "claude") -> str | N
             f"Run `{installed_skill_command('list-tasks.sh', host=host)}` to inspect tasks, then `resume-task.sh <slug>` or `set-active-task.sh <slug>` before major work."
         )
     return None
-
-
-def looks_complex(prompt: str) -> bool:
-    text = prompt.strip().lower()
-    if not text:
-        return False
-
-    keywords = [
-        "implement",
-        "build",
-        "create",
-        "add",
-        "refactor",
-        "debug",
-        "investigate",
-        "migrate",
-        "design",
-        "plan",
-        "optimize",
-        "fix",
-        "实现",
-        "设计",
-        "重构",
-        "排查",
-        "调研",
-        "迁移",
-        "优化",
-        "新增",
-        "修复",
-    ]
-    complexity_signals = [
-        "\n",
-        "1.",
-        "2.",
-        "- ",
-        "需要",
-        "并且",
-        "同时",
-        "方案",
-        "步骤",
-    ]
-
-    keyword_hit = any(word in text for word in keywords)
-    signal_hit = any(signal in prompt for signal in complexity_signals)
-    word_count = len(re.findall(r"\w+", prompt, flags=re.UNICODE))
-
-    return keyword_hit and (signal_hit or word_count >= 8)
 
 
 def init_task_hint(host: str = "claude") -> str:

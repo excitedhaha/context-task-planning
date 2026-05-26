@@ -318,6 +318,25 @@ These guards are intentionally lightweight. They do not attempt to become a hard
 transaction manager. Their job is to prevent the most common silent failures in
 long-running agent work.
 
+## Shared Core Module Boundaries
+
+The public shell contract stays centered on `skill/scripts/*.sh`, with
+`task_guard.py` acting as the Python CLI facade for command parsing, task
+resolution orchestration, and command output.
+
+Reusable decisions should live in focused modules instead of growing
+`task_guard.py` or host adapters:
+
+- `task_text.py` owns text complexity, term extraction, and delegate text helpers
+- `spec_context.py` owns spec context normalization, provider detection, brief quality, and spec display helpers
+- `task_drift.py` owns route evidence classification and drift output formatting
+- `task_preflight.py` owns native `Task` preflight decisions, delegate escalation, prompt prefixes, and preflight output formatting
+- `session_binding.py` and `repo_registry.py` remain the lower-level persistence helpers for sessions, repo registration, and task repo binding files
+
+Host adapters may call shell wrappers or import these shared modules when needed,
+but they must not maintain separate copies of drift, delegate, spec, repo, or
+session-binding heuristics.
+
 ## Host Adapters And Boundaries
 
 The canonical truth still lives in `skill/scripts/` plus the files under
