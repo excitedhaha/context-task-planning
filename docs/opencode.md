@@ -58,6 +58,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - prefix the session title as `task:<slug> | ...`
 - expose bundled slash commands for common task entry points
 - show toasts for stale planning and task-binding/bootstrap events
+- show cooldown toasts when `progress.md` is large enough that `context-prune.sh --prepare` is recommended
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
 - inject strong task context only at recovery or native-`Task` preflight points for sessions with an explicit task binding; workspace fallback resolution stays advisory
@@ -111,6 +112,7 @@ After the plugin and commands are enabled and OpenCode is restarted, you should 
 - bundled slash commands such as `/task-init` appearing in the OpenCode command menu
 - route evidence injected into the main LLM when a prompt has strong switch signals, without a drift toast
 - a warning toast when tracked work has happened but planning files look stale
+- a context-prune toast if a bound task's `progress.md` has crossed the shared prune threshold
 - a fresh unbound session no longer inherits strong task prompt context just because the workspace has `.active_task` or a latest task; OpenCode only injects full recovery context and native-`Task` task prefixes after explicit session binding
 - the first task-creation shell command in a fresh OpenCode session now bootstraps a real session binding instead of falling back to the shared workspace pointer
 - if a fresh or fallback-resolved session directly edits one task's `.planning/<slug>/state.json|task_plan.md|progress.md|findings.md`, OpenCode now auto-bootstraps a binding for that task instead of silently staying on the old fallback task; it tries writer first and falls back to observer with a warning when repo isolation blocks writer ownership
@@ -186,7 +188,7 @@ Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these mom
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
 - `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed; freshness tracking normalizes namespaced tool names such as `functions.bash`, inspects `multi_tool_use.parallel` payloads for nested tracked work like `functions.apply_patch`, and uses `state.json` / `progress.md` as the sync-critical freshness baseline before falling back to the broader planning set
 - `tool.execute.after` also watches for direct writes to one task's main planning files; when a session is still running on fallback resolution, that planning write now bootstraps the matching session binding so later writer reminders target the task the agent is actually editing
-- `event` - on host events such as `session.created`, `session.updated`, `session.compacted`, and `tui.session.select`; sync session titles for already-bound tasks, cache message and diff metadata from `message.updated` / `message.part.updated` / `session.diff`, run a deterministic writer-only journal sync on `session.idle`, and fall back to the same deduped journal sync on later visible events such as `session.updated`, `session.status`, `message.updated`, or `session.diff` when the host never emits `session.idle` for that completed turn
+- `event` - on host events such as `session.created`, `session.updated`, `session.compacted`, and `tui.session.select`; sync session titles for already-bound tasks, cache message and diff metadata from `message.updated` / `message.part.updated` / `session.diff`, run a deterministic writer-only journal sync on `session.idle`, skip self-referential planning-only turns, and show cooldown prune toasts when the shared status says `progress.md` should be pruned
 
 Typical message flow:
 
@@ -217,6 +219,7 @@ The automatic journal sync path is intentionally narrow:
 - it updates `state.json.updated_at` and `state.json.latest_checkpoint`
 - it refreshes the `## Snapshot` block in `progress.md`
 - it prepends one append-only `## Session Log` entry with actions, files touched, and notes derived from the latest turn
+- it skips turns whose only file evidence is the current task's main planning files, so automatic planning sync does not recursively grow `progress.md`
 
 This keeps the plugin advisory for planning content while still giving OpenCode a minimal, deterministic writeback layer for the most common "I changed code but forgot to sync progress" case.
 

@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-28
+
+### Added
+- Added `context-prune.sh` and shared `task_prune.py` support for detecting oversized `progress.md`, preparing a model summary brief, applying a writer-only prune with full archive, and restoring the archived original.
+- Added context-prune documentation covering trigger timing, hook/plugin responsibilities, agent roles, and safety rules.
+- Added pytest coverage for prune status detection, archive/apply, stale-source rejection, and restore.
+
+### Changed
+- `validate-task.sh` now warns when `progress.md` has grown large enough to prune.
+- Claude/Codex/Trae shared task context can surface prune hints, while OpenCode shows cooldown prune toasts after idle sync.
+- OpenCode idle journal sync now skips turns whose only file evidence is the current task's main planning files, reducing self-referential `progress.md` growth.
+
 ## [0.7.6] - 2026-05-24
 
 ### Changed

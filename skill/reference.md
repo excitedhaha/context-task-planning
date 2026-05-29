@@ -86,6 +86,21 @@ Run `validate-task.sh` whenever you suspect drift between `state.json`, markdown
 - hard failures should cover missing files, invalid JSON, or active delegate mismatches
 - softer warnings can cover stale `progress.md` snapshots or other recoverable drift
 - `validate-task.sh --fix-warnings` should only repair warning-level snapshot drift, not hard failures or operational truth in `state.json`
+- oversized `progress.md` files produce a warning that points to `context-prune.sh --prepare`
+
+## Context pruning
+
+Use `context-prune.sh` when `progress.md` has become too large for repeated recovery reads:
+
+```bash
+sh skill/scripts/context-prune.sh --status
+sh skill/scripts/context-prune.sh --prepare
+sh skill/scripts/context-prune.sh --apply --summary-file <summary.md>
+```
+
+The command only prunes `progress.md` in the first implementation. It keeps the latest session entries, inserts a `Pruned History Summary`, archives the full original under `.planning/<slug>/.derived/prune/<run-id>/progress.original.md`, and refuses `--apply` if the source changed after `--prepare`.
+
+Apply and restore require writer access. Hook and plugin adapters may surface prune hints, but they must not rewrite task files themselves.
 
 ## Task focus guard
 

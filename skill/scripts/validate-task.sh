@@ -54,6 +54,7 @@ if str(script_dir) not in sys.path:
     sys.path.insert(0, str(script_dir))
 
 import task_guard
+import task_prune
 
 state_file = plan_dir / "state.json"
 task_plan_file = plan_dir / "task_plan.md"
@@ -519,6 +520,22 @@ def validate_task() -> tuple[dict, list[str], list[str], dict]:
                     continue
                 warnings.append(
                     f"progress.md Snapshot `{key}` differs from state.json (`{actual}` != `{expected}`)"
+                )
+
+        prune_status = task_prune.context_prune_status(plan_dir)
+        if prune_status.get("risk") not in {"ok", "warn"}:
+            metrics = prune_status.get("metrics", {})
+            if int(prune_status.get("prunable_sessions") or 0) > 0:
+                warnings.append(
+                    "progress.md is large enough to prune "
+                    f"({metrics.get('lines', 0)} lines, {metrics.get('session_count', 0)} sessions; "
+                    f"risk={prune_status.get('risk')}); run context-prune.sh --prepare before reading the full log repeatedly"
+                )
+            else:
+                warnings.append(
+                    "progress.md is large, but no older Session Log entries are currently prunable "
+                    f"({metrics.get('lines', 0)} lines, {metrics.get('session_count', 0)} sessions; "
+                    f"risk={prune_status.get('risk')}); inspect the file manually instead of running --prepare"
                 )
 
     delegate_states = {}

@@ -41,6 +41,7 @@ After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed tas
 - native `Task` preflight guidance through `pre_tool_use` when available
 - `post_tool_use` planning evidence tracking for mutating tools plus per-turn prompt/file/action capture, alongside session-binding bootstrap after `/context-task-planning:task-init`
 - automatic `record-progress` writeback from `stop` for writer-owned mutating turns, with a fallback guard that can still ask the agent to continue once if planning sync evidence is still missing
+- shared context-prune hints on recovery when `progress.md` has grown large enough to summarize and prune manually
 - namespaced slash commands for the common task loop
 
 The plugin does not provide a native status line or session-title cue today. Use `current-task.sh` in a shell prompt or tmux status line if you want always-visible task text.

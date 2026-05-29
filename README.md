@@ -60,6 +60,7 @@ The model never has to re-derive what it already figured out — the runtime han
 - **🪟 Always-visible state** — Status-line cues, session titles, and injected reminders show which task is active, who owns it (writer vs. observer), and what repo/worktree it touches.
 - **🚧 Safe parallelism** — Session bindings + writer/observer roles + per-task git worktrees keep two parallel tasks from trampling each other's files or branches.
 - **✅ Real verification gate** — A task isn't "done" until verification is recorded in `progress.md`. No silent declarations of victory.
+- **🧹 Prunable history** — If `progress.md` grows into thousands of lines, `context-prune.sh` prepares a model-reviewed summary, archives the full original, and keeps recovery reads small.
 
 ## When to Use
 

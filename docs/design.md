@@ -84,6 +84,13 @@ Inside each task, the document roles remain stable:
 - `state.json` is the authoritative operational snapshot for lifecycle,
   verification, repo scope, and routing metadata
 
+Large `progress.md` files are handled by context pruning rather than by hidden
+adapter rewrites. The shared `context-prune` command measures file size and
+session count, prepares a model summary brief, archives the full original under
+`.derived/prune/<run-id>/`, and rewrites only `progress.md` after the writer
+provides a summary file. Hooks and plugins may surface the shared status, but
+the coordinator remains responsible for applying or restoring a prune.
+
 ## Task Resolution And Workspace Boundaries
 
 The first architectural question is not "how do we read the task files?" It is

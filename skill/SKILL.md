@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.7.6"
+  version: "0.8.0"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -134,11 +134,15 @@ Promote only the distilled conclusions into the main plan.
 
 Every task should declare its verification targets and record actual results in `progress.md`.
 
-### 6. Archive, do not overwrite
+### 6. Prune oversized progress intentionally
+
+If `progress.md` grows too large for repeated recovery reads, run `scripts/context-prune.sh --status` first. Hooks may remind you when pruning is recommended, but they do not rewrite task files. Use `--prepare`, have the coordinator or a delegate summarize the older session range, then use `--apply --summary-file <summary.md>` only from the writer lane. The full original is archived under `.derived/prune/<run-id>/` and can be restored.
+
+### 7. Archive, do not overwrite
 
 When a task is complete, keep the task directory as history. Switch or remove the session binding or workspace fallback pointer instead of reusing the directory for unrelated work.
 
-### 7. Guard against task drift on hosts without runtime adapters
+### 8. Guard against task drift on hosts without runtime adapters
 
 When the host does not provide native task UI or prompt hooks, use the shared scripts as the fallback policy:
 
@@ -221,6 +225,7 @@ This keeps recovery portable across Claude Code, OpenCode, Codex, and TraeCLI/Co
 - `scripts/resolve-plan-dir.sh` - resolve current task from `PLAN_TASK`, session binding, `.active_task`, or latest plan
 - `scripts/current-task.sh` - show the resolved task; default output is an action-oriented summary, `--compact` stays short for prompts and status bars, and `--json` adds recommendation metadata for host adapters
 - `scripts/check-task-drift.sh` - produce heuristic route evidence for whether a new prompt still fits the active task
+- `scripts/context-prune.sh` - inspect oversized planning context, prepare a model summary brief, apply a writer-only `progress.md` prune, or restore the archived original
 - `scripts/check-switch-safety.sh` - inspect whether a git worktree should be stashed or committed before switching tasks
 - `scripts/list-repos.sh --discover` - show registered repos plus direct-child git repos that could be registered under the current workspace
 - `scripts/register-repo.sh --id <repo-id> <path>` - explicitly register a repo under a parent workspace

@@ -54,6 +54,7 @@ After you enable the plugin or standalone adapter, Claude Code can surface the s
 - shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related or heuristic-unclear work and routing or delegate escalation when the fit is wrong for explicitly bound sessions; fallback-only sessions stay routing-only
 - linked or ambiguous spec context such as auto-detected OpenSpec refs in startup and native-`Task` preflight context when the current task has a clear external artifact candidate or multiple plausible ones, including a short candidate hint when the runtime refuses to guess
 - repo context such as `primary_repo` and `repo_scope` when a task spans multiple repos
+- context-prune hints on recovery or subagent startup when `progress.md` is large enough that the writer should prepare a model-reviewed prune
 
 ## Enable the Claude adapter
 

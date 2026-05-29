@@ -69,6 +69,8 @@ The plugin bundles hooks that enable:
 - `PostToolUse` - track whether this turn read planning files, used mutating tools, or updated planning files
 - `Stop` - continue once if Codex is about to finish without the required planning read or update
 
+The injected task context can also include a shared context-prune hint when `progress.md` is large enough to summarize and prune manually.
+
 Codex hooks require a Codex CLI build that lists `codex_hooks` in `codex features list`; this workflow has been verified with `codex-cli 0.125.0`.
 
 Quick verification after plugin install:

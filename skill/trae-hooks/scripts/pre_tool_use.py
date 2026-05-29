@@ -67,7 +67,7 @@ def main() -> None:
             tool_name=str(tool_name or "Task"),
         )
         if preflight:
-            context = state_summary(state, task_meta=task_meta)
+            context = state_summary(state, task_meta=task_meta, host="trae")
             decision = preflight.get("decision")
             prompt_prefix = str(preflight.get("prompt_prefix") or "").strip()
             operator_message = str(preflight.get("operator_message") or "").strip()
@@ -80,7 +80,7 @@ def main() -> None:
 
         drift_result = task_drift_result(task_text, cwd, session_key=session_key)
         summary_tool_name = str(tool_name or "") if allow_delegate_hint(drift_result) else None
-        context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name)
+        context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name, host="trae")
         drift_hint = task_drift_hint(drift_result, tool_name=str(tool_name or ""))
         if drift_hint:
             context += "\n" + drift_hint

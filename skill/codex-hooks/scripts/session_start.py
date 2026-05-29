@@ -38,7 +38,7 @@ def main() -> None:
             print_context(
                 "\n".join(
                     [
-                        state_summary(state, task_meta=task_meta, include_spec=True),
+                        state_summary(state, task_meta=task_meta, include_spec=True, host="codex"),
                         codex_planning_guard_text(slug),
                     ]
                 ),

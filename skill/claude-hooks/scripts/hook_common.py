@@ -29,12 +29,14 @@ try:
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     from task_guard import classify_drift, resolve_task as resolve_guard_task  # type: ignore
+    from task_prune import context_prune_status  # type: ignore
     from task_text import looks_complex  # type: ignore
 
     TASK_GUARD_IMPORT_OK = True
 except ImportError:
     classify_drift = None  # type: ignore
     resolve_guard_task = None  # type: ignore
+    context_prune_status = None  # type: ignore
 
     def looks_complex(prompt: str) -> bool:  # type: ignore
         return False
@@ -284,6 +286,38 @@ def spec_summary_lines(task_meta: dict | None) -> list[str]:
     return lines
 
 
+def prune_summary_line(task_meta: dict | None, host: str = "claude") -> str | None:
+    if (
+        not TASK_GUARD_IMPORT_OK
+        or context_prune_status is None
+        or not isinstance(task_meta, dict)
+    ):
+        return None
+    plan_dir = str(task_meta.get("plan_dir") or "").strip()
+    if not plan_dir:
+        return None
+    try:
+        status = context_prune_status(Path(plan_dir))
+    except Exception:
+        return None
+    risk = str(status.get("risk") or "ok")
+    if risk not in {"recommend_prune", "strongly_recommend", "read_guard"}:
+        return None
+    metrics = status.get("metrics") if isinstance(status.get("metrics"), dict) else {}
+    slug = str(status.get("task_slug") or task_meta.get("slug") or "").strip()
+    command = ""
+    if int(status.get("prunable_sessions") or 0) > 0:
+        command = (
+            f" Run `{installed_skill_command('context-prune.sh', host=host)} --task {slug} --prepare` "
+            "to prepare a model-reviewed prune."
+        )
+    return (
+        f"[context-task-planning] Task `{slug}` has a large `progress.md` "
+        f"({metrics.get('lines', 0)} lines, {metrics.get('session_count', 0)} sessions; risk={risk})."
+        f"{command} Do not read the full progress log unless the archived history is needed."
+    )
+
+
 def delegate_hint_from_preflight(
     preflight: dict | None,
     state: dict | None = None,
@@ -448,6 +482,7 @@ def state_summary(
     task_meta: dict | None = None,
     tool_name: str | None = None,
     include_spec: bool = False,
+    host: str = "claude",
 ) -> str:
     slug = state.get("slug", "(unknown)")
     status = state.get("status", "unknown")
@@ -495,6 +530,9 @@ def state_summary(
         )
     if include_spec:
         lines.extend(spec_summary_lines(task_meta))
+    prune_hint = prune_summary_line(task_meta, host=host)
+    if prune_hint:
+        lines.append(prune_hint)
 
     if tool_name == "Bash":
         lines.append(f"Verification commands: {verify_commands}")

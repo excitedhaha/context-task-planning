@@ -6,7 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PLUGIN_VERSION = "0.7.6" // sync with VERSION file
+const PLUGIN_VERSION = "0.8.0" // sync with VERSION file
 
 /**
  * Discover the skill root directory containing scripts/task_guard.py.
@@ -94,6 +94,7 @@ const TASK_TITLE_PREFIX_RE = /^task:[^|]+\s+\|\s+/
 const FRESHNESS_WORK_THRESHOLD = 2
 const FRESHNESS_AGE_THRESHOLD_MS = 20 * 60 * 1000
 const FRESHNESS_TRACKED_TOOLS = new Set(["apply_patch", "bash", "edit", "multiedit", "write", "task"])
+const PRUNE_TOAST_COOLDOWN_MS = 60 * 60 * 1000
 const PLANNING_FILES = ["state.json", "task_plan.md", "progress.md", "findings.md"]
 const FRESHNESS_SYNC_FILES = ["state.json", "progress.md"]
 
@@ -307,6 +308,23 @@ function planningTaskSlugFromPath(filePath) {
 
   const match = normalized.match(/(?:^|\/)\.planning\/([^/]+)\/(state\.json|task_plan\.md|progress\.md|findings\.md)$/u)
   return match ? String(match[1] || "").trim() : ""
+}
+
+function isMainPlanningFileForTask(filePath, task) {
+  const text = String(filePath || "").trim()
+  if (!text || !task?.slug || !task?.plan_dir) {
+    return false
+  }
+  const normalized = text.replaceAll("\\", "/")
+  if (planningTaskSlugFromPath(normalized) === task.slug) {
+    return true
+  }
+  const absolute = path.resolve(text)
+  return PLANNING_FILES.some((fileName) => absolute === path.resolve(task.plan_dir, fileName))
+}
+
+function allFilesAreMainPlanningFiles(files, task) {
+  return Array.isArray(files) && files.length > 0 && files.every((filePath) => isMainPlanningFileForTask(filePath, task))
 }
 
 function writtenPlanningTaskSlugs(input) {
@@ -705,6 +723,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
   const assistantStateByMessageID = new Map()
   const latestAssistantBySession = new Map()
   const latestDiffBySession = new Map()
+  const pruneToastBySession = new Map()
   const observedSessionIDs = new Set()
   let lastExplicitSessionID = ""
 
@@ -880,6 +899,37 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       scriptArgs.push("--session-key", sessionKey)
     }
     return runJsonScript(SUBAGENT_PREFLIGHT_SCRIPT, scriptArgs, cwd)
+  }
+
+  function readPruneStatus(task, cwd = baseCwd, sessionID = "") {
+    if (skillMissing || !task?.found || !task?.slug) return null
+    const args = [
+      TASK_GUARD_SCRIPT,
+      "context-prune",
+      "--json",
+      "--cwd",
+      cwd,
+      "--task",
+      task.slug,
+    ]
+    const sessionKey = pluginSessionKey(sessionID)
+    if (sessionKey) {
+      args.push("--session-key", sessionKey)
+    }
+    return runJsonCommand("python3", args, cwd)
+  }
+
+  function pruneToastPayload(status) {
+    const risk = String(status?.risk || "")
+    if (!["recommend_prune", "strongly_recommend", "read_guard"].includes(risk)) {
+      return null
+    }
+    const metrics = status?.metrics || {}
+    return {
+      title: risk === "read_guard" ? "Planning log is very large" : "Planning log can be pruned",
+      message: `progress.md has ${metrics.lines || 0} lines and ${metrics.session_count || 0} sessions. Run context-prune --prepare when convenient.`,
+      variant: risk === "read_guard" || risk === "strongly_recommend" ? "warning" : "info",
+    }
   }
 
   function bindSessionTask(sessionID, taskSlug, role = "writer") {
@@ -1144,7 +1194,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     return runJsonCommand("python3", args, payload.cwd || baseCwd)
   }
 
-  function idleSyncPayload(sessionID, trigger = "") {
+  function idleSyncPayload(sessionID, trigger = "", task = null) {
     const assistant = latestAssistantBySession.get(sessionID)
     if (!assistant?.messageID || !assistant.completedAt) {
       return null
@@ -1153,6 +1203,10 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     const files = uniqueItems([...(assistant.files || []), ...(latestDiffBySession.get(sessionID) || [])])
     const tools = uniqueItems(assistant.tools || [])
     if (files.length === 0 && tools.length === 0) {
+      return null
+    }
+
+    if (allFilesAreMainPlanningFiles(files, task)) {
       return null
     }
 
@@ -1187,7 +1241,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       return false
     }
 
-    const payload = idleSyncPayload(sessionID, trigger)
+    const payload = idleSyncPayload(sessionID, trigger, task)
     if (!payload) {
       return false
     }
@@ -1201,6 +1255,23 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
     const cacheSessionID = sessionCacheKey(session, true)
     refreshFreshnessState(freshnessBySession, cacheSessionID, readCurrentTask(baseCwd, session?.readSessionID || sessionID))
     return true
+  }
+
+  async function maybeShowPruneToast(task, sessionID) {
+    if (!sessionID || !task?.found) {
+      return
+    }
+    const status = readPruneStatus(task, baseCwd, sessionID)
+    const toast = pruneToastPayload(status)
+    if (!toast) {
+      return
+    }
+    const previous = pruneToastBySession.get(sessionID) || { at: 0, risk: "" }
+    if (previous.risk === status.risk && Date.now() - previous.at < PRUNE_TOAST_COOLDOWN_MS) {
+      return
+    }
+    pruneToastBySession.set(sessionID, { at: Date.now(), risk: status.risk })
+    await showToast(toast.title, toast.message, toast.variant)
   }
 
   return {
@@ -1492,6 +1563,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
           return
         }
         maybeSyncJournalFromActivity(task, session, explicitSessionID, "session.idle")
+        await maybeShowPruneToast(task, explicitSessionID)
         return
       }
 

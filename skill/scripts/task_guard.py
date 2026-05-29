@@ -70,6 +70,14 @@ from spec_context import (
 )
 from task_drift import classify_drift, print_drift
 from task_preflight import build_subagent_preflight_result, print_subagent_preflight
+from task_prune import (
+    DEFAULT_KEEP_SESSIONS,
+    apply_context_prune,
+    context_prune_status,
+    format_prune_status,
+    prepare_context_prune,
+    restore_context_prune,
+)
 from task_text import nonempty_text_list
 
 
@@ -221,6 +229,21 @@ def parse_args() -> argparse.Namespace:
     record.add_argument("--primary-repo", default="")
     record.add_argument("--repo", action="append", default=[])
     record.add_argument("--json", action="store_true")
+
+    prune = subparsers.add_parser("context-prune")
+    prune.add_argument("--cwd", default="")
+    prune.add_argument("--task", default="")
+    prune.add_argument("--session-key", default="")
+    prune.add_argument("--fallback", action="store_true")
+    prune.add_argument("--status", action="store_true")
+    prune.add_argument("--prepare", action="store_true")
+    prune.add_argument("--apply", action="store_true")
+    prune.add_argument("--restore", default="")
+    prune.add_argument("--summary-file", default="")
+    prune.add_argument("--manifest", default="")
+    prune.add_argument("--keep-sessions", type=int, default=DEFAULT_KEEP_SESSIONS)
+    prune.add_argument("--json", action="store_true")
+    prune.add_argument("--compact", action="store_true")
 
     return parser.parse_args()
 
@@ -2491,6 +2514,124 @@ def handle_record_progress(args: argparse.Namespace) -> None:
     )
 
 
+def resolve_context_prune_task(
+    args: argparse.Namespace, session_key: str = ""
+) -> tuple[Path, Path, str, Path]:
+    workspace_root = resolve_workspace_root(args.cwd)
+    plan_root = workspace_root / ".planning"
+    task = resolve_task(args.cwd, args.task, session_key)
+    if not task.get("found") or not task.get("slug"):
+        raise SystemExit("Could not resolve a current task for context-prune.")
+    task_slug = str(task.get("slug") or "").strip()
+    return workspace_root, plan_root, task_slug, plan_root / task_slug
+
+
+def resolve_user_path(workspace_root: Path, value: str) -> Path | None:
+    text = value.strip()
+    if not text:
+        return None
+    candidate = Path(text).expanduser()
+    if not candidate.is_absolute():
+        candidate = workspace_root / candidate
+    return candidate.resolve()
+
+
+def ensure_context_prune_writer_access(
+    workspace_root: Path, task_slug: str, session_key: str
+) -> None:
+    if not session_key:
+        raise SystemExit(
+            "context-prune write actions require PLAN_SESSION_KEY or --session-key. Use --fallback for the shared workspace default."
+        )
+    check_task_access(
+        argparse.Namespace(
+            cwd=str(workspace_root),
+            task=task_slug,
+            session_key=session_key,
+            require_role=ROLE_WRITER,
+            fallback=False,
+        )
+    )
+
+
+def print_context_prune_result(result: dict, as_json: bool, compact: bool) -> None:
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    action = result.get("action")
+    if action == "prepared":
+        files_value = result.get("files")
+        files = files_value if isinstance(files_value, dict) else {}
+        print(f"[context-task-planning] Prepared context prune for `{result.get('task_slug')}`")
+        print(f"[context-task-planning] Brief: {files.get('brief')}")
+        print(f"[context-task-planning] Manifest: {files.get('manifest')}")
+        print(
+            "[context-task-planning] Next: write the summary, then run "
+            f"`sh skill/scripts/context-prune.sh --task {result.get('task_slug')} --apply --summary-file <summary.md>`"
+        )
+        return
+    if action == "applied":
+        archive_value = result.get("archive")
+        archive = archive_value if isinstance(archive_value, dict) else {}
+        result_value = result.get("result")
+        result_meta = result_value if isinstance(result_value, dict) else {}
+        print(f"[context-task-planning] Applied context prune for `{result.get('task_slug')}`")
+        print(f"[context-task-planning] Archive: {archive.get('path')}")
+        print(
+            f"[context-task-planning] progress.md now has {result_meta.get('lines', 0)} lines and {result_meta.get('session_count', 0)} recent sessions."
+        )
+        return
+    if action == "restored":
+        print(f"[context-task-planning] Restored progress.md for `{result.get('task_slug')}`")
+        print(f"[context-task-planning] Manifest: {result.get('manifest_path')}")
+        print(f"[context-task-planning] Restore backup: {result.get('restore_backup')}")
+        return
+    print(format_prune_status(result, compact=compact))
+
+
+def handle_context_prune(args: argparse.Namespace) -> None:
+    actions = [
+        bool(args.prepare),
+        bool(args.apply),
+        bool(args.restore),
+        bool(args.status),
+    ]
+    if sum(1 for item in actions if item) > 1:
+        raise SystemExit("Choose only one of --status, --prepare, --apply, or --restore.")
+
+    session_key = effective_session_key(args.session_key, args.fallback)
+    workspace_root, _plan_root, task_slug, plan_dir = resolve_context_prune_task(
+        args, session_key
+    )
+
+    if args.prepare:
+        result = prepare_context_prune(plan_dir, keep_sessions=args.keep_sessions)
+        print_context_prune_result(result, args.json, args.compact)
+        return
+
+    if args.apply:
+        ensure_context_prune_writer_access(workspace_root, task_slug, session_key)
+        summary_path = resolve_user_path(workspace_root, args.summary_file)
+        if summary_path is None:
+            raise SystemExit("context-prune --apply requires --summary-file <path>.")
+        manifest_path = resolve_user_path(workspace_root, args.manifest)
+        result = apply_context_prune(plan_dir, summary_path, manifest_path)
+        print_context_prune_result(result, args.json, args.compact)
+        return
+
+    if args.restore:
+        ensure_context_prune_writer_access(workspace_root, task_slug, session_key)
+        manifest_path = None
+        if args.restore.strip().lower() != "latest":
+            manifest_path = resolve_user_path(workspace_root, args.restore)
+        result = restore_context_prune(plan_dir, manifest_path)
+        print_context_prune_result(result, args.json, args.compact)
+        return
+
+    result = context_prune_status(plan_dir, keep_sessions=args.keep_sessions)
+    print_context_prune_result(result, args.json, args.compact)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -2529,6 +2670,10 @@ def main() -> None:
 
     if args.command == "record-progress":
         handle_record_progress(args)
+        return
+
+    if args.command == "context-prune":
+        handle_context_prune(args)
         return
 
     if args.command == "ensure-switch-safety":
