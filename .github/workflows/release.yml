@@ -63,6 +63,53 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           sh skill/scripts/extract-release-notes.sh "$version" > release-notes.md
 
+      - name: Build and publish OpenCode npm package
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          sh scripts/build-opencode-npm-package.sh
+          cd packages/opencode-plugin
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+            echo "$package_name@$package_version is already published; skipping npm publish."
+            exit 0
+          fi
+
+          publish_log="$(mktemp)"
+          echo "Publishing $package_name@$package_version with npm trusted publishing."
+          set +e
+          env -u NODE_AUTH_TOKEN -u NPM_TOKEN npm publish --access public --provenance >"$publish_log" 2>&1
+          status="$?"
+          set -e
+          if [ "$status" -eq 0 ]; then
+            cat "$publish_log"
+            exit 0
+          fi
+          cat "$publish_log" >&2
+
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            token_npmrc="$(mktemp)"
+            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$token_npmrc"
+            echo "Trusted publishing failed; retrying with NPM_TOKEN."
+            set +e
+            NPM_CONFIG_USERCONFIG="$token_npmrc" NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish --access public --provenance >"$publish_log" 2>&1
+            status="$?"
+            set -e
+            rm -f "$token_npmrc"
+            if [ "$status" -eq 0 ]; then
+              cat "$publish_log"
+              exit 0
+            fi
+            cat "$publish_log" >&2
+          fi
+
+          echo "::error::npm publish failed for $package_name@$package_version. Configure npm trusted publishing for excitedhaha/context-task-planning .github/workflows/release.yml, or set release environment NPM_TOKEN to a token from an npm maintainer with publish access."
+          echo "Current npm maintainers:"
+          npm view "$package_name" maintainers --json || true
+          exit "$status"
+
       - name: Fetch tags
         run: git fetch --tags --force
 
@@ -107,42 +154,3 @@ jobs:
             --title "${{ steps.version.outputs.tag }}" \
             --notes-file release-notes.md \
             --target "$GITHUB_SHA"
-
-      - name: Set up Node.js for npm publish
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Build and optionally publish OpenCode npm package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          sh scripts/build-opencode-npm-package.sh
-          cd packages/opencode-plugin
-          package_name="$(node -p "require('./package.json').name")"
-          package_version="$(node -p "require('./package.json').version")"
-          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
-            echo "$package_name@$package_version is already published; skipping npm publish."
-            exit 0
-          fi
-          publish_args=(--access public)
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NODE_AUTH_TOKEN is empty; attempting npm trusted publishing with GitHub OIDC."
-            publish_args=(--access public --provenance)
-          fi
-          publish_log="$(mktemp)"
-          set +e
-          npm publish "${publish_args[@]}" >"$publish_log" 2>&1
-          status="$?"
-          set -e
-          if [ "$status" -eq 0 ]; then
-            cat "$publish_log"
-            exit 0
-          fi
-          cat "$publish_log" >&2
-          if grep -Eq "(E401|E403|E404|ENEEDAUTH)" "$publish_log"; then
-            echo "::warning::Optional npm publish failed because npm rejected the token, package name, or package access. GitHub release was already created; fix npm registry permissions and publish $package_name@$package_version manually if needed."
-            exit 0
-          fi
-          exit "$status"

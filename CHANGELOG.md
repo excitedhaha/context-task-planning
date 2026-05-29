@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-05-29
+
+### Fixed
+- Made the OpenCode npm package publish run before GitHub tag/release creation and fail the release if npm cannot publish the version.
+- Prefer npm trusted publishing over `NPM_TOKEN`, with token fallback only after OIDC fails, so a stale or wrong token no longer prevents trusted publishing from working.
+
 ## [0.8.1] - 2026-05-29
 
 ### Fixed

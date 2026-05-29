@@ -135,7 +135,8 @@ sh skill/scripts/validate-task.sh || true
 5. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
 6. Confirm install commands point at `excitedhaha/context-task-planning`.
 7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `.codex-plugin/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
-8. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` handles `v$(cat VERSION)` after the change lands on `main`.
+8. Confirm npm trusted publishing is configured for `context-task-planning-opencode` from `excitedhaha/context-task-planning` and `.github/workflows/release.yml`, or that the release environment `NPM_TOKEN` belongs to an npm maintainer with publish access.
+9. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` publishes npm first, then handles `v$(cat VERSION)` after the change lands on `main`.
 
 ## Notes on `.planning/`
 
