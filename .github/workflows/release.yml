@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -113,15 +114,35 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Build and publish OpenCode npm package
+      - name: Build and optionally publish OpenCode npm package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Verify token is available
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NODE_AUTH_TOKEN is empty — check that the secret exists in the release environment"
-            exit 1
-          fi
           sh scripts/build-opencode-npm-package.sh
           cd packages/opencode-plugin
-          npm publish --access public
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+            echo "$package_name@$package_version is already published; skipping npm publish."
+            exit 0
+          fi
+          publish_args=(--access public)
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NODE_AUTH_TOKEN is empty; attempting npm trusted publishing with GitHub OIDC."
+            publish_args=(--access public --provenance)
+          fi
+          publish_log="$(mktemp)"
+          set +e
+          npm publish "${publish_args[@]}" >"$publish_log" 2>&1
+          status="$?"
+          set -e
+          if [ "$status" -eq 0 ]; then
+            cat "$publish_log"
+            exit 0
+          fi
+          cat "$publish_log" >&2
+          if grep -Eq "(E401|E403|E404|ENEEDAUTH)" "$publish_log"; then
+            echo "::warning::Optional npm publish failed because npm rejected the token, package name, or package access. GitHub release was already created; fix npm registry permissions and publish $package_name@$package_version manually if needed."
+            exit 0
+          fi
+          exit "$status"

@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-05-29
+
+### Fixed
+- Made the OpenCode npm publish step optional in the release workflow, so npm registry auth or package-name permission failures emit a warning instead of failing an already-created GitHub Release.
+- Normalized the OpenCode npm package repository URL to the npm-preferred `git+https` form.
+
 ## [0.8.0] - 2026-05-28
 
 ### Added

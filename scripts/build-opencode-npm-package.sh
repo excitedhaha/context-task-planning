@@ -63,7 +63,7 @@ cat > "$PACKAGE_DIR/package.json" <<PKGJSON
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/excitedhaha/context-task-planning.git",
+    "url": "git+https://github.com/excitedhaha/context-task-planning.git",
     "directory": "packages/opencode-plugin"
   },
   "files": [
