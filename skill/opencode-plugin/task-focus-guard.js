@@ -6,7 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PLUGIN_VERSION = "0.8.3" // sync with VERSION file
+const PLUGIN_VERSION = "0.8.4" // sync with VERSION file
 
 /**
  * Discover the skill root directory containing scripts/task_guard.py.
@@ -57,6 +57,37 @@ function resolveSkillRoot(directory) {
   return null
 }
 
+const COMMAND_SCRIPT_NAMES = {
+  "task-current.md": "current-task.sh",
+  "task-done.md": "done-task.sh",
+  "task-drift.md": "check-task-drift.sh",
+  "task-init.md": "init-task.sh",
+  "task-list.md": "list-tasks.sh",
+  "task-validate.md": "validate-task.sh",
+}
+
+const COMMAND_MARKER_RE = /^<!-- context-task-planning-opencode:managed version=([^ ]+) -->/mu
+
+function managedCommandContent(content) {
+  return `<!-- context-task-planning-opencode:managed version=${PLUGIN_VERSION} -->\n${content}`
+}
+
+function managedCommandVersion(content) {
+  const match = String(content || "").match(COMMAND_MARKER_RE)
+  return match ? String(match[1] || "").trim() : ""
+}
+
+function looksLikeLegacyGeneratedCommand(file, content) {
+  const scriptName = COMMAND_SCRIPT_NAMES[file]
+  const text = String(content || "")
+  return Boolean(
+    scriptName &&
+      text.includes("context-task-planning") &&
+      text.includes("Requirements:") &&
+      text.includes(scriptName),
+  )
+}
+
 /**
  * Auto-install slash commands from bundled commands/ directory to
  * ~/.config/opencode/commands/ on first load (npm package mode).
@@ -76,12 +107,22 @@ function autoInstallCommands(skillRoot) {
     const files = readdirSync(bundledDir).filter(f => f.endsWith(".md"))
     for (const file of files) {
       const target = path.join(targetDir, file)
-      if (existsSync(target)) continue // don't overwrite existing
-
       const source = path.join(bundledDir, file)
       let content = readFileSync(source, "utf8")
       if (scriptsDir) {
         content = content.replace(/\{\{SKILL_SCRIPTS_DIR\}\}/g, scriptsDir)
+      }
+      content = managedCommandContent(content)
+
+      if (existsSync(target)) {
+        const existing = readFileSync(target, "utf8")
+        const managedVersion = managedCommandVersion(existing)
+        if (!managedVersion && !looksLikeLegacyGeneratedCommand(file, existing)) {
+          continue
+        }
+        if (managedVersion === PLUGIN_VERSION && existing === content) {
+          continue
+        }
       }
 
       mkdirSync(targetDir, { recursive: true })
@@ -706,7 +747,9 @@ function freshnessReminder(task, state, planning) {
 
   return [
     `[context-task-planning] ${urgency} \`${slug}\`: the freshness baseline is \`${planning.baselineFile}\` from about ${ageMinutes}m ago, and ${count} tracked work step(s) have happened since then.`,
-    `Before more implementation or wrap-up, sync \`.planning/${slug}/\` with at least the current progress and next_action.`,
+    task?.binding_role === "observer"
+      ? "This session is observe-only for main planning files; record observer results in a delegate lane or hand them to the writer session."
+      : `Before more implementation or wrap-up, sync \`.planning/${slug}/\` with at least the current progress and next_action.`,
   ].join(" ")
 }
 
@@ -1521,6 +1564,18 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       }
     },
 
+    "experimental.session.compacting": async (input, output) => {
+      const session = sessionContext(input, output)
+      const visibleSessionID = session.explicitSessionID || session.fallbackSessionID
+      if (!visibleSessionID) {
+        return
+      }
+      const task = readCurrentTask(baseCwd, session.readSessionID)
+      if (explicitTaskContextEligible(task)) {
+        requirePlanningRecovery(visibleSessionID)
+      }
+    },
+
     "shell.env": async (input, output) => {
       const session = sessionContext(input, output)
       const task = readCurrentTask(input.cwd || baseCwd, session.readSessionID)
@@ -1641,6 +1696,7 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
         event?.type !== "session.updated" &&
         event?.type !== "tui.session.select" &&
         event?.type !== "session.status" &&
+        event?.type !== "session.compacted" &&
         event?.type !== "message.updated" &&
         event?.type !== "session.diff"
       ) {
@@ -1677,6 +1733,13 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
 
       const task = readCurrentTask(baseCwd, session.readSessionID)
       if (!pluginEnabled(task)) {
+        return
+      }
+
+      if (event?.type === "session.compacted") {
+        if (explicitTaskContextEligible(task)) {
+          requirePlanningRecovery(explicitSessionID)
+        }
         return
       }
 

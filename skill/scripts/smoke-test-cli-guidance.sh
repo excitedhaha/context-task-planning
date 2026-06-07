@@ -145,12 +145,12 @@ PLAN_SESSION_KEY=session-alpha sh "$SCRIPT_DIR/init-task.sh" --slug alpha --repo
 sh "$SCRIPT_DIR/prepare-task-worktree.sh" --task alpha --repo frontend >/dev/null
 
 PLAN_SESSION_KEY=session-beta sh "$SCRIPT_DIR/init-task.sh" --slug beta --repo frontend --primary frontend --title "Beta" >/dev/null
-SET_REPOS_TEXT=$(sh "$SCRIPT_DIR/set-task-repos.sh" --task beta --repo frontend --repo backend --primary frontend)
+SET_REPOS_TEXT=$(PLAN_SESSION_KEY=session-beta sh "$SCRIPT_DIR/set-task-repos.sh" --task beta --repo frontend --repo backend --primary frontend)
 printf '%s\n' "$SET_REPOS_TEXT" | grep -F "Safe shared repos: frontend (frontend)" >/dev/null || fail "set-task-repos missed safe shared repo guidance"
 printf '%s\n' "$SET_REPOS_TEXT" | grep -F "backend shares \`backend\` with alpha; run \`sh skill/scripts/prepare-task-worktree.sh --task beta --repo backend\`" >/dev/null || fail "set-task-repos missed backend worktree guidance"
 
 sh "$SCRIPT_DIR/prepare-task-worktree.sh" --task beta --repo frontend >/dev/null
-SET_REPOS_TEXT=$(sh "$SCRIPT_DIR/set-task-repos.sh" --task beta --repo frontend --repo backend --primary frontend)
+SET_REPOS_TEXT=$(PLAN_SESSION_KEY=session-beta sh "$SCRIPT_DIR/set-task-repos.sh" --task beta --repo frontend --repo backend --primary frontend)
 printf '%s\n' "$SET_REPOS_TEXT" | grep -F "Already isolated repos: frontend (.worktrees/beta/frontend)" >/dev/null || fail "set-task-repos missed already isolated repo guidance"
 printf '%s\n' "$SET_REPOS_TEXT" | grep -F "backend shares \`backend\` with alpha; run \`sh skill/scripts/prepare-task-worktree.sh --task beta --repo backend\`" >/dev/null || fail "set-task-repos lost backend worktree guidance after isolation"
 
@@ -479,7 +479,7 @@ printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Spec candidates:" >/dev/null ||
 printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Resolve explicitly: sh skill/scripts/set-task-spec-context.sh --task runtime --ref <chosen-spec-ref>" >/dev/null || fail "subagent-preflight text output missed ambiguous resolve hint"
 printf '%s\n' "$AMBIG_PREFLIGHT_TEXT" | grep -F "Exploratory work may reference these as non-authoritative candidates." >/dev/null || fail "subagent-preflight text output missed ambiguous exploratory guidance"
 
-sh "$SCRIPT_DIR/set-task-spec-context.sh" --task runtime --ref openspec/changes/runtime-session --artifact openspec/changes/runtime-session/proposal.md >/dev/null
+PLAN_SESSION_KEY=claude:runtime-session sh "$SCRIPT_DIR/set-task-spec-context.sh" --task runtime --ref openspec/changes/runtime-session --artifact openspec/changes/runtime-session/proposal.md >/dev/null
 OVERRIDDEN_JSON=$(sh "$SCRIPT_DIR/current-task.sh" --task runtime --json)
 "$PYTHON_BIN" - "$OVERRIDDEN_JSON" <<'PY'
 import json

@@ -11,9 +11,7 @@ Validate the current `context-task-planning` task without automatically fixing w
 ## Requirements
 
 - Expect the main `context-task-planning` skill to be installed alongside this entry skill.
-- If this entry skill is loaded from a Claude Code plugin, prefer the bundled core script at `${CLAUDE_SKILL_DIR}/../../skill/scripts/validate-task.sh`.
-- Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/validate-task.sh`.
-- If neither installed path exists but the current workspace contains `skill/scripts/validate-task.sh`, use the repo-local path instead.
+- Resolve the core script from the installed host path: prefer `${CLAUDE_SKILL_DIR}/../../skill/scripts/validate-task.sh` for Claude plugin installs, `${COCO_PLUGIN_ROOT}/skill/scripts/validate-task.sh` for TraeCLI/Coco plugin installs, `$HOME/.codex/plugins/context-task-planning/skill/scripts/validate-task.sh` for Codex plugin installs, then standalone skill paths under `$HOME/.claude/skills/`, `$HOME/.codex/skills/`, `$HOME/.config/opencode/skills/`, and finally repo-local `skill/scripts/validate-task.sh`.
 - Run the command from the current workspace.
 - Do not add `--fix-warnings`.
 - After the command succeeds, summarize whether validation passed and mention any reported issues.
@@ -21,8 +19,17 @@ Validate the current `context-task-planning` task without automatically fixing w
 ## Run
 
 ```bash
-core="${CLAUDE_SKILL_DIR}/../../skill/scripts/validate-task.sh"
-[ -f "$core" ] || core="$HOME/.claude/skills/context-task-planning/scripts/validate-task.sh"
-[ -f "$core" ] || core="skill/scripts/validate-task.sh"
+core=""
+for candidate in \
+  "${CLAUDE_SKILL_DIR:-}/../../skill/scripts/validate-task.sh" \
+  "${COCO_PLUGIN_ROOT:-}/skill/scripts/validate-task.sh" \
+  "$HOME/.codex/plugins/context-task-planning/skill/scripts/validate-task.sh" \
+  "$HOME/.claude/skills/context-task-planning/scripts/validate-task.sh" \
+  "$HOME/.codex/skills/context-task-planning/scripts/validate-task.sh" \
+  "$HOME/.config/opencode/skills/context-task-planning/scripts/validate-task.sh" \
+  "skill/scripts/validate-task.sh"; do
+  [ -f "$candidate" ] && core="$candidate" && break
+done
+[ -n "$core" ] || { echo "context-task-planning validate-task.sh not found" >&2; exit 1; }
 sh "$core"
 ```

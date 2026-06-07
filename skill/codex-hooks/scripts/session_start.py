@@ -39,7 +39,7 @@ def main() -> None:
                 "\n".join(
                     [
                         state_summary(state, task_meta=task_meta, include_spec=True, host="codex"),
-                        codex_planning_guard_text(slug),
+                        codex_planning_guard_text(slug, role=str((task_meta or {}).get("binding_role") or "")),
                     ]
                 ),
                 hook_event_name,

@@ -35,7 +35,7 @@
 - Planning Path: `.planning/{{TASK_SLUG}}`
 - Primary Repo Constraint: (unset)
 - Repo Scope Constraint: (unset)
-- Single Writer: only the coordinator updates `task_plan.md`, `progress.md`, and `state.json`
+- Single Writer: only the coordinator updates `task_plan.md`, `findings.md`, `progress.md`, and `state.json`
 
 ## Open Questions
 
@@ -52,6 +52,7 @@
 ## Verification Commands
 
 - [ ] [command or validation step]
+- Mirror these entries into `state.verify_commands`; `done-task.sh` requires matching successful rows in `progress.md` under `## Verification Log`.
 
 ## Spec Context
 

@@ -349,6 +349,8 @@ def build_prune_brief(
             "",
             f"`sh skill/scripts/context-prune.sh --task {task_slug} --apply --summary-file <summary.md>`",
             "",
+            "Run that command from the writer session, or add `--fallback` when using the shared workspace-default writer.",
+            "",
         ]
     )
 

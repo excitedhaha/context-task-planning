@@ -5,7 +5,7 @@
 - Kind: `{{DELEGATE_KIND}}`
 - Goal: {{DELEGATE_GOAL}}
 - Constraints:
-  - Do not edit `task_plan.md`, `progress.md`, or `state.json`
+  - Do not edit `task_plan.md`, `findings.md`, `progress.md`, or `state.json`
   - Write outputs only inside this delegate directory
 - Deliverable:
   - {{DELEGATE_DELIVERABLE}}

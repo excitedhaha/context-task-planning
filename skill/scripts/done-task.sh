@@ -49,11 +49,113 @@ plan_dir = Path(sys.argv[4])
 timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 state = json.loads(state_path.read_text(encoding="utf-8"))
 
+def has_declared_verification(state):
+    values = state.get("verify_commands")
+    if not isinstance(values, list):
+        return False
+    return any(str(value).strip() for value in values)
+
+
+def normalize_verification_text(value):
+    text = " ".join(str(value or "").strip().strip("`'").split())
+    if text.startswith("[ ] ") or text.startswith("[x] ") or text.startswith("[X] "):
+        text = text[4:].strip()
+    return text.lower()
+
+
+def successful_result(value):
+    text = normalize_verification_text(value)
+    if not text:
+        return False
+    failure_terms = {
+        "blocked",
+        "cancelled",
+        "canceled",
+        "error",
+        "fail",
+        "failed",
+        "failure",
+        "non-zero",
+        "nonzero",
+        "not run",
+        "skip",
+        "skipped",
+        "timeout",
+    }
+    if any(term in text for term in failure_terms):
+        return False
+    success_terms = {
+        "0",
+        "done",
+        "green",
+        "ok",
+        "pass",
+        "passed",
+        "success",
+        "succeeded",
+    }
+    return text in success_terms or any(term in text for term in success_terms)
+
+
+def recorded_successful_verifications(progress_path):
+    records = set()
+    if not progress_path.exists():
+        return records
+    lines = progress_path.read_text(encoding="utf-8").splitlines()
+    in_log = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "## Verification Log":
+            in_log = True
+            continue
+        if in_log and stripped.startswith("## "):
+            break
+        if not in_log or not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        lowered = " ".join(cells).lower()
+        if "timestamp" in lowered and "command" in lowered and "result" in lowered:
+            continue
+        if set("".join(cells)) <= {"-", " ", ":"}:
+            continue
+        command = cells[1] if len(cells) > 1 else ""
+        result = cells[2] if len(cells) > 2 else ""
+        if command and successful_result(result):
+            records.add(normalize_verification_text(command))
+    return records
+
+
+def missing_successful_verifications(state, progress_path):
+    declared = [
+        str(value).strip()
+        for value in state.get("verify_commands", [])
+        if str(value).strip()
+    ]
+    recorded = recorded_successful_verifications(progress_path)
+    missing = []
+    for command in declared:
+        normalized = normalize_verification_text(command)
+        if normalized not in recorded:
+            missing.append(command)
+    return missing
+
 if state.get("status") == "archived":
     raise SystemExit("Cannot mark an archived task done.")
 
 if state.get("blockers"):
     raise SystemExit("Cannot mark task done while blockers are still recorded.")
+
+if not has_declared_verification(state):
+    raise SystemExit("Cannot mark task done before verification targets are declared in state.verify_commands.")
+
+missing_verification = missing_successful_verifications(state, progress_path)
+if missing_verification:
+    raise SystemExit(
+        "Cannot mark task done before every state.verify_commands entry has a matching successful result in progress.md under `## Verification Log`: "
+        + ", ".join(missing_verification)
+    )
 
 active_delegates = []
 delegates_dir = plan_dir / "delegates"

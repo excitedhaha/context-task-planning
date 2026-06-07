@@ -18,9 +18,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/compact_session_start.py\"",
-            "timeout": 12,
-            "statusMessage": "Syncing compact task context"
+            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/session_start.py\"",
+            "timeout": 8,
+            "statusMessage": "Loading compact task context"
           }
         ]
       }

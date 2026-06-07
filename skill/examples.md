@@ -123,7 +123,7 @@ PLAN_SESSION_KEY=manual:writer sh scripts/set-active-task.sh feature-auth
 PLAN_SESSION_KEY=manual:reviewer sh scripts/set-active-task.sh --observe feature-auth
 ```
 
-Observers may update delegate lanes, but they should not edit `task_plan.md`, `progress.md`, or `state.json`.
+Observers may update delegate lanes, but they should not edit `task_plan.md`, `findings.md`, `progress.md`, or `state.json`.
 
 ## Example 5: Parent workspace with multiple repos
 

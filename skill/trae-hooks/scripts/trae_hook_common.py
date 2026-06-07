@@ -111,9 +111,18 @@ def print_system_message(message: str | None) -> None:
         print(json.dumps({"systemMessage": text}, ensure_ascii=False))
 
 
-def trae_planning_guard_text(slug: str | None = None) -> str:
+def trae_planning_guard_text(slug: str | None = None, role: str | None = None) -> str:
     current_task = installed_skill_command("current-task.sh", host=HOST)
     target = f"`.planning/{slug}/progress.md` and `.planning/{slug}/state.json`" if slug else "the current task's `progress.md` and `state.json`"
+    if str(role or "").strip() == "observer":
+        return "\n".join(
+            [
+                "[context-task-planning] TraeCLI/Coco long-context guard:",
+                f"- If task context may be stale, refresh it with `{current_task}` before acting on the task.",
+                "- This session is observe-only for main planning files. Do not update `task_plan.md`, `progress.md`, `state.json`, or `findings.md`.",
+                "- If this turn changes code, decisions, verification status, blockers, or next action, record it in a delegate lane or hand it to the writer session.",
+            ]
+        )
     return "\n".join(
         [
             "[context-task-planning] TraeCLI/Coco long-context guard:",

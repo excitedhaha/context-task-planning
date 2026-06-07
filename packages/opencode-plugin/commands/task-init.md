@@ -19,5 +19,5 @@ Requirements:
 Run:
 
 ```bash
-sh {{SKILL_SCRIPTS_DIR}}/init-task.sh --title "<final task title>" --slug "<final task slug>"
+sh "{{SKILL_SCRIPTS_DIR}}/init-task.sh" --title "<final task title>" --slug "<final task slug>"
 ```

@@ -100,7 +100,7 @@ sh skill/scripts/context-prune.sh --apply --summary-file <summary.md>
 
 The command only prunes `progress.md` in the first implementation. It keeps the latest session entries, inserts a `Pruned History Summary`, archives the full original under `.planning/<slug>/.derived/prune/<run-id>/progress.original.md`, and refuses `--apply` if the source changed after `--prepare`.
 
-Apply and restore require writer access. Hook and plugin adapters may surface prune hints, but they must not rewrite task files themselves.
+Apply and restore require writer access. Run them from the writer session, or add `--fallback` when using the shared workspace-default writer in shell-only mode. Hook and plugin adapters may surface prune hints, but they must not rewrite task files themselves.
 
 ## Task focus guard
 
@@ -130,7 +130,7 @@ Use `check-switch-safety.sh --target-task <slug> --json` when you are about to s
 
 `init-task.sh`, `resume-task.sh`, and `set-active-task.sh` now enforce that guard automatically. In a dirty git worktree they will prompt to stash, stop so you can commit manually, continue dirty, or cancel. Use `--stash` to auto-stash or `--allow-dirty` to bypass the guard deliberately. When `PLAN_SESSION_KEY` is present, those commands update the current session binding instead of treating `.planning/.active_task` as the only live pointer; without a session key, they operate on the shared `workspace-default` fallback.
 
-Observer sessions may still create or update delegate lanes under `delegates/<delegate-id>/`, but they must leave `task_plan.md`, `progress.md`, `state.json`, and `findings.md` to the writer.
+Observer sessions may still create or update delegate lanes under `delegates/<delegate-id>/`, but they must leave `task_plan.md`, `findings.md`, `progress.md`, and `state.json` to the writer.
 
 For parent workspaces that contain multiple repos, register repos explicitly with `register-repo.sh`, attach them to tasks with `set-task-repos.sh`, and only use auto-discovery as a review aid before you confirm the registrations.
 

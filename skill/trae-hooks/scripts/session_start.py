@@ -35,7 +35,7 @@ def main() -> None:
                 "\n".join(
                     [
                         state_summary(state, task_meta=task_meta, include_spec=True, host="trae"),
-                        trae_planning_guard_text(slug),
+                        trae_planning_guard_text(slug, role=str((task_meta or {}).get("binding_role") or "")),
                     ]
                 )
             )

@@ -1,7 +1,7 @@
 ---
 name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-backed state, recovery after context loss, or optional sub-agent delegation.
-allowed-tools: Read Bash Glob Grep
+allowed-tools: Read Write Edit Bash Glob Grep
 ---
 
 # Context Task Planning

@@ -41,7 +41,21 @@ coco plugin install --type=github excitedhaha/context-task-planning --name conte
 
 Then restart TraeCLI/Coco.
 
-For OpenCode, Codex, or standalone skill installs:
+For OpenCode, install the skill and the OpenCode plugin:
+
+```bash
+npx skills add excitedhaha/context-task-planning -g
+opencode plugin context-task-planning-opencode --global
+```
+
+For Codex, prefer the bundled plugin install:
+
+```bash
+codex plugin marketplace add excitedhaha/context-task-planning
+codex plugin install context-task-planning@context-task-planning
+```
+
+For standalone skill-only fallback installs:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g

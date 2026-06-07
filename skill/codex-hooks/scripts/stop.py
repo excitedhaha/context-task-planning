@@ -49,16 +49,27 @@ def main() -> None:
         return
 
     slug = str(marker.get("task_slug") or task_meta.get("slug") or "")
-    lines = ["[context-task-planning] Before finishing this Codex turn, sync planning context."]
+    role = str((task_meta or {}).get("binding_role") or "")
+    is_observer = role == "observer"
+    lines = [
+        "[context-task-planning] Before finishing this Codex turn, preserve observer context safely."
+        if is_observer
+        else "[context-task-planning] Before finishing this Codex turn, sync planning context."
+    ]
     if needs_read:
         lines.append(
             "- Refresh the current task from planning files before relying on long conversation context."
         )
     if needs_update:
-        lines.append(
-            f"- Update `.planning/{slug}/progress.md` and `.planning/{slug}/state.json` with code changes, verification status, blockers, and next_action."
-        )
-    lines.append(codex_planning_guard_text(slug))
+        if is_observer:
+            lines.append(
+                "- Do not update main planning files from this observe-only session; record the result in a delegate lane or ask the writer session to sync it."
+            )
+        else:
+            lines.append(
+                f"- Update `.planning/{slug}/progress.md` and `.planning/{slug}/state.json` with code changes, verification status, blockers, and next_action."
+            )
+    lines.append(codex_planning_guard_text(slug, role=role))
 
     marker["stop_prompted"] = True
     write_marker(plan_dir, payload, marker)

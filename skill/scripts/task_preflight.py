@@ -196,7 +196,7 @@ def build_subagent_preflight_result(
     delegate = delegate_analysis_for_text(task_text, task)
     binding_role = preflight_binding_role(task)
     normalized_host = (
-        host if host in {"claude", "opencode", "codex", "generic"} else "generic"
+        host if host in {"claude", "opencode", "codex", "trae", "generic"} else "generic"
     )
     normalized_tool = tool_name or "Task"
 

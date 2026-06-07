@@ -686,7 +686,7 @@ def state_summary(
         )
         if role == "observer":
             lines.append(
-                "Observe-only session: do not edit `task_plan.md`, `progress.md`, or `state.json`. You may still create or update delegate lanes under `delegates/<delegate-id>/`."
+                "Observe-only session: do not edit `task_plan.md`, `progress.md`, `state.json`, or `findings.md`. You may still create or update delegate lanes under `delegates/<delegate-id>/`."
             )
     if repo_scope:
         lines.append(

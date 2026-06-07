@@ -16,6 +16,7 @@ STATE_FILE="$PLAN_DIR/state.json"
 PROGRESS_FILE="$PLAN_DIR/progress.md"
 TASK_PLAN_FILE="$PLAN_DIR/task_plan.md"
 ACTIVE_FILE="$PLAN_ROOT/.active_task"
+TASK_SLUG=$(basename "$PLAN_DIR")
 
 if [ ! -f "$STATE_FILE" ]; then
     echo "[context-task-planning] Missing state.json in $PLAN_DIR" >&2
@@ -107,15 +108,6 @@ if task_plan_path.exists():
                 break
     task_plan_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
 PY
-
-TASK_SLUG=$("$PYTHON_BIN" - "$STATE_FILE" <<'PY'
-import json
-import sys
-from pathlib import Path
-state = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-print(state.get("slug", ""))
-PY
-)
 
 if [ -f "$ACTIVE_FILE" ]; then
     ACTIVE_SLUG=$(tr -d '\r\n' < "$ACTIVE_FILE")

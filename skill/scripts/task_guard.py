@@ -2567,7 +2567,8 @@ def print_context_prune_result(result: dict, as_json: bool, compact: bool) -> No
         print(f"[context-task-planning] Manifest: {files.get('manifest')}")
         print(
             "[context-task-planning] Next: write the summary, then run "
-            f"`sh skill/scripts/context-prune.sh --task {result.get('task_slug')} --apply --summary-file <summary.md>`"
+            f"`sh skill/scripts/context-prune.sh --task {result.get('task_slug')} --apply --summary-file <summary.md>` "
+            "from the writer session, or add `--fallback` when using the shared workspace-default writer."
         )
         return
     if action == "applied":

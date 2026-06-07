@@ -30,7 +30,7 @@ Choose `context-task-planning` and the OpenCode agent when prompted in step 1.
 To pin or update the plugin version:
 
 ```bash
-opencode plugin context-task-planning-opencode@0.5.0 --global --force
+opencode plugin context-task-planning-opencode@0.8.4 --global --force
 ```
 
 ### Legacy (symlink-based)
@@ -131,7 +131,7 @@ This is a sample illustration of the expected title/toast fallback, not a live s
 Current bundled commands:
 
 - `/task-init <task title>` - confirm the final title and slug, then run `sh ~/.config/opencode/skills/context-task-planning/scripts/init-task.sh --title "<final task title>" --slug "<final task slug>"` and report the created task
-- `/task-current` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/current-task.sh` and summarize the active task plus next action
+- `/task-current` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/current-task.sh` and summarize the active task, status, mode, and next action
 - `/task-list` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/list-tasks.sh` and summarize the available tasks in the workspace
 - `/task-validate` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/validate-task.sh` and summarize whether the current task state is valid
 - `/task-drift <new request>` - run `sh ~/.config/opencode/skills/context-task-planning/scripts/check-task-drift.sh --prompt "<new request>" --json` and summarize whether the new ask still fits the current task
@@ -172,7 +172,7 @@ If the commands do not appear right away:
 - restart OpenCode after running the install helper
 - if you used the npm plugin, commands are auto-installed on first load; restart OpenCode to trigger auto-install
 - if you used symlink install, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh` if the command symlinks are missing (or use `--force` to replace stale ones)
-- if the title/toast behavior is missing but slash commands are present, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` (or `opencode plugin context-task-planning-opencode@0.5.0 --global --force`)
+- if the title/toast behavior is missing but slash commands are present, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` (or `opencode plugin context-task-planning-opencode@0.8.4 --global --force`)
 - if the slash commands work but the task title never updates, verify that the plugin loaded and that you restarted OpenCode after installation
 
 ## Plugin lifecycle

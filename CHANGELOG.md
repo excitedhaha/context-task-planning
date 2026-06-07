@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-06-07
+
+### Fixed
+- Fixed task archival, writer-only task metadata updates, observer planning-sync prompts, and OpenCode compaction recovery wiring so runtime behavior matches the documented single-writer contract.
+- Added a real `done-task.sh` verification evidence gate requiring declared verification targets and recorded `progress.md` verification results before marking a task done.
+- Tightened `done-task.sh` verification matching so failed, skipped, or unrelated verification rows cannot satisfy the completion gate.
+- Synchronized Claude plugin compaction startup hooks and made OpenCode npm slash-command auto-install safely refresh managed or legacy generated commands on upgrade.
+
+### Changed
+- Clarified context-prune writer/fallback apply guidance and aligned task ownership wording to include `findings.md`.
+- Condensed the main `skill/SKILL.md` prompt into an execution-focused contract, leaving detailed command semantics in `skill/reference.md`.
+
 ## [0.8.3] - 2026-06-07
 
 ### Changed

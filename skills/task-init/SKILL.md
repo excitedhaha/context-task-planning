@@ -18,9 +18,7 @@ Initialize a new `context-task-planning` task for this workspace using a confirm
 - When you surface a candidate task, ask the user to confirm or edit both the title and the slug.
 - If the user edits the title but does not explicitly override the slug, recompute the slug from the final title before running the command.
 - If the user explicitly edits the slug, pass that slug through `init-task.sh --slug`; the core script will still normalize it with `slugify.sh` before creating the task.
-- If this entry skill is loaded from a Claude Code plugin, prefer the bundled core script at `${CLAUDE_SKILL_DIR}/../../skill/scripts/init-task.sh`.
-- Otherwise prefer the standalone core skill script at `~/.claude/skills/context-task-planning/scripts/init-task.sh`.
-- If neither installed path exists but the current workspace contains `skill/scripts/init-task.sh`, use the repo-local path instead.
+- Resolve the core script from the installed host path: prefer `${CLAUDE_SKILL_DIR}/../../skill/scripts/init-task.sh` for Claude plugin installs, `${COCO_PLUGIN_ROOT}/skill/scripts/init-task.sh` for TraeCLI/Coco plugin installs, `$HOME/.codex/plugins/context-task-planning/skill/scripts/init-task.sh` for Codex plugin installs, then standalone skill paths under `$HOME/.claude/skills/`, `$HOME/.codex/skills/`, `$HOME/.config/opencode/skills/`, and finally repo-local `skill/scripts/init-task.sh`.
 - Run the command from the current workspace.
 - If the dirty-worktree guard asks for a decision, stop and ask the user instead of choosing `--stash` or `--allow-dirty` yourself.
 - After the command succeeds, summarize the created task slug and the next action.
@@ -28,8 +26,17 @@ Initialize a new `context-task-planning` task for this workspace using a confirm
 ## Run
 
 ```bash
-core="${CLAUDE_SKILL_DIR}/../../skill/scripts/init-task.sh"
-[ -f "$core" ] || core="$HOME/.claude/skills/context-task-planning/scripts/init-task.sh"
-[ -f "$core" ] || core="skill/scripts/init-task.sh"
+core=""
+for candidate in \
+  "${CLAUDE_SKILL_DIR:-}/../../skill/scripts/init-task.sh" \
+  "${COCO_PLUGIN_ROOT:-}/skill/scripts/init-task.sh" \
+  "$HOME/.codex/plugins/context-task-planning/skill/scripts/init-task.sh" \
+  "$HOME/.claude/skills/context-task-planning/scripts/init-task.sh" \
+  "$HOME/.codex/skills/context-task-planning/scripts/init-task.sh" \
+  "$HOME/.config/opencode/skills/context-task-planning/scripts/init-task.sh" \
+  "skill/scripts/init-task.sh"; do
+  [ -f "$candidate" ] && core="$candidate" && break
+done
+[ -n "$core" ] || { echo "context-task-planning init-task.sh not found" >&2; exit 1; }
 sh "$core" --title "<final task title>" --slug "<final task slug>"
 ```

@@ -19,5 +19,5 @@ Requirements:
 Run:
 
 ```bash
-sh ~/.config/opencode/skills/context-task-planning/scripts/init-task.sh --title "<final task title>" --slug "<final task slug>"
+sh "$HOME/.config/opencode/skills/context-task-planning/scripts/init-task.sh" --title "<final task title>" --slug "<final task slug>"
 ```

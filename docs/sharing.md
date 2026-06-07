@@ -14,9 +14,10 @@ This repository is meant to be shared as a context engineering skill while keepi
 - `README.md`
 - `docs/`
 - `.claude-plugin/`
+- `.codex-plugin/`
+- `packages/opencode-plugin/`
 - `coco.yaml`
 - `commands/`
-- `hooks/`
 - `skill/`
 - `skills/`
 - `LICENSE`
@@ -38,16 +39,24 @@ claude plugin marketplace add excitedhaha/context-task-planning
 claude plugin install context-task-planning@context-task-planning
 ```
 
-For OpenCode, Codex, or standalone skill installs:
+For OpenCode, install the skill and then the plugin integration:
 
 ```bash
 npx skills add excitedhaha/context-task-planning -g
+opencode plugin context-task-planning-opencode --global
 ```
 
-For OpenCode plugin integration after the skill is installed:
+For Codex, prefer the bundled plugin install:
 
 ```bash
-opencode plugin context-task-planning-opencode --global
+codex plugin marketplace add excitedhaha/context-task-planning
+codex plugin install context-task-planning@context-task-planning
+```
+
+For standalone skill-only fallback installs:
+
+```bash
+npx skills add excitedhaha/context-task-planning -g
 ```
 
 For TraeCLI/Coco, install the plugin:

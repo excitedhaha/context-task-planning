@@ -36,7 +36,10 @@ for cmd in "$COMMANDS_SOURCE_DIR"/*.md; do
         continue
     fi
     name=$(basename "$cmd")
-    sed 's|~/.config/opencode/skills/context-task-planning/scripts|{{SKILL_SCRIPTS_DIR}}|g' "$cmd" \
+    sed \
+        -e 's|~/.config/opencode/skills/context-task-planning/scripts|{{SKILL_SCRIPTS_DIR}}|g' \
+        -e 's|\$HOME/.config/opencode/skills/context-task-planning/scripts|{{SKILL_SCRIPTS_DIR}}|g' \
+        "$cmd" \
         > "$PACKAGE_DIR/commands/$name"
 done
 

@@ -42,4 +42,10 @@ if [ -z "$TASK_SLUG" ]; then
     exit 1
 fi
 
+if [ -n "${PLAN_SESSION_KEY:-}" ]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --task "$TASK_SLUG"
+else
+    "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" check-task-access --task "$TASK_SLUG" --fallback
+fi
+
 "$PYTHON_BIN" "$SCRIPT_DIR/task_guard.py" set-task-repos --task "$TASK_SLUG" "$@"

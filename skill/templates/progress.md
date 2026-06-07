@@ -38,6 +38,8 @@
 |-----------|---------|--------|-------|
 |           |         |        |       |
 
+Record one successful row for each `state.verify_commands` entry before running `done-task.sh`.
+
 ## Delegate Activity
 
 | Delegate | Kind | Status | Summary |

@@ -2,7 +2,7 @@
 
 **Persistent, structured context for long-running AI coding tasks — auto-planned, auto-synced, auto-injected.**
 
-Your agent plans the task, syncs the plan to disk as it works, and re-injects the right context on every turn — even after dozens of conversation rounds and multiple auto-compactions.
+Your agent plans the task, syncs the plan to disk as it works, and re-injects the right context at recovery points and when the task needs it — even after dozens of conversation rounds and multiple auto-compactions.
 
 Works across Claude Code, OpenCode, Codex, and TraeCLI/Coco.
 
@@ -15,7 +15,7 @@ Works across Claude Code, OpenCode, Codex, and TraeCLI/Coco.
                               ▲                          │
                               │   inject hot context     │
                               └──────────────────────────┘
-                       every turn / after compaction / on resume
+                       needed turns / after compaction / on resume
 ```
 
 ## The Problem
@@ -43,7 +43,7 @@ On every meaningful step the agent writes back to local files:
 - `progress.md` — chronological execution log
 - `findings.md` — distilled, durable conclusions worth re-reading
 
-### ③ Inject — every turn, automatically
+### ③ Inject — automatically when needed
 Host plugins/hooks read the latest state and feed only the **smallest useful snapshot** back into the model:
 - on session start
 - before new turns when needed
