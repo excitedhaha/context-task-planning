@@ -10,6 +10,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def clear_plan_session_key(monkeypatch):
+    """Keep tests independent from host-injected session bindings."""
+    monkeypatch.delenv("PLAN_SESSION_KEY", raising=False)
+
+
 @pytest.fixture
 def temp_workspace():
     """Create a temporary workspace directory with .planning structure."""

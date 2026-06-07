@@ -94,7 +94,7 @@ trap cleanup EXIT HUP INT TERM
 TRAE_HINT=$(
     cd "$TMP_ROOT" &&
         printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"trae-smoke\",\"prompt\":\"Implement a multi-step migration that needs recovery and verification.\"}" |
-        COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/user_prompt_submit.py"
+        PLAN_SESSION_KEY= COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/user_prompt_submit.py"
 )
 
 "$PYTHON_BIN" - "$TRAE_HINT" "$REPO_ROOT" <<'PY'
@@ -113,11 +113,11 @@ TASK_TITLE="Bootstrap session binding"
 TASK_SLUG="bootstrap-session-binding"
 (
     cd "$TMP_ROOT"
-    sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$TASK_TITLE" --slug "$TASK_SLUG" >/dev/null
+    PLAN_SESSION_KEY= sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$TASK_TITLE" --slug "$TASK_SLUG" >/dev/null
 )
 
 printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"trae-bootstrap-smoke\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sh \\\"$REPO_ROOT/skill/scripts/init-task.sh\\\" --title \\\"$TASK_TITLE\\\" --slug \\\"$TASK_SLUG\\\"\"}}" |
-    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
+    PLAN_SESSION_KEY= COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
 
 CURRENT_JSON=$(
     cd "$TMP_ROOT" &&
@@ -145,7 +145,7 @@ AUTO_PROMPT="Update the task runtime to persist automatic sync progress."
 AUTO_FILE="$TMP_ROOT/src/demo.py"
 (
     cd "$TMP_ROOT"
-    sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$AUTO_TASK_TITLE" --slug "$AUTO_TASK_SLUG" >/dev/null
+    PLAN_SESSION_KEY= sh "$REPO_ROOT/skill/scripts/init-task.sh" --title "$AUTO_TASK_TITLE" --slug "$AUTO_TASK_SLUG" >/dev/null
     "$PYTHON_BIN" "$REPO_ROOT/skill/scripts/task_guard.py" bind-session-task \
         --cwd "$TMP_ROOT" \
         --session-key "trae:$AUTO_SESSION_ID" \
@@ -155,14 +155,14 @@ AUTO_FILE="$TMP_ROOT/src/demo.py"
 )
 
 printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\",\"prompt\":\"$AUTO_PROMPT\"}" |
-    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/user_prompt_submit.py" >/dev/null
+    PLAN_SESSION_KEY= COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/user_prompt_submit.py" >/dev/null
 
 printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$AUTO_FILE\"}}" |
-    COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
+    PLAN_SESSION_KEY= COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/post_tool_use.py" >/dev/null
 
 STOP_OUTPUT=$(
     printf '%s' "{\"cwd\":\"$TMP_ROOT\",\"session_id\":\"$AUTO_SESSION_ID\"}" |
-        COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/stop.py"
+        PLAN_SESSION_KEY= COCO_PLUGIN_ROOT="$REPO_ROOT" "$PYTHON_BIN" "$TRAE_HOOK_DIR/stop.py"
 )
 
 "$PYTHON_BIN" - "$TMP_ROOT" "$AUTO_TASK_SLUG" "$STOP_OUTPUT" <<'PY'

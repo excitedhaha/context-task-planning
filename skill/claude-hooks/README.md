@@ -13,6 +13,7 @@ When plugin hooks are enabled, Claude Code receives task context on lifecycle ev
 - `SessionStart` - recover the current task snapshot from `.planning/<slug>/` for explicit bindings, while workspace fallback stays advisory
 - `UserPromptSubmit` - stay quiet for normal turns and inject route evidence only for high-signal `likely-unrelated` prompts
 - `PreToolUse` - run native-`Task` preflight for explicit bindings, with stronger routing guidance when the request is truly mismatched
+- `SubagentStart` - inject a concise current-task guardrail into native subagents, adding repo/worktree details only when needed
 
 ## What the hooks do not do
 

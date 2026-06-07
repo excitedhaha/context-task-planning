@@ -38,7 +38,7 @@ After the plugin is enabled, TraeCLI/Coco can surface the shared file-backed tas
 
 - automatic task-context recovery on `session_start`
 - prompt-time route evidence only for high-signal `likely-unrelated` prompts
-- native `Task` preflight guidance through `pre_tool_use` when available
+- native `Task` preflight guidance through `pre_tool_use` when available, using a concise subagent guardrail and adding repo/worktree details only when needed
 - `post_tool_use` planning evidence tracking for mutating tools plus per-turn prompt/file/action capture, alongside session-binding bootstrap after `/context-task-planning:task-init`
 - automatic `record-progress` writeback from `stop` for writer-owned mutating turns, with a fallback guard that can still ask the agent to continue once if planning sync evidence is still missing
 - shared context-prune hints on recovery when `progress.md` has grown large enough to summarize and prune manually
@@ -65,7 +65,7 @@ Current hooks in `coco.yaml` map to shared runtime behavior:
 
 - `session_start` - inject explicit task context or a weaker fallback advisory
 - `user_prompt_submit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
-- `pre_tool_use` - run shared native-`Task` preflight for `Task` launches
+- `pre_tool_use` - run shared native-`Task` preflight for `Task` launches and inject concise subagent context for explicitly bound sessions
 - `post_tool_use` - record whether this turn read planning files, used mutating tools, updated planning files, and which prompt/files/actions should be journaled if auto-sync runs later
 - `stop` - auto-run `record-progress` for writer-owned mutating turns, then continue once only if required planning read or update evidence is still missing
 

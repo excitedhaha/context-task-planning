@@ -12,7 +12,7 @@ function sessionBindingName(sessionKey) {
   return `${cleaned.slice(0, 48)}-${digest}.json`
 }
 
-function writeTask(planRoot, slug, title, status = "active") {
+function writeTask(planRoot, slug, title, status = "active", extra = {}) {
   const planDir = path.join(planRoot, slug)
   mkdirSync(planDir, { recursive: true })
   writeFileSync(
@@ -30,6 +30,7 @@ function writeTask(planRoot, slug, title, status = "active") {
       phases: [],
       delegation: { enabled: true, single_writer: true, active: [] },
       updated_at: "2026-03-26T00:00:00Z",
+      ...extra,
     }, null, 2)}\n`,
     "utf8",
   )
@@ -49,6 +50,20 @@ function setTaskStatus(planRoot, slug, status) {
   const state = JSON.parse(readFileSync(statePath, "utf8"))
   state.status = status
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8")
+}
+
+function writeRepoRegistry(planRoot, repos) {
+  const runtimeDir = path.join(planRoot, ".runtime")
+  mkdirSync(runtimeDir, { recursive: true })
+  writeFileSync(
+    path.join(runtimeDir, "repos.json"),
+    `${JSON.stringify({
+      schema_version: "1.0.0",
+      repos,
+      updated_at: "2026-03-26T00:00:00Z",
+    }, null, 2)}\n`,
+    "utf8",
+  )
 }
 
 function writeBinding(planRoot, sessionID, taskSlug) {
@@ -78,6 +93,24 @@ const workspace = mkdtempSync(path.join(os.tmpdir(), "ctp-opencode-title-smoke."
 try {
   const planRoot = path.join(workspace, ".planning")
   mkdirSync(planRoot, { recursive: true })
+  mkdirSync(path.join(workspace, "app"), { recursive: true })
+  mkdirSync(path.join(workspace, "api"), { recursive: true })
+  writeRepoRegistry(planRoot, [
+    {
+      id: "app",
+      path: "app",
+      registration_mode: "manual",
+      registered_at: "2026-03-26T00:00:00Z",
+      updated_at: "2026-03-26T00:00:00Z",
+    },
+    {
+      id: "api",
+      path: "api",
+      registration_mode: "manual",
+      registered_at: "2026-03-26T00:00:00Z",
+      updated_at: "2026-03-26T00:00:00Z",
+    },
+  ])
 
   writeTask(planRoot, "base-app-mobile", "Base App Mobile")
   writeTask(
@@ -86,14 +119,26 @@ try {
     "Base App Mobile Coldstart Optimization",
   )
   writeTask(planRoot, "base-mobile-number-locale", "Base Mobile Number Locale")
+  writeTask(planRoot, "runtime-cleanup", "Runtime Cleanup", "active", {
+    primary_repo: "app",
+    repo_scope: ["app"],
+  })
+  writeTask(planRoot, "runtime-multi-repo", "Runtime Multi Repo", "active", {
+    primary_repo: "app",
+    repo_scope: ["app", "api"],
+  })
   writeBinding(planRoot, "A", "base-app-mobile")
   writeBinding(planRoot, "B", "base-app-mobile-coldstart-optimization")
+  writeBinding(planRoot, "D", "runtime-cleanup")
+  writeBinding(planRoot, "E", "runtime-multi-repo")
   writeFileSync(path.join(planRoot, ".active_task"), "base-app-mobile-coldstart-optimization\n", "utf8")
 
   const titles = new Map([
     ["A", "Session A"],
     ["B", "Session B"],
     ["C", "Session C"],
+    ["D", "Session D"],
+    ["E", "Session E"],
   ])
   const toasts = []
   const client = {
@@ -134,6 +179,39 @@ try {
     fallbackTaskOutput,
   )
   assert.equal(fallbackTaskOutput.args.prompt, "Investigate helper script behavior")
+
+  const noRepoTaskOutput = { args: { prompt: "Review coldstart optimization behavior" } }
+  await plugin["tool.execute.before"](
+    { tool: "Task", sessionID: "B", args: { prompt: "Review coldstart optimization behavior" } },
+    noRepoTaskOutput,
+  )
+  assert.match(noRepoTaskOutput.args.prompt, /Current task: base-app-mobile-coldstart-optimization/u)
+  assert.match(noRepoTaskOutput.args.prompt, /Keep this subagent scoped to the current task/u)
+  assert.doesNotMatch(noRepoTaskOutput.args.prompt, /does not expose meaningful repo\/worktree bindings/u)
+  assert.doesNotMatch(noRepoTaskOutput.args.prompt, /Repo\/worktree bindings/u)
+
+  const minimalTaskOutput = { args: { prompt: "Review runtime cleanup behavior" } }
+  await plugin["tool.execute.before"](
+    { tool: "Task", sessionID: "D", args: { prompt: "Review runtime cleanup behavior" } },
+    minimalTaskOutput,
+  )
+  assert.match(minimalTaskOutput.args.prompt, /Current task: runtime-cleanup/u)
+  assert.match(minimalTaskOutput.args.prompt, /Keep this subagent scoped to the current task/u)
+  assert.doesNotMatch(minimalTaskOutput.args.prompt, /Repo\/worktree bindings/u)
+  assert.doesNotMatch(minimalTaskOutput.args.prompt, /- app: shared at app/u)
+  assert.doesNotMatch(minimalTaskOutput.args.prompt, /Delegate recommended/u)
+  assert.doesNotMatch(minimalTaskOutput.args.prompt, /bounded `review` side quest/u)
+  assert.doesNotMatch(minimalTaskOutput.args.prompt, /Task files may be stale/u)
+
+  const multiRepoTaskOutput = { args: { prompt: "Review runtime multi repo behavior" } }
+  await plugin["tool.execute.before"](
+    { tool: "Task", sessionID: "E", args: { prompt: "Review runtime multi repo behavior" } },
+    multiRepoTaskOutput,
+  )
+  assert.match(multiRepoTaskOutput.args.prompt, /Current task: runtime-multi-repo/u)
+  assert.match(multiRepoTaskOutput.args.prompt, /Repo scope: app, api/u)
+  assert.match(multiRepoTaskOutput.args.prompt, /- app: shared at app/u)
+  assert.match(multiRepoTaskOutput.args.prompt, /- api: shared at api/u)
 
   await plugin["chat.message"](
     { sessionID: "B", messageID: "user-quiet" },
@@ -554,6 +632,8 @@ try {
   setTaskStatus(planRoot, "base-app-mobile", "paused")
   setTaskStatus(planRoot, "base-app-mobile-coldstart-optimization", "paused")
   setTaskStatus(planRoot, "base-mobile-number-locale", "paused")
+  setTaskStatus(planRoot, "runtime-cleanup", "paused")
+  setTaskStatus(planRoot, "runtime-multi-repo", "paused")
 
   await plugin["tool.execute.after"]({ tool: "read" }, {})
   assert.equal(titles.get("A"), "task:base-app-mobile | Session A")

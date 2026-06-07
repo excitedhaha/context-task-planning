@@ -68,7 +68,7 @@ entry = entries[0]
 if entry.get("name") != "context-task-planning" or entry.get("source") != "./":
     raise SystemExit(f"unexpected marketplace entry: {entry!r}")
 
-expected_events = {"SessionStart", "UserPromptSubmit", "PreToolUse"}
+expected_events = {"SessionStart", "UserPromptSubmit", "PreToolUse", "SubagentStart"}
 actual_events = set((hooks.get("hooks") or {}).keys())
 if not expected_events.issubset(actual_events):
     raise SystemExit(f"missing hook events: {expected_events - actual_events}")

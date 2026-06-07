@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-07
+
+### Changed
+- Reduced host-native `Task` preflight prompt noise for OpenCode, Claude, and Trae/Coco by injecting a concise task guardrail by default, adding repo/worktree bindings only for multi-repo or worktree launches, and keeping freshness/recovery reminders out of subagent prompts.
+
 ## [0.8.2] - 2026-05-29
 
 ### Fixed

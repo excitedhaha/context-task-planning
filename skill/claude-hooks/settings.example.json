@@ -49,6 +49,18 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/skills/context-task-planning/claude-hooks/scripts/subagent_start.py\"",
+            "timeout": 5,
+            "statusMessage": "Injecting task context into subagent"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

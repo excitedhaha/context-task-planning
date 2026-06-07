@@ -62,7 +62,7 @@ The OpenCode plugin is a thin UI layer over the same file-backed task state. Onc
 - warn when tracked work happens but `.planning/<slug>/` looks stale
 - export `PLAN_SESSION_KEY` so task-aware shell commands bind to the current OpenCode session
 - inject strong task context only at recovery or native-`Task` preflight points for sessions with an explicit task binding; workspace fallback resolution stays advisory
-- call the shared `subagent-preflight` helper before native `Task` launches and prepend the canonical repo/worktree prefix when the request still fits the current task
+- call the shared `subagent-preflight` helper before native `Task` launches and prepend a concise task guardrail, adding repo/worktree details only when the launch needs that scope
 - surface linked spec context such as auto-detected OpenSpec refs in recovery and native-`Task` preflight payloads when available, including a short candidate hint when the runtime refuses to guess
 - carry repo context for parent-workspace multi-repo tasks
 - stay quiet in repositories that do not already use `.planning/`
@@ -184,7 +184,7 @@ Current handlers in `skill/opencode-plugin/task-focus-guard.js` run at these mom
 - `chat.message` - after a user message is assembled; cache prompt text, collect route evidence, and try to sync the visible task title
 - `experimental.chat.system.transform` - right before the model receives system context; inject planning recovery, high-signal route evidence, and freshness reminders for explicitly bound sessions, while fallback-only resolution emits at most one short advisory that the session is not bound yet
 - `experimental.session.compacting` - right before OpenCode compacts a session; cache one resume-time recovery injection for the next turn only when the session is explicitly bound to that task
-- `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with routing and delegate guidance for explicitly bound sessions
+- `tool.execute.before` - before a tool runs; today this mainly prefixes native `Task` launches with concise routing guidance for explicitly bound sessions, adding repo/worktree scope only when needed
 - `shell.env` - before shell execution; inject `PLAN_SESSION_KEY` so shell commands resolve the correct per-session task binding
 - `tool.execute.after` - after a tool finishes; refresh visible task cues and freshness counters, then show a stale-planning toast when needed; freshness tracking normalizes namespaced tool names such as `functions.bash`, inspects `multi_tool_use.parallel` payloads for nested tracked work like `functions.apply_patch`, and uses `state.json` / `progress.md` as the sync-critical freshness baseline before falling back to the broader planning set
 - `tool.execute.after` also watches for direct writes to one task's main planning files; when a session is still running on fallback resolution, that planning write now bootstraps the matching session binding so later writer reminders target the task the agent is actually editing
@@ -249,13 +249,13 @@ sh skill/scripts/subagent-preflight.sh \
   --json
 ```
 
-OpenCode keeps freshness reminders separate from the preflight decision:
+OpenCode keeps freshness and recovery reminders out of native `Task` prompts; those remain main-session guidance. For subagents, it uses the shared preflight decision but injects only the smallest useful prefix:
 
-- `payload_only` or `payload_plus_delegate_recommended` - prepend the canonical task and repo/worktree prefix to the outbound `Task` prompt
+- `payload_only` or `payload_plus_delegate_recommended` - prepend a concise task guardrail; add repo/worktree bindings only for multi-repo or worktree launches
 - `routing_only` - prepend routing confirmation only
 - `delegate_required` - prepend delegate-required guidance instead of treating the native `Task` launch as sufficient
 
-When `current-task` resolves a linked OpenSpec context, that same preflight prefix now includes the spec context summary plus the primary linked ref so the native `Task` launch stays scoped to the right external artifact. If the runtime stops at `status=ambiguous`, the prefix now carries the candidate refs plus an explicit manual-override hint instead of pretending one candidate is authoritative. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
+When `current-task` resolves a linked OpenSpec context, the prefix includes the spec provider/status plus the primary linked ref or candidate refs so the native `Task` launch stays scoped to the right external artifact. If the runtime stops at `status=ambiguous`, the prefix carries the explicit manual-override hint instead of pretending one candidate is authoritative. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front.
 
 The plugin keeps route evidence inside model context and reserves toasts for operational issues such as stale planning or binding/bootstrap events.
 

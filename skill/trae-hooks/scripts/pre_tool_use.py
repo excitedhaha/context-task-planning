@@ -2,8 +2,7 @@
 
 from trae_hook_common import (
     HOST,
-    allow_delegate_hint,
-    delegate_hint_from_preflight,
+    concise_subagent_preflight_context,
     explicit_task_context_eligible,
     fallback_task_advisory,
     load_state,
@@ -11,8 +10,8 @@ from trae_hook_common import (
     read_hook_input,
     resolve_plan_dir,
     resolve_task_meta,
-    state_summary,
     subagent_preflight_result,
+    subagent_preflight_should_inject_concise,
     task_drift_hint,
     task_drift_result,
     task_tool_text,
@@ -67,27 +66,23 @@ def main() -> None:
             tool_name=str(tool_name or "Task"),
         )
         if preflight:
-            context = state_summary(state, task_meta=task_meta, host="trae")
             decision = preflight.get("decision")
-            prompt_prefix = str(preflight.get("prompt_prefix") or "").strip()
             operator_message = str(preflight.get("operator_message") or "").strip()
-            if decision in {"payload_only", "payload_plus_delegate_recommended"} and prompt_prefix:
-                context += "\n" + prompt_prefix
-            if operator_message and (decision in {"routing_only", "delegate_required"} or not prompt_prefix):
-                context += "\n" + operator_message
-            print_context(context)
+            if subagent_preflight_should_inject_concise(preflight):
+                print_context(
+                    concise_subagent_preflight_context(preflight, task_meta=task_meta)
+                )
+                return
+            if operator_message and decision in {"routing_only", "delegate_required"}:
+                print_context(operator_message)
+                return
             return
 
         drift_result = task_drift_result(task_text, cwd, session_key=session_key)
-        summary_tool_name = str(tool_name or "") if allow_delegate_hint(drift_result) else None
-        context = state_summary(state, task_meta=task_meta, tool_name=summary_tool_name, host="trae")
+        context = concise_subagent_preflight_context(None, task_meta=task_meta)
         drift_hint = task_drift_hint(drift_result, tool_name=str(tool_name or ""))
         if drift_hint:
             context += "\n" + drift_hint
-        if allow_delegate_hint(drift_result):
-            delegate_hint = delegate_hint_from_preflight(None, state, host=HOST, task_text=task_text)
-            if delegate_hint:
-                context += "\n" + delegate_hint
         print_context(context)
         return
 

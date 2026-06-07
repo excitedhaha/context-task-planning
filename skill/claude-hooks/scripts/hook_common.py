@@ -225,6 +225,170 @@ def subagent_preflight_result(
         return None
 
 
+def _nonempty_strings(items) -> list[str]:
+    values = []
+    for item in items or []:
+        text = str(item or "").strip()
+        if text:
+            values.append(text)
+    return values
+
+
+def _unique_strings(items) -> list[str]:
+    seen = set()
+    values = []
+    for item in _nonempty_strings(items):
+        if item in seen:
+            continue
+        seen.add(item)
+        values.append(item)
+    return values
+
+
+def _preflight_repo_context_needed(preflight: dict | None) -> bool:
+    repo_context = preflight.get("repo_context", {}) if isinstance(preflight, dict) else {}
+    repos = repo_context.get("repos", []) if isinstance(repo_context, dict) else []
+    repos = repos if isinstance(repos, list) else []
+    repo_scope = _nonempty_strings(
+        repo_context.get("repo_scope", []) if isinstance(repo_context, dict) else []
+    )
+    return bool(
+        len(repos) > 1
+        or len(repo_scope) > 1
+        or any(
+            isinstance(repo, dict)
+            and str(repo.get("binding_mode") or "shared").strip() != "shared"
+            for repo in repos
+        )
+    )
+
+
+def _preflight_spec_context_needed(preflight: dict | None) -> bool:
+    task = preflight.get("task", {}) if isinstance(preflight, dict) else {}
+    task = task if isinstance(task, dict) else {}
+    spec = task.get("spec_context", {})
+    spec = spec if isinstance(spec, dict) else {}
+    return bool(
+        str(spec.get("provider") or "none") != "none"
+        or str(spec.get("status") or "none") != "none"
+        or str(spec.get("primary_ref") or "").strip()
+        or _nonempty_strings(spec.get("artifact_refs", []))
+        or _nonempty_strings(task.get("spec_candidate_refs", []))
+    )
+
+
+def _append_preflight_repo_context(lines: list[str], preflight: dict | None) -> None:
+    repo_context = preflight.get("repo_context", {}) if isinstance(preflight, dict) else {}
+    repo_context = repo_context if isinstance(repo_context, dict) else {}
+    repos = repo_context.get("repos", [])
+    repos = repos if isinstance(repos, list) else []
+    repo_scope = _nonempty_strings(repo_context.get("repo_scope", []))
+    primary_repo = str(repo_context.get("primary_repo") or "").strip()
+
+    if primary_repo:
+        lines.append(f"Primary repo: {primary_repo}")
+    if repo_scope:
+        lines.append(f"Repo scope: {', '.join(repo_scope)}")
+    if repos:
+        lines.append("Repo/worktree bindings:")
+        for repo in repos:
+            if not isinstance(repo, dict):
+                continue
+            repo_id = str(repo.get("id") or "").strip()
+            binding_mode = str(repo.get("binding_mode") or "shared").strip() or "shared"
+            checkout_path = (
+                str(repo.get("checkout_path") or repo.get("path") or ".").strip()
+                or "."
+            )
+            if repo_id:
+                lines.append(f"- {repo_id}: {binding_mode} at {checkout_path}")
+
+
+def _append_preflight_spec_context(lines: list[str], preflight: dict | None) -> None:
+    task = preflight.get("task", {}) if isinstance(preflight, dict) else {}
+    task = task if isinstance(task, dict) else {}
+    spec = task.get("spec_context", {})
+    spec = spec if isinstance(spec, dict) else {}
+    mode = str(spec.get("mode") or "embedded")
+    provider = str(spec.get("provider") or "none")
+    status = str(spec.get("status") or "none")
+    primary_ref = str(spec.get("primary_ref") or "").strip()
+    artifact_refs = _nonempty_strings(spec.get("artifact_refs", []))
+    candidate_refs = _nonempty_strings(task.get("spec_candidate_refs", []))
+    refs = _unique_strings(candidate_refs or artifact_refs)[:3]
+    resolution_hint = str(task.get("spec_resolution_hint") or "").strip()
+
+    lines.append(f"Spec context: mode={mode} | provider={provider} | status={status}")
+    if primary_ref:
+        lines.append(f"Primary spec ref: {primary_ref}")
+    if refs:
+        label = "Spec candidates" if candidate_refs else "Linked spec refs"
+        lines.append(f"{label}: {'; '.join(refs)}")
+    if resolution_hint:
+        lines.append(f"Resolve explicitly: {resolution_hint}")
+        lines.append(
+            "Treat candidates as non-authoritative unless one is resolved explicitly."
+        )
+
+
+def concise_subagent_preflight_context(
+    preflight: dict | None, task_meta: dict | None = None
+) -> str:
+    """Return the small automatic context block for native subagents.
+
+    The full preflight prompt prefix remains available for shell-first CLI and
+    wrappers. Host hooks use this concise block to avoid repeating main-agent
+    state that the parent agent should pass when it is actually relevant.
+    """
+    task = preflight.get("task", {}) if isinstance(preflight, dict) else {}
+    task = task if isinstance(task, dict) else {}
+    routing = preflight.get("routing", {}) if isinstance(preflight, dict) else {}
+    routing = routing if isinstance(routing, dict) else {}
+    meta = task_meta if isinstance(task_meta, dict) else {}
+
+    slug = str(task.get("slug") or meta.get("slug") or "(unknown)").strip()
+    role = str(task.get("binding_role") or meta.get("binding_role") or "writer").strip()
+    classification = str(routing.get("classification") or "-").strip()
+    lines = [
+        f"[context-task-planning] Current task: {slug or '(unknown)'} | role: {role or 'writer'} | routing: {classification or '-'}"
+    ]
+
+    if classification == "unclear":
+        lines.append(
+            "Task fit is unclear. Use the surrounding conversation and task goal; report a routing mismatch instead of continuing if it does not fit."
+        )
+    else:
+        lines.append(
+            "Keep this subagent scoped to the current task; report a routing mismatch instead of switching scope."
+        )
+
+    if _preflight_repo_context_needed(preflight):
+        _append_preflight_repo_context(lines, preflight)
+    if _preflight_spec_context_needed(preflight):
+        _append_preflight_spec_context(lines, preflight)
+
+    return "\n".join(lines)
+
+
+def subagent_preflight_should_inject_concise(preflight: dict | None) -> bool:
+    if not isinstance(preflight, dict):
+        return False
+    decision = str(preflight.get("decision") or "")
+    if decision in {"payload_only", "payload_plus_delegate_recommended"}:
+        return True
+    routing = preflight.get("routing", {})
+    classification = ""
+    if isinstance(routing, dict):
+        classification = str(routing.get("classification") or "")
+    task = preflight.get("task", {})
+    task_slug = str(task.get("slug") or "").strip() if isinstance(task, dict) else ""
+    return bool(
+        decision == "routing_only"
+        and classification in {"related", "unclear"}
+        and (preflight.get("found") or task_slug)
+    )
+
+
 def load_state(plan_dir: Path) -> dict:
     state_file = plan_dir / "state.json"
     if not state_file.exists():

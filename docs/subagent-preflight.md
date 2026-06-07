@@ -285,8 +285,8 @@ Task launch
 -> pre_tool_use.py
 -> hook_common.py helper wrapper
 -> sh skill/scripts/subagent-preflight.sh --json ...
--> decision + prompt_prefix
--> mutate outgoing Task prompt if allowed
+-> decision + concise host context
+-> SubagentStart injects concise context when allowed
 ```
 
 Implementation points:
@@ -295,10 +295,11 @@ Implementation points:
   - add a wrapper that shells out to `subagent-preflight.sh`
   - stop hardcoding blanket delegate-preferred Task messaging
 - `skill/claude-hooks/scripts/pre_tool_use.py`
-  - keep this as the only prompt mutation point
   - call the helper for `Task` tools only
-  - inject `prompt_prefix` only for `payload_only` and `payload_plus_delegate_recommended`
-  - emit routing-only or delegate-required guidance otherwise
+  - gate `delegate_required` before the launch
+- `skill/claude-hooks/scripts/subagent_start.py`
+  - inject concise task guardrails instead of a full task snapshot
+  - add repo/worktree or spec details only when the preflight payload says they matter
 - `skill/claude-hooks/scripts/user_prompt_submit.py`
   - keep advisory messaging aligned with the same decisions
   - do not mutate Task prompts here
@@ -311,7 +312,7 @@ Flow:
 Task launch
 -> tool.execute.before
 -> runJsonScript(subagent-preflight.sh, ...)
--> decision + prompt_prefix
+-> decision + concise host context
 -> mutate output.args.prompt if allowed
 ```
 
@@ -320,6 +321,7 @@ Implementation points:
 - `skill/opencode-plugin/task-focus-guard.js`
   - derive `task_text` from actual Task args at `tool.execute.before`
   - call `subagent-preflight.sh` through the existing JSON script path
+  - inject a concise task guardrail by default and keep freshness/recovery reminders in the main session
   - keep freshness reminders separate from preflight decisions
   - preserve current title/toast behavior in P0
 

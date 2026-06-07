@@ -51,7 +51,7 @@ After you enable the plugin or standalone adapter, Claude Code can surface the s
 - strong task-context recovery on session start for explicit bindings or `PLAN_TASK`, while workspace fallback stays advisory
 - prompt-time route evidence only for high-signal `likely-unrelated` prompts; normal and heuristic-`unclear` prompts stay quiet so Claude can use conversation context
 - stronger routing guidance before native `Task` launches when the fit is truly mismatched
-- shared `subagent-preflight` context before native `Task` launches, including repo/worktree prefixes for related or heuristic-unclear work and routing or delegate escalation when the fit is wrong for explicitly bound sessions; fallback-only sessions stay routing-only
+- shared `subagent-preflight` context for native `Task` launches, using a concise subagent guardrail by default and adding repo/worktree details only when the launch needs that scope; fallback-only sessions stay advisory
 - linked or ambiguous spec context such as auto-detected OpenSpec refs in startup and native-`Task` preflight context when the current task has a clear external artifact candidate or multiple plausible ones, including a short candidate hint when the runtime refuses to guess
 - repo context such as `primary_repo` and `repo_scope` when a task spans multiple repos
 - context-prune hints on recovery or subagent startup when `progress.md` is large enough that the writer should prepare a model-reviewed prune
@@ -105,7 +105,7 @@ This is a sample illustration of the expected task cue, not a live screenshot fr
 
 ## Task preflight
 
-Claude's `PreToolUse` hook now calls the shared shell-first helper before native `Task` launches:
+Claude's `PreToolUse` hook calls the shared shell-first helper before native `Task` launches to gate `delegate_required`; `SubagentStart` calls the same helper to inject concise context into the spawned subagent:
 
 ```bash
 sh skill/scripts/subagent-preflight.sh \
@@ -118,13 +118,13 @@ sh skill/scripts/subagent-preflight.sh \
 
 The helper returns one decision for the launch:
 
-- `payload_only` or `payload_plus_delegate_recommended` - Claude prepends the canonical task and repo/worktree prefix
+- `payload_only` or `payload_plus_delegate_recommended` - Claude injects a concise task guardrail, adding repo/worktree bindings only for multi-repo or worktree launches
 - `routing_only` - Claude shows routing confirmation only and does not inject the repo/worktree payload
 - `delegate_required` - Claude tells you to create or reuse a delegate lane first
 
-If the task resolves a linked OpenSpec context for an explicitly bound session, Claude surfaces that summary at session start, and the injected `Task` preflight prefix includes the same spec context summary and primary linked ref in addition to the repo/worktree scope. When the runtime reports `status=ambiguous`, Claude receives the candidate refs plus an explicit manual-override hint in those recovery or preflight contexts. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front. Workspace fallback alone does not trigger that strong payload.
+If the task resolves a linked OpenSpec context for an explicitly bound session, Claude surfaces that summary at session start, and the injected subagent context includes the spec provider/status plus the primary linked ref or candidate refs. When the runtime reports `status=ambiguous`, Claude receives the explicit manual-override hint instead of pretending one candidate is authoritative. Treat that as routing help first; exploratory work can usually continue without resolving candidates up front. Workspace fallback alone does not trigger that strong payload.
 
-`UserPromptSubmit` stays quiet for normal turns and only injects route evidence for high-signal switch prompts; the actual native-Task preflight happens in `PreToolUse`.
+`UserPromptSubmit` stays quiet for normal turns and only injects route evidence for high-signal switch prompts; native-`Task` gating happens in `PreToolUse`, while subagent context injection happens in `SubagentStart`.
 
 ## If you prefer no hooks
 

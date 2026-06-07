@@ -6,7 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PLUGIN_VERSION = "0.8.2" // sync with VERSION file
+const PLUGIN_VERSION = "0.8.3" // sync with VERSION file
 
 /**
  * Discover the skill root directory containing scripts/task_guard.py.
@@ -400,6 +400,116 @@ function taskTextFromArgs(args) {
     .trim()
 }
 
+function preflightRepoContextNeeded(preflight) {
+  const repoContext = preflight?.repo_context || {}
+  const repos = Array.isArray(repoContext.repos) ? repoContext.repos : []
+  const repoScope = Array.isArray(repoContext.repo_scope)
+    ? repoContext.repo_scope.filter((repo) => String(repo || "").trim())
+    : []
+
+  return (
+    repos.length > 1 ||
+    repoScope.length > 1 ||
+    repos.some((repo) => String(repo?.binding_mode || "shared") !== "shared")
+  )
+}
+
+function preflightSpecContextNeeded(preflight) {
+  const task = preflight?.task || {}
+  const spec = task.spec_context || {}
+  const provider = String(spec.provider || "none")
+  const status = String(spec.status || "none")
+  return Boolean(
+    provider !== "none" ||
+    status !== "none" ||
+    String(spec.primary_ref || "").trim() ||
+    (Array.isArray(spec.artifact_refs) && spec.artifact_refs.length > 0) ||
+    (Array.isArray(task.spec_candidate_refs) && task.spec_candidate_refs.length > 0),
+  )
+}
+
+function appendPreflightRepoContext(lines, preflight) {
+  const repoContext = preflight?.repo_context || {}
+  const repos = Array.isArray(repoContext.repos) ? repoContext.repos : []
+  const repoScope = Array.isArray(repoContext.repo_scope)
+    ? repoContext.repo_scope.map((repo) => String(repo || "").trim()).filter(Boolean)
+    : []
+  const primaryRepo = String(repoContext.primary_repo || "").trim()
+
+  if (primaryRepo) {
+    lines.push(`Primary repo: ${primaryRepo}`)
+  }
+  if (repoScope.length > 0) {
+    lines.push(`Repo scope: ${repoScope.join(", ")}`)
+  }
+  if (repos.length > 0) {
+    lines.push("Repo/worktree bindings:")
+    for (const repo of repos) {
+      const id = String(repo?.id || "").trim()
+      const bindingMode = String(repo?.binding_mode || "shared").trim() || "shared"
+      const checkoutPath = String(repo?.checkout_path || repo?.path || ".").trim() || "."
+      if (id) {
+        lines.push(`- ${id}: ${bindingMode} at ${checkoutPath}`)
+      }
+    }
+  }
+}
+
+function appendPreflightSpecContext(lines, preflight) {
+  const task = preflight?.task || {}
+  const spec = task.spec_context || {}
+  const mode = String(spec.mode || "embedded")
+  const provider = String(spec.provider || "none")
+  const status = String(spec.status || "none")
+  const primaryRef = String(spec.primary_ref || "").trim()
+  const artifactRefs = Array.isArray(spec.artifact_refs)
+    ? spec.artifact_refs.map((ref) => String(ref || "").trim()).filter(Boolean)
+    : []
+  const candidateRefs = Array.isArray(task.spec_candidate_refs)
+    ? task.spec_candidate_refs.map((ref) => String(ref || "").trim()).filter(Boolean)
+    : []
+  const refs = uniqueItems(candidateRefs.length > 0 ? candidateRefs : artifactRefs).slice(0, 3)
+  const resolutionHint = String(task.spec_resolution_hint || "").trim()
+
+  lines.push(`Spec context: mode=${mode} | provider=${provider} | status=${status}`)
+  if (primaryRef) {
+    lines.push(`Primary spec ref: ${primaryRef}`)
+  }
+  if (refs.length > 0) {
+    lines.push(`${candidateRefs.length > 0 ? "Spec candidates" : "Linked spec refs"}: ${refs.join("; ")}`)
+  }
+  if (resolutionHint) {
+    lines.push(`Resolve explicitly: ${resolutionHint}`)
+    lines.push("Treat candidates as non-authoritative unless one is resolved explicitly.")
+  }
+}
+
+function conciseTaskPreflightPrefix(preflight, currentTask) {
+  const task = preflight?.task || {}
+  const routing = preflight?.routing || {}
+  const slug = String(task.slug || currentTask?.slug || "(unknown)").trim()
+  const role = String(task.binding_role || currentTask?.binding_role || "writer").trim()
+  const classification = String(routing.classification || "-").trim()
+  const lines = [
+    `[context-task-planning] Current task: ${slug || "(unknown)"} | role: ${role || "writer"} | routing: ${classification || "-"}`,
+  ]
+
+  if (classification === "unclear") {
+    lines.push("Task fit is unclear. Use the surrounding conversation and task goal; report a routing mismatch instead of continuing if it does not fit.")
+  } else {
+    lines.push("Keep this subagent scoped to the current task; report a routing mismatch instead of switching scope.")
+  }
+
+  if (preflightRepoContextNeeded(preflight)) {
+    appendPreflightRepoContext(lines, preflight)
+  }
+  if (preflightSpecContextNeeded(preflight)) {
+    appendPreflightSpecContext(lines, preflight)
+  }
+
+  return lines.join("\n")
+}
+
 function stripTaskPrefix(title) {
   return String(title || "").replace(TASK_TITLE_PREFIX_RE, "")
 }
@@ -611,19 +721,6 @@ function freshnessToastMessage(task, state, planning) {
     message: `Sync .planning/${task.slug}/ before more implementation or wrap-up.`,
     variant: "warning",
   }
-}
-
-function freshnessTaskPrefix(task, state, planning) {
-  const level = freshnessLevel(state, planning)
-  if (!level) {
-    return null
-  }
-
-  return [
-    `[context-task-planning] Task files may be stale for ${task.slug || "(unknown)"}.`,
-    `Freshness baseline: ${planning.baselineFile}. Work steps since then: ${state.workEventsSincePlanning}.`,
-    "Before or after this subagent work, sync `.planning/<slug>/` with the current progress and next_action.",
-  ].join("\n")
 }
 
 function normalizedToolName(toolName) {
@@ -1388,57 +1485,29 @@ export const ContextTaskPlanningOpenCodePlugin = async ({ client, directory, wor
       const drift = cacheSessionID ? driftBySession.get(cacheSessionID) : null
       const explicitTaskContext = explicitTaskContextEligible(currentTask)
 
-      const { state: freshnessState, planning } = refreshFreshnessState(
-        freshnessBySession,
-        cacheSessionID,
-        currentTask,
-      )
-      const planningRecovery = cacheSessionID ? planningRecoveryBySession.get(cacheSessionID) || null : null
       const prefixes = []
 
       if (explicitTaskContext && preflight) {
+        const routingClassification = String(preflight.routing?.classification || "")
         if (
           (preflight.decision === "payload_only" ||
             preflight.decision === "payload_plus_delegate_recommended") &&
           preflight.prompt_prefix
         ) {
-          prefixes.push(preflight.prompt_prefix)
+          prefixes.push(conciseTaskPreflightPrefix(preflight, currentTask))
+        } else if (
+          preflight.decision === "routing_only" &&
+          (routingClassification === "related" || routingClassification === "unclear") &&
+          (preflight.found || preflight.task?.slug)
+        ) {
+          prefixes.push(conciseTaskPreflightPrefix(preflight, currentTask))
         } else if (preflight.operator_message) {
           prefixes.push(preflight.operator_message)
-        }
-
-        // Append delegate command hint when a delegate is recommended.
-        // The preflight result already contains the delegate.kind and
-        // delegate.command computed by task_guard.py (single source of truth).
-        if (
-          preflight.decision === "payload_plus_delegate_recommended" &&
-          preflight.delegate
-        ) {
-          const delegate = preflight.delegate
-          const kind = delegate.kind || ""
-          const command = delegate.command || ""
-          if (kind && command) {
-            prefixes.push(
-              `[context-task-planning] If this turns into a bounded \`${kind}\` side quest, a delegate lane may help. Optional command: \`${command}\`. Keep it optional unless observe-only routing or durable lifecycle tracking makes a delegate required.`,
-            )
-          }
         }
       } else if (drift) {
         const task = drift.task && drift.task.found ? drift.task : currentTask
         if (task && task.found) {
           prefixes.push(taskToolPrefix(task, drift))
-        }
-      }
-
-      if (explicitTaskContext) {
-        const freshnessPrefix = freshnessTaskPrefix(currentTask, freshnessState, planning)
-        if (freshnessPrefix) {
-          prefixes.push(freshnessPrefix)
-        }
-
-        const planningRecoveryText = planningRecoveryReminder(currentTask, planningRecovery)
-        if (planningRecoveryText) {
-          prefixes.push(planningRecoveryText)
         }
       }
 

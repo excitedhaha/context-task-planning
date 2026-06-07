@@ -42,6 +42,7 @@ _import_shared_hooks()
 
 from hook_common import (  # noqa: E402
     allow_delegate_hint,
+    concise_subagent_preflight_context,
     delegate_hint_from_preflight,
     explicit_task_context_eligible,
     fallback_task_advisory,
@@ -58,6 +59,7 @@ from hook_common import (  # noqa: E402
     session_key_from_payload,
     state_summary,
     subagent_preflight_result,
+    subagent_preflight_should_inject_concise,
     task_drift_hint,
     task_drift_result,
     task_tool_text,
@@ -564,6 +566,7 @@ __all__ = [
     "HOST",
     "allow_delegate_hint",
     "bootstrap_session_binding_after_init",
+    "concise_subagent_preflight_context",
     "create_turn_marker",
     "delegate_hint_from_preflight",
     "explicit_task_context_eligible",
@@ -583,6 +586,7 @@ __all__ = [
     "state_summary",
     "stop_block_payload",
     "subagent_preflight_result",
+    "subagent_preflight_should_inject_concise",
     "sync_files_updated",
     "task_drift_hint",
     "task_drift_result",
