@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-06-07
+
+### Changed
+- Clarified the default `clarify` phase in the skill, reference, onboarding, and README docs as a one-question-at-a-time task brief interview with recommended answers and local repo inspection before asking the user.
+
 ## [0.8.4] - 2026-06-07
 
 ### Fixed

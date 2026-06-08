@@ -36,6 +36,8 @@ A simple loop, repeated for as long as the task is alive.
 ### ① Plan — once, at the start
 For non-trivial work, the agent confirms a task title/slug and captures goal, non-goals, acceptance criteria, constraints, and verification target into `.planning/<slug>/task_plan.md`.
 
+If the brief is fuzzy, the agent should ask one focused question at a time, include a recommended answer, and inspect local code/docs first when they can answer it.
+
 ### ② Persist — continuously, as work happens
 On every meaningful step the agent writes back to local files:
 - `state.json` — machine-readable status, phase, next action, blockers

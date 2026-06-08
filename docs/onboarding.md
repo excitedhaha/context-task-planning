@@ -185,6 +185,8 @@ What to do:
 
 - start or resume tasks through normal conversation
 - let the agent capture a lightweight brief before deep implementation: goal, non-goals, acceptance criteria, constraints, and verification expectations
+- when the brief is incomplete, expect the agent to ask one focused question at a time with a recommended answer
+- if the answer is discoverable from code, tests, docs, task files, or linked spec artifacts, expect the agent to inspect those first instead of asking you
 - if the repo already has spec artifacts, let the runtime reuse them for scope; otherwise keep the brief local and lightweight
 - keep the current task visible in your host or shell
 - let the agent keep the current task, next action, and verification state current
@@ -194,6 +196,12 @@ Try saying:
 
 ```text
 This task will take multiple steps and may span more than one session. Keep the task state current as you work, and verify before you wrap up.
+```
+
+If the task is still fuzzy, say:
+
+```text
+Before implementation, grill the task brief. Ask one blocking question at a time, give your recommended answer, and inspect the repo first when the answer can be discovered locally.
 ```
 
 If task visibility is not showing yet, say:

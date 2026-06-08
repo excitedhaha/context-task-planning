@@ -14,6 +14,15 @@ This skill treats context engineering as three coordinated layers:
 
 Capture goals, non-goals, acceptance criteria, constraints, and open questions before implementation.
 
+For ambiguous complex work, treat clarification as a short decision-tree interview rather than a form fill:
+
+- ask one blocking question at a time
+- include a recommended answer with each question
+- inspect code, tests, docs, task files, and linked spec artifacts first when they can answer the question
+- resolve dependent decisions in order, promoting only stable conclusions into `state.json` and `task_plan.md`
+- keep non-blocking uncertainty in `open_questions` and blockers in `blockers`
+- move from `clarify` to `plan` or `execute` only after the task has enough acceptance criteria and verification intent to be checked later
+
 ### Markdown for humans, JSON for tools
 
 Use markdown for explanation and review. Use `state.json` for stable machine-readable state.

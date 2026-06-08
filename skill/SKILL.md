@@ -3,7 +3,7 @@ name: context-task-planning
 description: Task-scoped context engineering for complex multi-step work. Use when a task needs clarification, phased execution, durable file-based state, recovery after context loss, or optional sub-agent delegation.
 license: MIT
 metadata:
-  version: "0.8.4"
+  version: "0.8.5"
 allowed-tools: Read Write Edit Bash Glob Grep WebFetch Task
 ---
 
@@ -54,6 +54,17 @@ When resuming, recover in this order:
 4. unresolved delegates
 
 Use `scripts/current-task.sh` when you need the selected task and next recommended action. Use `--compact` only for prompt/status-line contexts.
+
+## Clarify Before Build
+
+For complex or ambiguous work, run the clarify phase as a focused interview before planning or implementation:
+
+- Ask one blocking question at a time instead of dumping a questionnaire.
+- Include your recommended answer with each question so the user can approve, edit, or reject it quickly.
+- If the answer can be discovered by reading code, tests, docs, task files, or linked spec artifacts, inspect those first instead of asking the user.
+- Resolve dependent decisions in order: goal, non-goals, acceptance criteria, constraints, edge cases, verification target, then execution approach.
+- Record resolved answers in `state.json` first, keep `task_plan.md` aligned, and log meaningful decisions or remaining uncertainty in `progress.md`.
+- Keep unresolved but non-blocking uncertainty in `open_questions`; do not start implementation while critical ambiguity remains.
 
 ## Operating Rules
 
