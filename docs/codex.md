@@ -4,12 +4,15 @@ This page only covers Codex-specific setup and behavior. Use `README.md` for the
 
 ## Install
 
-Recommended plugin install (skills + hooks bundled):
+Recommended plugin install from a checkout (skills + hooks bundled):
 
 ```bash
-codex plugin marketplace add excitedhaha/context-task-planning
-codex plugin install context-task-planning@context-task-planning
+git clone https://github.com/excitedhaha/context-task-planning.git
+cd context-task-planning
+sh skill/scripts/install-codex-plugin.sh
 ```
+
+The script creates a stable local Codex marketplace wrapper under `~/.codex/context-task-planning-marketplace` and installs `context-task-planning@context-task-planning-local`. Current Codex marketplace descriptors expect plugins under `./plugins/<name>`, so a bare repository root is not enough for `codex plugin add`.
 
 Alternative skill-only install:
 
@@ -30,16 +33,17 @@ A global install makes the skill available under:
 Codex now has lifecycle hooks, so the recommended path is:
 
 - the same shared file-backed core under `.planning/<slug>/`
-- optional Codex hooks that inject task context on session start and route evidence only for high-signal scope switches
+- optional Codex hooks that inject task context on session start, after compaction recovery, and when native subagents start
+- prompt-time route evidence only for high-signal scope switches
 - a `Stop` hook that asks Codex to continue once when a complex or mutating turn is about to finish without planning read/update evidence
 - shell-first visibility with `sh skill/scripts/current-task.sh` as the fallback and debugging surface
 
 Codex still does not expose the same surfaces as Claude Code or OpenCode:
 
 - no native status line or session-title API for a persistent task cue
-- no supported `PreToolUse` context injection or tool input rewrite path
-- no automatic native subagent prompt mutation equivalent to Claude `Task` or OpenCode `tool.execute.before`
-- no dedicated session compaction hook; recovery happens on the next `SessionStart`, `UserPromptSubmit`, or `Stop` check
+- this plugin does not use Codex `PreToolUse` for command rewriting or policy enforcement
+- no native subagent prompt mutation equivalent to Claude `Task` or OpenCode `tool.execute.before`; `SubagentStart` injects a concise task guardrail instead
+- compaction recovery uses `SessionStart` with the `compact` source; this plugin does not block or rewrite compaction with `PreCompact` / `PostCompact`
 
 Use the hooks for long-context reminders and end-of-turn planning sync. Keep the shell scripts as the source of truth and as the manual escape hatch.
 
@@ -64,24 +68,27 @@ sh skill/scripts/set-active-task.sh --observe feature-auth
 
 The plugin bundles hooks that enable:
 
-- `SessionStart` - inject explicit task context on startup, resume, or clear
+- `SessionStart` - inject explicit task context on startup, resume, clear, or compact recovery
 - `UserPromptSubmit` - record turn markers and inject route evidence only for high-signal `likely-unrelated` prompts
+- `SubagentStart` - inject a concise current-task guardrail into native Codex subagents
 - `PostToolUse` - track whether this turn read planning files, used mutating tools, or updated planning files
 - `Stop` - continue once if Codex is about to finish without the required planning read or update
 
 The injected task context can also include a shared context-prune hint when `progress.md` is large enough to summarize and prune manually.
 
-Codex hooks require a Codex CLI build that lists `codex_hooks` in `codex features list`; this workflow has been verified with `codex-cli 0.125.0`.
+Codex hooks require a Codex build that lists `hooks` in `codex features list`. The older `codex_hooks` feature key is deprecated.
 
 Quick verification after plugin install:
 
 ```bash
 codex --version
-codex features list | grep codex_hooks
+codex features list | grep hooks
 codex exec "Do not modify files or run commands. Reply exactly: OK"
 ```
 
-The last command should show `SessionStart Completed`, `UserPromptSubmit Completed`, and `Stop Completed`. If the prompt asks Codex to run a shell command, `PostToolUse Completed` should also appear.
+The last command should return `OK` without hook trust or plugin manifest errors. Depending on Codex UI/CLI mode, hook completion may appear in `/hooks` or persisted hook trust state rather than in `codex exec` stdout. A native subagent smoke run with `--json` should show `spawn_agent` / `wait` / `close_agent` events and no `context-task-planning` manifest warnings.
+
+Plugin-bundled hooks are reviewed by hash. After upgrading this plugin, open `/hooks` in Codex and trust the changed hook definitions before expecting them to run.
 
 Contributor/package verification from a checkout:
 
@@ -104,7 +111,8 @@ sh skill/scripts/current-task.sh
 ## What you should notice
 
 - there is still no native Codex task UI today
-- with hooks enabled, session start should receive task context, while normal new turns stay quiet unless route evidence is high-signal
+- with hooks enabled, session start and compact recovery should receive task context, while normal new turns stay quiet unless route evidence is high-signal
+- native subagents should receive a concise task guardrail when the Codex session is explicitly bound to a planning task
 - after a code-changing turn, Codex may automatically continue once to update or explicitly justify not updating planning files
 - `current-task.sh` should show the resolved task, access mode, repo/worktree summary, and a recommended next step
 - `current-task.sh` can also show one linked spec ref, or a few candidate refs when the runtime refuses to guess
@@ -117,7 +125,7 @@ If that quick check prints `task=<slug> ...`, the fallback visibility path is wo
 
 ## Shell-first Task preflight
 
-Codex hooks currently do not provide a reliable native subagent prompt mutation path. Two approaches are available:
+Codex hooks now provide `SubagentStart` context injection, but they still do not rewrite native subagent prompts. Two explicit preflight approaches remain useful when you want the full prompt prefix or delegate decision before launch:
 
 ### Option A: Custom agent with preflight awareness
 
@@ -132,7 +140,7 @@ cp skill/codex-hooks/agents/context-aware-worker.toml ~/.codex/agents/
 
 Then tell Codex: "Use the context-aware-worker agent to investigate the auth module."
 
-The agent's `developer_instructions` tell it to run `subagent-preflight.sh` before starting and follow the routing guidance. This is not automatic injection but provides a structured workflow for task-scoped subagents.
+The agent's `developer_instructions` tell it to run `subagent-preflight.sh` before starting and follow the routing guidance. This complements the plugin's automatic `SubagentStart` guardrail when a full preflight decision is useful.
 
 ### Option B: Manual preflight invocation
 

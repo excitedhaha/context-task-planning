@@ -1,6 +1,6 @@
 {
   "name": "context-task-planning",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Task-scoped context engineering for recoverable, visible, and isolated long-running coding work.",
   "author": {
     "name": "excitedhaha"
@@ -13,14 +13,22 @@
     "tasks",
     "hooks"
   ],
-  "skills": [
-    "./skill",
-    "./skills/task-current",
-    "./skills/task-done",
-    "./skills/task-drift",
-    "./skills/task-init",
-    "./skills/task-list",
-    "./skills/task-validate"
-  ],
-  "hooks": "./.codex-plugin/hooks.json"
+  "skills": "./skills",
+  "hooks": "./skill/codex-hooks/hooks.json",
+  "interface": {
+    "displayName": "Context Task Planning",
+    "shortDescription": "Durable planning context for long Codex tasks.",
+    "longDescription": "Keep long-running coding tasks recoverable with file-backed plans, progress logs, routing hints, and Codex lifecycle hooks.",
+    "developerName": "excitedhaha",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use Context Task Planning to start a durable plan for this multi-step coding task.",
+      "Resume the active task from local planning files before continuing."
+    ],
+    "brandColor": "#2563EB"
+  }
 }

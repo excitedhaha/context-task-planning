@@ -2,11 +2,11 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear",
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.codex/plugins/context-task-planning/skill/codex-hooks/scripts/session_start.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/skill/codex-hooks/scripts/session_start.py\"",
             "timeout": 8,
             "statusMessage": "Loading task context"
           }
@@ -18,9 +18,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.codex/plugins/context-task-planning/skill/codex-hooks/scripts/user_prompt_submit.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/skill/codex-hooks/scripts/user_prompt_submit.py\"",
             "timeout": 5,
             "statusMessage": "Checking planning context"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/skill/codex-hooks/scripts/subagent_start.py\"",
+            "timeout": 5,
+            "statusMessage": "Loading subagent task context"
           }
         ]
       }
@@ -31,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.codex/plugins/context-task-planning/skill/codex-hooks/scripts/post_tool_use.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/skill/codex-hooks/scripts/post_tool_use.py\"",
             "timeout": 5,
             "statusMessage": "Tracking planning evidence"
           }
@@ -43,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.codex/plugins/context-task-planning/skill/codex-hooks/scripts/stop.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/skill/codex-hooks/scripts/stop.py\"",
             "timeout": 8,
             "statusMessage": "Checking planning sync"
           }

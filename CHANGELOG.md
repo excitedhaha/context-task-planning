@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-06-11
+
+### Added
+- Added Codex `SubagentStart` hook support so native Codex subagents receive a concise current-task guardrail for explicit task bindings.
+- Added Codex plugin install-surface metadata through `.codex-plugin/plugin.json` `interface` fields.
+- Fixed the Codex plugin manifest to use the runtime-compatible single `skills` path and documented the local Codex marketplace-wrapper install path.
+- Added `skill/scripts/install-codex-plugin.sh` to install the repository-root Codex plugin through a stable local marketplace wrapper.
+
+### Changed
+- Moved Codex hooks configuration to `skill/codex-hooks/hooks.json`, updated the plugin manifest to point there, and switched hook commands to `${PLUGIN_ROOT}`.
+- Extended Codex `SessionStart` hook matching to include compact recovery.
+- Updated Codex docs and smoke tests for the canonical `hooks` feature key; `codex_hooks` remains documented only as a deprecated alias.
+
+### Removed
+- Removed the obsolete `.codex-plugin/hooks.json` hook config file. Upgrading users must review and trust the changed plugin hook definitions in `/hooks`.
+
 ## [0.8.5] - 2026-06-07
 
 ### Changed
@@ -101,7 +117,7 @@ All notable changes to this project are documented here.
 - Added `smoke-test-codex-plugin.sh` to validate Codex plugin structure and configuration.
 
 ### Changed
-- Codex install is now a single plugin command (`codex plugin install`) instead of two-step skill + hook package install.
+- Codex install is now a bundled plugin install path instead of two-step skill + hook package install.
 - Updated all docs (`README.md`, `docs/codex.md`, `docs/sharing.md`, `skill/SKILL.md`, `skill/reference.md`, `skill/codex-hooks/README.md`) to recommend Codex plugin install.
 - Extended `check-version.sh` to validate `.codex-plugin/plugin.json` version.
 

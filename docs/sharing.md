@@ -49,8 +49,9 @@ opencode plugin context-task-planning-opencode --global
 For Codex, prefer the bundled plugin install:
 
 ```bash
-codex plugin marketplace add excitedhaha/context-task-planning
-codex plugin install context-task-planning@context-task-planning
+git clone https://github.com/excitedhaha/context-task-planning.git
+cd context-task-planning
+sh skill/scripts/install-codex-plugin.sh
 ```
 
 For standalone skill-only fallback installs:
@@ -74,8 +75,9 @@ Notes:
 5. If they use Codex, install the plugin for bundled skills + hooks:
 
    ```bash
-   codex plugin marketplace add excitedhaha/context-task-planning
-   codex plugin install context-task-planning@context-task-planning
+   git clone https://github.com/excitedhaha/context-task-planning.git
+   cd context-task-planning
+   sh skill/scripts/install-codex-plugin.sh
    ```
 
 6. If they use TraeCLI/Coco, restart the CLI after plugin installation and verify the command surface with `coco plugin validate context-task-planning` or `/plugin list`.
@@ -143,7 +145,7 @@ sh skill/scripts/validate-task.sh || true
 4. Confirm local absolute paths only appear in private planning state, not in shareable docs.
 5. Confirm README and docs lead with context engineering, delegate lanes, and agent-first usage rather than a script-only workflow.
 6. Confirm install commands point at `excitedhaha/context-task-planning`.
-7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `.codex-plugin/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
+7. Confirm hook docs still match `skill/claude-hooks/hooks.json`, `skill/claude-hooks/settings.example.json`, `skill/codex-hooks/hooks.json`, `coco.yaml`, and `skill/trae-hooks/`.
 8. Confirm npm trusted publishing is configured for `context-task-planning-opencode` from `excitedhaha/context-task-planning` and `.github/workflows/release.yml`, or that the release environment `NPM_TOKEN` belongs to an npm maintainer with publish access.
 9. Do not create tags or GitHub releases manually unless explicitly requested; `.github/workflows/release.yml` publishes npm first, then handles `v$(cat VERSION)` after the change lands on `main`.
 

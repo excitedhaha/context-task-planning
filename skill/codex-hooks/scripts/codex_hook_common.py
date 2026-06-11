@@ -25,6 +25,7 @@ _import_shared_hooks()
 
 from hook_common import (  # noqa: E402
     allow_delegate_hint,
+    concise_subagent_preflight_context,
     delegate_hint_from_preflight,
     explicit_task_context_eligible,
     fallback_task_advisory,
@@ -39,6 +40,9 @@ from hook_common import (  # noqa: E402
     resolve_task_meta,
     session_key_from_payload,
     state_summary,
+    subagent_preflight_result,
+    subagent_preflight_should_inject_concise,
+    subagent_start_payload,
     task_drift_hint,
     task_drift_result,
 )
@@ -276,6 +280,7 @@ def stop_block_payload(reason: str) -> str:
 __all__ = [
     "HOST",
     "allow_delegate_hint",
+    "concise_subagent_preflight_context",
     "codex_planning_guard_text",
     "codex_session_key",
     "create_turn_marker",
@@ -293,6 +298,9 @@ __all__ = [
     "resolve_task_meta",
     "state_summary",
     "stop_block_payload",
+    "subagent_preflight_result",
+    "subagent_preflight_should_inject_concise",
+    "subagent_start_payload",
     "sync_files_updated",
     "task_drift_hint",
     "task_drift_result",
