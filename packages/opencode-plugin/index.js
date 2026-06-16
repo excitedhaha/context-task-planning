@@ -6,7 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url))
-const PLUGIN_VERSION = "0.8.6" // sync with VERSION file
+const PLUGIN_VERSION = "0.8.7" // sync with VERSION file
 
 /**
  * Discover the skill root directory containing scripts/task_guard.py.
@@ -796,26 +796,42 @@ function trackableToolExecution(input) {
   return normalizedToolName(input?.tool) === "parallel" && trackableParallelTool(input?.args)
 }
 
+function normalizeSessionIDCandidate(value) {
+  const text = String(value || "").trim()
+  if (!text || (/^[a-z]{3}_/u.test(text) && !text.startsWith("ses"))) {
+    return ""
+  }
+  return text
+}
+
 function resolveExplicitSessionID(...values) {
   for (const value of values) {
     if (!value) {
       continue
     }
 
-    if (typeof value === "string" && value.trim()) {
-      return value.trim()
+    if (typeof value === "string") {
+      const sessionID = normalizeSessionIDCandidate(value)
+      if (sessionID) {
+        return sessionID
+      }
+      continue
     }
 
     if (typeof value === "object") {
+      const isEvent =
+        typeof value.type === "string" && Object.prototype.hasOwnProperty.call(value, "properties")
       const nested =
         resolveExplicitSessionID(
           value.sessionID,
           value.sessionId,
-          value.id,
-          value.session,
           value.properties?.sessionID,
           value.properties?.sessionId,
+          value.properties?.info?.sessionID,
+          value.properties?.info?.sessionId,
           value.properties?.info?.id,
+          value.session,
+          isEvent ? "" : value.id,
         ) || ""
       if (nested) {
         return nested

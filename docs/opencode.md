@@ -30,7 +30,7 @@ Choose `context-task-planning` and the OpenCode agent when prompted in step 1.
 To pin or update the plugin version:
 
 ```bash
-opencode plugin context-task-planning-opencode@0.8.6 --global --force
+opencode plugin context-task-planning-opencode@0.8.7 --global --force
 ```
 
 ### Legacy (symlink-based)
@@ -172,7 +172,7 @@ If the commands do not appear right away:
 - restart OpenCode after running the install helper
 - if you used the npm plugin, commands are auto-installed on first load; restart OpenCode to trigger auto-install
 - if you used symlink install, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-commands.sh` if the command symlinks are missing (or use `--force` to replace stale ones)
-- if the title/toast behavior is missing but slash commands are present, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` (or `opencode plugin context-task-planning-opencode@0.8.6 --global --force`)
+- if the title/toast behavior is missing but slash commands are present, rerun `sh ~/.config/opencode/skills/context-task-planning/scripts/install-opencode-plugin.sh` (or `opencode plugin context-task-planning-opencode@0.8.7 --global --force`)
 - if the slash commands work but the task title never updates, verify that the plugin loaded and that you restarted OpenCode after installation
 
 ## Plugin lifecycle

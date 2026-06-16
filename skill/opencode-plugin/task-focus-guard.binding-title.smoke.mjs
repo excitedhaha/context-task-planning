@@ -59,9 +59,11 @@ try {
   writeFileSync(path.join(planRoot, ".active_task"), "existing-task\n", "utf8")
 
   const titles = new Map([["A", "Session A"]])
+  const sessionLookups = []
   const client = {
     session: {
       async get({ path: { id } }) {
+        sessionLookups.push(id)
         return { data: { id, title: titles.get(id) || "Session" } }
       },
       async update({ path: { id }, body: { title } }) {
@@ -76,12 +78,25 @@ try {
 
   const plugin = await ContextTaskPlanningOpenCodePlugin({ client, directory: workspace, worktree: "/" })
 
-  await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
+  await plugin.event({
+    event: {
+      id: "evt_ece7b712d001JK93tMZ75h078I",
+      type: "session.created",
+      properties: { info: { id: "A" } },
+    },
+  })
   assert.equal(titles.get("A"), "Session A")
 
   writeBinding(planRoot, "A", "existing-task")
-  await plugin.event({ event: { type: "session.created", properties: { info: { id: "A" } } } })
+  await plugin.event({
+    event: {
+      id: "evt_ece7b712d001JK93tMZ75h078I",
+      type: "session.created",
+      properties: { info: { id: "A" } },
+    },
+  })
   assert.equal(titles.get("A"), "task:existing-task | Session A")
+  assert.equal(sessionLookups.includes("evt_ece7b712d001JK93tMZ75h078I"), false)
 
   console.log("[context-task-planning] smoke test passed: OpenCode titles require explicit session binding and ignore root worktree")
 } finally {

@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-06-16
+
+### Fixed
+- Fixed OpenCode session resolution so event IDs such as `evt_*` are not passed to session title APIs that require `ses*` session IDs.
+
 ## [0.8.6] - 2026-06-11
 
 ### Added
