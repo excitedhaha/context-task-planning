@@ -30,6 +30,6 @@ cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
-Make sure `codex --version` is a build that exposes `hooks` in `codex features list`; `codex_hooks` is the deprecated feature-key alias.
+Make sure `codex --version` is a build that supports plugin hooks. The canonical configuration surface is `hooks`, while some Codex builds still list the deprecated `codex_hooks` feature key in `codex features list`.
 
-After plugin installation or upgrade, open `/hooks` in Codex and trust the plugin-bundled hooks if prompted. `codex exec "Do not modify files or run commands. Reply exactly: OK"` should return `OK` without hook trust or plugin manifest errors. Depending on Codex UI/CLI mode, hook completion may appear in `/hooks` or persisted hook trust state rather than in `codex exec` stdout.
+After marketplace registration, open `/plugins` in Codex or the Codex app plugin browser if your Codex CLI does not provide non-interactive plugin installation. After plugin installation or upgrade, open `/hooks` in Codex and trust the plugin-bundled hooks if prompted. `codex exec "Do not modify files or run commands. Reply exactly: OK"` should return `OK` without hook trust or plugin manifest errors. Depending on Codex UI/CLI mode, hook completion may appear in `/hooks` or persisted hook trust state rather than in `codex exec` stdout.

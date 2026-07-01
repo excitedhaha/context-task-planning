@@ -93,10 +93,12 @@ coco plugin install --type=github excitedhaha/context-task-planning --name conte
 
 **Codex:**
 ```bash
-git clone https://github.com/excitedhaha/context-task-planning.git
-cd context-task-planning
-sh skill/scripts/install-codex-plugin.sh
+codex plugin marketplace add excitedhaha/context-task-planning
 ```
+
+Then open the Codex app plugin browser, or run `codex` and open `/plugins`, and install or enable `context-task-planning`.
+
+For local checkout development, use `sh skill/scripts/install-codex-plugin.sh` as a fallback wrapper.
 
 ### 2. Start one real task
 

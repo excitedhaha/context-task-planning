@@ -4,7 +4,15 @@ This page only covers Codex-specific setup and behavior. Use `README.md` for the
 
 ## Install
 
-Recommended plugin install from a checkout (skills + hooks bundled):
+Recommended plugin install (skills + hooks bundled):
+
+```bash
+codex plugin marketplace add excitedhaha/context-task-planning
+```
+
+The repository is a Codex marketplace root: `.agents/plugins/marketplace.json` points Codex at the repository root plugin declared by `.codex-plugin/plugin.json`. The Codex plugin entry point is to add the marketplace, then install or enable the plugin from the Codex app plugin browser or by running `codex` and opening CLI `/plugins`.
+
+Local checkout fallback:
 
 ```bash
 git clone https://github.com/excitedhaha/context-task-planning.git
@@ -12,7 +20,7 @@ cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
-The script creates a stable local Codex marketplace wrapper under `~/.codex/context-task-planning-marketplace` and installs `context-task-planning@context-task-planning-local`. Current Codex marketplace descriptors expect plugins under `./plugins/<name>`, so a bare repository root is not enough for `codex plugin add`.
+The fallback script creates a stable local Codex marketplace wrapper under `~/.codex/context-task-planning-marketplace` and registers `context-task-planning@context-task-planning-local`. Some Codex builds still expose a non-interactive plugin install command, and the script uses it when available. Current Codex builds may only expose marketplace management in the CLI; after the script finishes, open `/plugins` in Codex or the Codex app plugin browser, then install or enable `context-task-planning@context-task-planning-local`.
 
 Alternative skill-only install:
 
@@ -76,13 +84,13 @@ The plugin bundles hooks that enable:
 
 The injected task context can also include a shared context-prune hint when `progress.md` is large enough to summarize and prune manually.
 
-Codex hooks require a Codex build that lists `hooks` in `codex features list`. The older `codex_hooks` feature key is deprecated.
+Codex hooks use the canonical `hooks` configuration surface. Some Codex builds still list the deprecated `codex_hooks` feature key in `codex features list`; either `hooks` or `codex_hooks` indicates hook support.
 
 Quick verification after plugin install:
 
 ```bash
 codex --version
-codex features list | grep hooks
+codex features list | grep -E '^(hooks|codex_hooks|plugins)\b'
 codex exec "Do not modify files or run commands. Reply exactly: OK"
 ```
 
