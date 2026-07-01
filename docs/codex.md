@@ -4,7 +4,17 @@ This page only covers Codex-specific setup and behavior. Use `README.md` for the
 
 ## Install
 
-Recommended local plugin install from this repository checkout (skills + hooks bundled):
+Recommended plugin install (skills + hooks bundled):
+
+```bash
+codex plugin marketplace add excitedhaha/context-task-planning
+codex
+# Then open /plugins and install or enable context-task-planning.
+```
+
+The repository is a Codex marketplace root: `.agents/plugins/marketplace.json` points Codex at the repository root plugin declared by `.codex-plugin/plugin.json`. The Codex plugin entry point is to add the marketplace, then install or enable the plugin from the Codex app plugin browser or CLI `/plugins`.
+
+Local checkout fallback:
 
 ```bash
 git clone https://github.com/excitedhaha/context-task-planning.git
@@ -12,11 +22,7 @@ cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
-This is the project-local install path, not the general Codex marketplace install command. The official plugin entry point is to add an available marketplace, then install or enable the plugin from the Codex app plugin browser or CLI `/plugins`.
-
-The script creates a stable local Codex marketplace wrapper under `~/.codex/context-task-planning-marketplace` and registers `context-task-planning@context-task-planning-local`. Current Codex marketplace descriptors expect plugins under `./plugins/<name>`, so this bare repository root is not enough for direct marketplace registration.
-
-Some Codex builds still expose a non-interactive plugin install command, and the script uses it when available. Current Codex builds may only expose marketplace management in the CLI; after the script finishes, open `/plugins` in Codex or the Codex app plugin browser, then install or enable `context-task-planning@context-task-planning-local`.
+The fallback script creates a stable local Codex marketplace wrapper under `~/.codex/context-task-planning-marketplace` and registers `context-task-planning@context-task-planning-local`. Some Codex builds still expose a non-interactive plugin install command, and the script uses it when available. Current Codex builds may only expose marketplace management in the CLI; after the script finishes, open `/plugins` in Codex or the Codex app plugin browser, then install or enable `context-task-planning@context-task-planning-local`.
 
 Alternative skill-only install:
 

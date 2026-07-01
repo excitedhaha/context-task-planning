@@ -15,13 +15,18 @@ echo "1. Checking .codex-plugin/plugin.json..."
 python3 -m json.tool "$REPO_ROOT/.codex-plugin/plugin.json" > /dev/null
 echo "   ✓ Valid JSON"
 
-# 2. Validate hooks.json
-echo "2. Checking skill/codex-hooks/hooks.json..."
+# 2. Validate marketplace.json
+echo "2. Checking .agents/plugins/marketplace.json..."
+python3 -m json.tool "$REPO_ROOT/.agents/plugins/marketplace.json" > /dev/null
+echo "   ✓ Valid JSON"
+
+# 3. Validate hooks.json
+echo "3. Checking skill/codex-hooks/hooks.json..."
 python3 -m json.tool "$REPO_ROOT/skill/codex-hooks/hooks.json" > /dev/null
 echo "   ✓ Valid JSON"
 
-# 3. Check skill path exists
-echo "3. Checking skill path..."
+# 4. Check skill path exists
+echo "4. Checking skill path..."
 python3 - "$REPO_ROOT" <<'PY'
 import json
 from pathlib import Path
@@ -55,8 +60,8 @@ for skill_name in (
 print("   ✓ Skill path and entry skills exist")
 PY
 
-# 4. Check hook scripts exist
-echo "4. Checking hook scripts..."
+# 5. Check hook scripts exist
+echo "5. Checking hook scripts..."
 for script in session_start.py user_prompt_submit.py subagent_start.py post_tool_use.py stop.py; do
     path="$REPO_ROOT/skill/codex-hooks/scripts/$script"
     if [ ! -f "$path" ]; then
@@ -66,13 +71,53 @@ for script in session_start.py user_prompt_submit.py subagent_start.py post_tool
 done
 echo "   ✓ All hook scripts exist"
 
-# 5. Check version consistency
-echo "5. Checking version consistency..."
+# 6. Check version consistency
+echo "6. Checking version consistency..."
 sh "$SCRIPT_DIR/check-version.sh"
 echo "   ✓ Versions consistent"
 
-# 6. Check hooks config structure
-echo "6. Checking hooks configuration..."
+# 7. Check marketplace structure
+echo "7. Checking marketplace configuration..."
+python3 - "$REPO_ROOT" <<'PY'
+import json
+from pathlib import Path
+
+root = Path(sys.argv[1]) if (sys := __import__('sys')).argv[1:] else Path(".")
+
+with (root / ".agents" / "plugins" / "marketplace.json").open() as f:
+    marketplace = json.load(f)
+
+if marketplace.get("name") != "context-task-planning":
+    raise SystemExit("Codex marketplace name must be context-task-planning")
+
+interface = marketplace.get("interface") or {}
+if interface.get("displayName") != "Context Task Planning":
+    raise SystemExit("Codex marketplace interface.displayName must be Context Task Planning")
+
+plugins = marketplace.get("plugins")
+if not isinstance(plugins, list) or len(plugins) != 1:
+    raise SystemExit("Codex marketplace must declare exactly one plugin")
+
+entry = plugins[0]
+if entry.get("name") != "context-task-planning":
+    raise SystemExit("Codex marketplace plugin name must be context-task-planning")
+
+source = entry.get("source") or {}
+if source.get("source") != "local" or source.get("path") != "./":
+    raise SystemExit('Codex marketplace plugin source must be {"source": "local", "path": "./"}')
+
+policy = entry.get("policy") or {}
+if policy.get("installation") != "AVAILABLE" or policy.get("authentication") != "ON_INSTALL":
+    raise SystemExit("Codex marketplace plugin policy must be AVAILABLE / ON_INSTALL")
+
+if entry.get("category") != "Productivity":
+    raise SystemExit("Codex marketplace plugin category must be Productivity")
+
+print("   ✓ Marketplace configured")
+PY
+
+# 8. Check hooks config structure
+echo "8. Checking hooks configuration..."
 python3 - "$REPO_ROOT" <<'PY'
 import json
 from pathlib import Path
