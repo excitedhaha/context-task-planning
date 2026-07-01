@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
 - Clarified Codex plugin installation docs for the latest marketplace-plus-`/plugins` flow and the `hooks` / `codex_hooks` feature-key transition.
 - Clarified that `install-codex-plugin.sh` is the project-local Codex install wrapper, not the general Codex marketplace install command.
 - Added Codex marketplace root metadata so `codex plugin marketplace add excitedhaha/context-task-planning` can be the primary install path, with `/plugins` used to install or enable the plugin.
+- Clarified that Codex plugins can be enabled from the Codex app plugin browser or the CLI `/plugins` surface after marketplace registration.
 
 ## [0.8.7] - 2026-06-16
 

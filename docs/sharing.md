@@ -46,13 +46,13 @@ npx skills add excitedhaha/context-task-planning -g
 opencode plugin context-task-planning-opencode --global
 ```
 
-For Codex, add the marketplace and enable the plugin from `/plugins`:
+For Codex, add the marketplace and enable the plugin from the Codex app plugin browser or CLI `/plugins`:
 
 ```bash
 codex plugin marketplace add excitedhaha/context-task-planning
-codex
-# Then open /plugins and install or enable context-task-planning.
 ```
+
+Then open the Codex app plugin browser, or run `codex` and open `/plugins`, and install or enable `context-task-planning`.
 
 For standalone skill-only fallback installs:
 
@@ -76,9 +76,9 @@ Notes:
 
    ```bash
    codex plugin marketplace add excitedhaha/context-task-planning
-   codex
-   # Then open /plugins and install or enable context-task-planning.
    ```
+
+   Then open the Codex app plugin browser, or run `codex` and open `/plugins`, and install or enable `context-task-planning`.
 
    For local checkout development, `sh skill/scripts/install-codex-plugin.sh` remains a fallback wrapper.
 

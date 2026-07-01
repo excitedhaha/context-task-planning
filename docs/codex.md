@@ -8,11 +8,9 @@ Recommended plugin install (skills + hooks bundled):
 
 ```bash
 codex plugin marketplace add excitedhaha/context-task-planning
-codex
-# Then open /plugins and install or enable context-task-planning.
 ```
 
-The repository is a Codex marketplace root: `.agents/plugins/marketplace.json` points Codex at the repository root plugin declared by `.codex-plugin/plugin.json`. The Codex plugin entry point is to add the marketplace, then install or enable the plugin from the Codex app plugin browser or CLI `/plugins`.
+The repository is a Codex marketplace root: `.agents/plugins/marketplace.json` points Codex at the repository root plugin declared by `.codex-plugin/plugin.json`. The Codex plugin entry point is to add the marketplace, then install or enable the plugin from the Codex app plugin browser or by running `codex` and opening CLI `/plugins`.
 
 Local checkout fallback:
 
