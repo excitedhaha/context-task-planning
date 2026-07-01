@@ -91,14 +91,14 @@ opencode plugin context-task-planning-opencode --global
 coco plugin install --type=github excitedhaha/context-task-planning --name context-task-planning
 ```
 
-**Codex:**
+**Codex (local install from this repository):**
 ```bash
 git clone https://github.com/excitedhaha/context-task-planning.git
 cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
-If your Codex CLI only registers the local marketplace, open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
+This is not the general Codex marketplace install command. The official plugin entry point is to add an available marketplace, then install or enable the plugin from the Codex app plugin browser or CLI `/plugins`. This repository root is not currently a Codex marketplace root, so the script creates a local marketplace wrapper; if your Codex CLI only registers that marketplace, open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
 
 ### 2. Start one real task
 

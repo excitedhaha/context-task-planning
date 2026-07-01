@@ -11,6 +11,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 - Clarified Codex plugin installation docs for the latest marketplace-plus-`/plugins` flow and the `hooks` / `codex_hooks` feature-key transition.
+- Clarified that `install-codex-plugin.sh` is the project-local Codex install wrapper, not the general Codex marketplace install command.
 
 ## [0.8.7] - 2026-06-16
 

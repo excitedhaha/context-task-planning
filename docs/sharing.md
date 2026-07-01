@@ -46,7 +46,7 @@ npx skills add excitedhaha/context-task-planning -g
 opencode plugin context-task-planning-opencode --global
 ```
 
-For Codex, prefer the bundled plugin install:
+For Codex, use the bundled local plugin installer from this repository checkout:
 
 ```bash
 git clone https://github.com/excitedhaha/context-task-planning.git
@@ -80,7 +80,7 @@ Notes:
    sh skill/scripts/install-codex-plugin.sh
    ```
 
-   If their Codex CLI only registers the local marketplace, have them open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
+   This is not the general Codex marketplace install command. The official plugin entry point is to add an available marketplace, then install or enable the plugin from the Codex app plugin browser or CLI `/plugins`. If their Codex CLI only registers the local marketplace, have them open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
 
 6. If they use TraeCLI/Coco, restart the CLI after plugin installation and verify the command surface with `coco plugin validate context-task-planning` or `/plugin list`.
 7. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
