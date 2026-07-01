@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-06-30
+
+### Fixed
+- Updated the Codex plugin installer to tolerate current Codex CLI builds that expose marketplace management but no non-interactive plugin install command.
+
+### Changed
+- Clarified Codex plugin installation docs for the latest marketplace-plus-`/plugins` flow and the `hooks` / `codex_hooks` feature-key transition.
+
 ## [0.8.7] - 2026-06-16
 
 ### Fixed

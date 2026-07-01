@@ -58,9 +58,25 @@ EOF
 # Re-point repeat installs to this stable wrapper if an older local wrapper used the same name.
 "$CODEX_BIN" plugin marketplace remove "$MARKETPLACE_NAME" >/dev/null 2>&1 || true
 "$CODEX_BIN" plugin marketplace add "$MARKETPLACE_DIR"
-"$CODEX_BIN" plugin add "$PLUGIN_NAME@$MARKETPLACE_NAME"
+
+INSTALL_COMMAND=""
+if "$CODEX_BIN" plugin add --help >/dev/null 2>&1; then
+    INSTALL_COMMAND="add"
+elif "$CODEX_BIN" plugin install --help >/dev/null 2>&1; then
+    INSTALL_COMMAND="install"
+fi
+
+if [ -n "$INSTALL_COMMAND" ]; then
+    "$CODEX_BIN" plugin "$INSTALL_COMMAND" "$PLUGIN_NAME@$MARKETPLACE_NAME"
+fi
 
 echo ""
-echo "Codex plugin install complete."
+if [ -n "$INSTALL_COMMAND" ]; then
+    echo "Codex plugin install complete."
+else
+    echo "Codex marketplace registration complete."
+    echo "Open /plugins in Codex or the Codex app plugin browser, then install or enable:"
+    echo "  $PLUGIN_NAME@$MARKETPLACE_NAME"
+fi
 echo "Marketplace: $MARKETPLACE_DIR"
 echo "Plugin: $PLUGIN_NAME@$MARKETPLACE_NAME"

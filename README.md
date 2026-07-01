@@ -98,6 +98,8 @@ cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
+If your Codex CLI only registers the local marketplace, open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
+
 ### 2. Start one real task
 
 Just talk normally. The agent will propose a task title/slug and start tracking it under `.planning/<slug>/`.

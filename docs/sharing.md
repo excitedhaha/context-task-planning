@@ -80,6 +80,8 @@ Notes:
    sh skill/scripts/install-codex-plugin.sh
    ```
 
+   If their Codex CLI only registers the local marketplace, have them open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
+
 6. If they use TraeCLI/Coco, restart the CLI after plugin installation and verify the command surface with `coco plugin validate context-task-planning` or `/plugin list`.
 7. If they already use `planning-with-files`, disable its hooks or old skill link first to avoid duplicate planning prompts.
 

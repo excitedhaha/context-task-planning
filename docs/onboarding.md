@@ -56,6 +56,8 @@ cd context-task-planning
 sh skill/scripts/install-codex-plugin.sh
 ```
 
+If your Codex CLI only registers the local marketplace, open `/plugins` in Codex or the Codex app plugin browser and enable `context-task-planning@context-task-planning-local`.
+
 For standalone skill-only fallback installs:
 
 ```bash
